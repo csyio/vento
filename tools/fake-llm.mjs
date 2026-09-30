@@ -60,6 +60,18 @@ const srv = http.createServer((req, res) => {
     res.writeHead(401, { "Content-Type": "text/html; charset=utf-8", "WWW-Authenticate": 'Basic realm="Test Alani"' });
     return res.end('<!doctype html><meta charset="utf-8"><title>Yetkisiz</title><p>giris gerekli</p>');
   }
+  // Dosya seçici testi: tek / çoklu / accept'li / klasör girdileri; seçilen dosyaların adı+içeriği başlığa yazılır
+  if (req.method === "GET" && req.url.startsWith("/dosya.html")) {
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    return res.end(`<!doctype html><meta charset="utf-8"><title>hazir</title>
+      <input id="tek" type="file"><input id="cok" type="file" multiple>
+      <input id="acc" type="file" accept=".txt,image/png"><input id="dir" type="file" webkitdirectory>
+      <script>
+        const yaz = async inp => { const p = []; for (const f of inp.files) p.push(f.name + "=" + (await f.text())); document.title = "dosya:" + inp.id + ":" + p.join("|"); };
+        for (const id of ["tek", "cok", "acc"]) document.getElementById(id).addEventListener("change", e => yaz(e.target));
+        document.getElementById("dir").addEventListener("change", e => { document.title = "dosya:dir:" + e.target.files.length; });
+      </script>`);
+  }
   if (req.method === "GET" && req.url.startsWith("/yavas.bin")) {
     // İptal testi: 5 MB'ı ağır ağır yollar (bitmesi ~30 sn sürer)
     res.writeHead(200, { "Content-Type": "application/octet-stream", "Content-Length": 5 * 1024 * 1024 });

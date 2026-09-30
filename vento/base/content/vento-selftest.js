@@ -773,6 +773,113 @@
       tabs.close(tab);
     }
 
+    // ===================== Dosya seçici (<input type=file>) =====================
+    // Yerel macOS paneli başsız testte tıklanamaz → kayıtlı sahte seçici. Ölçülen: sayfa seçiciyi gerçekten çağırıyor mu,
+    // mod/filtre doğru mu, seçilen dosya sayfaya ulaşıyor mu, İptal'de sayfa değişmiyor mu.
+    {
+      const llm = Services.env.get("VENTO_ESIN_ENDPOINT").replace(/\/v1$/, "");
+      const tab = tabs.open("about:blank");
+      const load = u => tab.browser.fixupAndLoadURIString(u, { triggeringPrincipal: Vento.SYSTEM_PRINCIPAL });
+      const inPage = (body, ms = 8000) => new Promise(resolve => {
+        const id = "vento:dosya:" + Math.random();
+        const mm = tab.browser.messageManager;
+        mm.addMessageListener(id, m => resolve(m.data), { once: true });
+        mm.loadFrameScript("data:,(" + encodeURIComponent(`function(){ Promise.resolve().then(() => (${body})()).then(r => sendAsyncMessage(${JSON.stringify(id)}, r), e => sendAsyncMessage(${JSON.stringify(id)}, "HATA " + e)); }`) + ")()", false);
+        setTimeout(() => resolve("ZAMAN ASIMI"), ms);
+      });
+      // Gerçek kullanıcı etkinleştirmesiyle (aksi hâlde sayfa seçici açamaz) girdiye tıklar
+      const tikla = id => inPage(`() => { content.document.notifyUserGestureActivation(); content.document.getElementById("${id}").click(); return true; }`);
+      const tmp = name => PathUtils.join(PathUtils.tempDir, name);
+      const nsFile = path => { const f = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsIFile); f.initWithPath(path); return f; };
+      await IOUtils.writeUTF8(tmp("vento-test-a.txt"), "merhaba");
+      await IOUtils.writeUTF8(tmp("vento-test-b.txt"), "dunya");
+
+      // Gerçek (yerel) seçici bileşeni var ve penceremizle başlatılabiliyor
+      {
+        let ok = false, err = "";
+        try {
+          const fp = Cc["@mozilla.org/filepicker;1"].createInstance(Ci.nsIFilePicker);
+          fp.init(window.browsingContext, "Dosya sec", Ci.nsIFilePicker.modeOpen);
+          ok = true;
+        } catch (e) { err = String(e); }
+        check("yerel dosya seçici bileşeni var ve pencereyle başlatılıyor", ok, err);
+      }
+
+      // -- sahte seçici
+      const registrar = Components.manager.QueryInterface(Ci.nsIComponentRegistrar);
+      const CONTRACT = "@mozilla.org/filepicker;1";
+      const oldCID = registrar.contractIDToCID(CONTRACT);
+      const newCID = Services.uuid.generateUUID();
+      const mock = { calls: [], files: [], result: Ci.nsIFilePicker.returnOK };
+      class Picker {
+        QueryInterface = ChromeUtils.generateQI(["nsIFilePicker"]);
+        defaultString = ""; defaultExtension = ""; filterIndex = 0; displayDirectory = null; displaySpecialDirectory = "";
+        okButtonLabel = ""; addToRecentDocs = false;
+        init(bc, title, mode) { this.rec = { title, mode, filters: [], masks: 0, hasBC: !!bc }; mock.calls.push(this.rec); this.mode = mode; }
+        appendFilter(title, filter) { this.rec.filters.push(filter); }
+        appendFilters(mask) { this.rec.masks |= mask; }
+        get file() { return mock.files[0] ?? null; }
+        get fileURL() { return mock.files[0] ? Services.io.newFileURI(mock.files[0]) : null; }
+        get files() { return mock.files[Symbol.iterator](); }
+        get domFileOrDirectory() { return null; }
+        get domFileOrDirectoryEnumerator() { return [][Symbol.iterator](); }
+        get domFilesInWebKitDirectory() { return [][Symbol.iterator](); }
+        open(cb) { Services.tm.dispatchToMainThread(() => cb.done(mock.result)); }
+      }
+      const factory = { createInstance: iid => new Picker().QueryInterface(iid), QueryInterface: ChromeUtils.generateQI(["nsIFactory"]) };
+      registrar.registerFactory(newCID, "VentoTestFilePicker", CONTRACT, factory);
+      try {
+        load(`${llm}/dosya.html`);
+        await wait(() => tab.title === "hazir", 15000);
+
+        // tek dosya
+        mock.files = [nsFile(tmp("vento-test-a.txt"))];
+        await tikla("tek");
+        check("tek dosya: sayfa seçiciyi çağırdı (Aç modu, başlık var, pencere bağlı)", await wait(() => mock.calls.length === 1, 10000) && mock.calls[0].mode === Ci.nsIFilePicker.modeOpen && mock.calls[0].hasBC && mock.calls[0].title !== "", JSON.stringify(mock.calls[0]));
+        check("tek dosya: ad ve İÇERİK sayfaya ulaştı", await wait(() => tab.title === "dosya:tek:vento-test-a.txt=merhaba", 10000), `"${tab.title}"`);
+
+        // İptal: sayfa değişmemeli
+        mock.result = Ci.nsIFilePicker.returnCancel;
+        mock.files = [];
+        load(`${llm}/dosya.html?iptal`);
+        await wait(() => tab.title === "hazir" && tab.url.endsWith("?iptal"), 15000);
+        const n0 = mock.calls.length;
+        await tikla("tek");
+        await wait(() => mock.calls.length === n0 + 1, 10000);
+        await new Promise(r => setTimeout(r, 800));
+        const secim = await inPage(`() => content.document.getElementById("tek").files.length`);
+        check("İptal: seçici açıldı ama sayfada dosya seçilmedi, başlık değişmedi", secim === 0 && tab.title === "hazir", `dosya=${secim} başlık="${tab.title}"`);
+
+        // çoklu
+        mock.result = Ci.nsIFilePicker.returnOK;
+        mock.files = [nsFile(tmp("vento-test-a.txt")), nsFile(tmp("vento-test-b.txt"))];
+        const n1 = mock.calls.length;
+        await tikla("cok");
+        check("çoklu: Aç-çoklu modu istendi", await wait(() => mock.calls.length === n1 + 1, 10000) && mock.calls.at(-1).mode === Ci.nsIFilePicker.modeOpenMultiple, String(mock.calls.at(-1)?.mode));
+        check("çoklu: iki dosya da sayfaya ulaştı", await wait(() => tab.title === "dosya:cok:vento-test-a.txt=merhaba|vento-test-b.txt=dunya", 10000), `"${tab.title}"`);
+
+        // accept="…": filtre seçiciye iletilir
+        mock.files = [nsFile(tmp("vento-test-a.txt"))];
+        const n2 = mock.calls.length;
+        await tikla("acc");
+        await wait(() => mock.calls.length === n2 + 1, 10000);
+        const rec = mock.calls.at(-1);
+        check("accept='.txt,image/png': filtre seçiciye iletildi", rec.filters.some(f => /\*\.txt/.test(f)) || rec.masks !== 0, JSON.stringify(rec));
+
+        // klasör seçimi
+        const n3 = mock.calls.length;
+        mock.files = [nsFile(PathUtils.tempDir)];
+        await tikla("dir");
+        check("webkitdirectory: klasör seçme modu istendi", await wait(() => mock.calls.length === n3 + 1, 10000) && mock.calls.at(-1).mode === Ci.nsIFilePicker.modeGetFolder, String(mock.calls.at(-1)?.mode));
+      } finally {
+        registrar.unregisterFactory(newCID, factory);
+        if (oldCID) { registrar.registerFactory(oldCID, "", CONTRACT, null); }
+      }
+      await IOUtils.remove(tmp("vento-test-a.txt"), { ignoreAbsent: true });
+      await IOUtils.remove(tmp("vento-test-b.txt"), { ignoreAbsent: true });
+      tabs.close(tab);
+    }
+
     // ===================== Sekme simgeleri (favicon) =====================
     {
       const llm = Services.env.get("VENTO_ESIN_ENDPOINT").replace(/\/v1$/, "");
