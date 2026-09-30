@@ -72,6 +72,13 @@ const srv = http.createServer((req, res) => {
         document.getElementById("dir").addEventListener("change", e => { document.title = "dosya:dir:" + e.target.files.length; });
       </script>`);
   }
+  // Yazdırma testi: ?pencere → sayfa kendi window.print()'ini çağırır
+  if (req.method === "GET" && req.url.startsWith("/yazdir.html")) {
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    return res.end(`<!doctype html><meta charset="utf-8"><title>Yazdirma sayfasi</title>
+      <h1>Yazdirilacak baslik</h1><p>Turkce karakterler: ığüşöç ĞÜŞİÖÇ. ${"Uzun paragraf. ".repeat(80)}</p>
+      <script>if (location.search === "?pencere") setTimeout(() => window.print(), 300);</script>`);
+  }
   if (req.method === "GET" && req.url.startsWith("/yavas.bin")) {
     // İptal testi: 5 MB'ı ağır ağır yollar (bitmesi ~30 sn sürer)
     res.writeHead(200, { "Content-Type": "application/octet-stream", "Content-Length": 5 * 1024 * 1024 });

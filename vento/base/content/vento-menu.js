@@ -94,6 +94,7 @@ Vento.contextMenu = (() => {
       add("Yenile", () => t.reload());
       sep();
       add("Sayfa Adresini Kopyala", () => copy(data.pageUrl));
+      add("Yazdır…", () => Vento.print());
       add("Sayfayı Esin ile Özetle", () => Vento.esin.ask("Bu sayfayı kısaca özetle."));
       add("Sayfa Kaynağını Göster", () => t.open(`view-source:${data.pageUrl}`, { afterCurrent: true }));
     }

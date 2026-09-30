@@ -880,6 +880,62 @@
       tabs.close(tab);
     }
 
+    // ===================== Yazdırma =====================
+    // Yerel macOS paneli başsız testte tıklanamaz → "PDF'e kaydet" sanal yazıcısı + sessiz kip: gerçek bir PDF üretilip üretilmediği ölçülür.
+    {
+      const llm = Services.env.get("VENTO_ESIN_ENDPOINT").replace(/\/v1$/, "");
+      const tab = tabs.open("about:blank");
+      const load = u => tab.browser.fixupAndLoadURIString(u, { triggeringPrincipal: Vento.SYSTEM_PRINCIPAL });
+      const pdf = name => PathUtils.join(PathUtils.tempDir, name);
+      const PRINTER = "Mozilla Save to PDF";
+      const pk = "print.printer_Mozilla_Save_to_PDF.";
+      const setOut = path => {
+        Services.prefs.setStringPref("print_printer", PRINTER);
+        Services.prefs.setBoolPref(pk + "print_to_file", true);
+        Services.prefs.setStringPref(pk + "print_to_filename", path);
+      };
+      const isPDF = async path => {
+        try {
+          const bytes = await IOUtils.read(path, { maxBytes: 5 });
+          return new TextDecoder().decode(bytes) === "%PDF-" && (await IOUtils.stat(path)).size > 1000;
+        } catch (e) { return false; }
+      };
+      const browsersBefore = document.querySelectorAll("browser").length;
+
+      check("yazdırma katmanı yüklenebiliyor (PrintUtils) ve sistem paneli tercih edilmiş", typeof Vento.loadPrintUtils()?.startPrintWindow === "function" && Services.prefs.getBoolPref("print.prefer_system_dialog") === true);
+      const key = document.getElementById("key_print");
+      check("⌘P kısayolu ve Dosya ▸ Yazdır… menüsü bağlı", key?.getAttribute("key") === "p" && key.getAttribute("modifiers") === "accel" && document.getElementById("menu_print")?.getAttribute("command") === "cmd_print");
+      check("boş sekmede yazdırma başlamaz (false)", Vento.print(tab) === false);
+
+      Services.prefs.setBoolPref("print.always_print_silent", true);
+      try {
+        // ⌘P yolu
+        load(`${llm}/yazdir.html`);
+        await wait(() => tab.title === "Yazdirma sayfasi" && !tab.loading, 15000);
+        await IOUtils.remove(pdf("vento-yazdir-a.pdf"), { ignoreAbsent: true });
+        setOut(pdf("vento-yazdir-a.pdf"));
+        check("⌘P: yazdırma başladı (true)", Vento.print() === true);
+        check("⌘P: gerçek bir PDF üretildi (%PDF-, >1 KB)", await wait(() => isPDF(pdf("vento-yazdir-a.pdf")), 20000), String((await IOUtils.exists(pdf("vento-yazdir-a.pdf"))) && (await IOUtils.stat(pdf("vento-yazdir-a.pdf"))).size));
+
+        // window.print(): sayfanın kendisi çağırır
+        await IOUtils.remove(pdf("vento-yazdir-b.pdf"), { ignoreAbsent: true });
+        setOut(pdf("vento-yazdir-b.pdf"));
+        load(`${llm}/yazdir.html?pencere`);
+        check("window.print(): gerçek bir PDF üretildi", await wait(() => isPDF(pdf("vento-yazdir-b.pdf")), 25000), String(await IOUtils.exists(pdf("vento-yazdir-b.pdf"))));
+        await new Promise(r => setTimeout(r, 1500));
+        check("yazdırma sonrası sayfa hâlâ yüklü ve sekme sayısı aynı", tab.title === "Yazdirma sayfasi" && tabs.all.includes(tab), `"${tab.title}"`);
+        check("yazdırma için açılan geçici tarayıcılar temizlendi", document.querySelectorAll("browser").length <= browsersBefore + 0, `${document.querySelectorAll("browser").length} / önce ${browsersBefore}`);
+      } finally {
+        Services.prefs.clearUserPref("print.always_print_silent");
+        Services.prefs.clearUserPref("print_printer");
+        Services.prefs.clearUserPref(pk + "print_to_file");
+        Services.prefs.clearUserPref(pk + "print_to_filename");
+        await IOUtils.remove(pdf("vento-yazdir-a.pdf"), { ignoreAbsent: true });
+        await IOUtils.remove(pdf("vento-yazdir-b.pdf"), { ignoreAbsent: true });
+      }
+      tabs.close(tab);
+    }
+
     // ===================== Sekme simgeleri (favicon) =====================
     {
       const llm = Services.env.get("VENTO_ESIN_ENDPOINT").replace(/\/v1$/, "");

@@ -14,6 +14,7 @@
 
     on("cmd_newTab", () => t.open("about:blank", { afterCurrent: true }));
     on("cmd_closeTab", () => t.close(t.selected));
+    on("cmd_print", () => Vento.print());
     on("cmd_focusBar", () => Vento.ui.focusBar());
     on("cmd_reload", () => t.reload());
     on("cmd_stop", () => t.stop());
@@ -35,14 +36,48 @@
 
   // ---- window.open / target=_blank -----------------------------------------------------
 
+  /**
+   * Firefox'un yazdırma katmanı (toolkit/components/printing): ilk kullanımda yüklenir. Betik, browser.xhtml'in sağladığı
+   * `XPCOMUtils` genel değişkenini varsayar; bizde yok → önce tanımlanır.
+   */
+  function loadPrintUtils() {
+    if (!window.PrintUtils) {
+      window.XPCOMUtils ??= ChromeUtils.importESModule("resource://gre/modules/XPCOMUtils.sys.mjs").XPCOMUtils;
+      Services.scriptloader.loadSubScript("chrome://global/content/printUtils.js", window);
+    }
+    return window.PrintUtils;
+  }
+  Vento.loadPrintUtils = loadPrintUtils;
+
+  /** window.print(): içerik süreci belgenin statik kopyası için bir tarayıcı ister (yazdırma katmanı kurar). */
+  function printBrowser(openWindowInfo) {
+    try {
+      return loadPrintUtils().handleStaticCloneCreatedForPrint(openWindowInfo);
+    } catch (e) {
+      Vento.trace(`yazdırma tarayıcısı kurulamadı: ${e}`);
+      return null;
+    }
+  }
+
+  /** Seçili sekmeyi yazdırır (yerel macOS paneli). Boş/yazdırılamaz sekmede hiçbir şey yapmaz. */
+  Vento.print = (tab = Vento.tabs.selected) => {
+    if (!tab || tab.blank || tab.pending) {
+      return false;
+    }
+    try {
+      loadPrintUtils().startPrintWindow(tab.browser.browsingContext);
+      return true;
+    } catch (e) {
+      Vento.trace(`yazdırma başlatılamadı: ${e}`);
+      return false;
+    }
+  };
+
   /** nsIBrowserDOMWindow: içerik yeni pencere/sekme isterse buraya gelir. */
   function makeBrowserAccess() {
     const openTab = (where, openWindowInfo) => {
       if (where === BDW.OPEN_CURRENTWINDOW && !openWindowInfo && Vento.tabs.selected) {
         return Vento.tabs.selected;
-      }
-      if (where === BDW.OPEN_PRINT_BROWSER) {
-        return null;
       }
       return Vento.tabs.open("about:blank", {
         openWindowInfo,
@@ -55,10 +90,16 @@
       QueryInterface: ChromeUtils.generateQI(["nsIBrowserDOMWindow"]),
 
       createContentWindow(uri, openWindowInfo, where) {
+        if (where === BDW.OPEN_PRINT_BROWSER) {
+          return printBrowser(openWindowInfo)?.browsingContext ?? null;
+        }
         return openTab(where, openWindowInfo)?.browser.browsingContext ?? null;
       },
 
       openURI(uri, openWindowInfo, where, flags, triggeringPrincipal) {
+        if (where === BDW.OPEN_PRINT_BROWSER) {
+          return printBrowser(openWindowInfo)?.browsingContext ?? null;
+        }
         const tab = openTab(where, openWindowInfo);
         if (!tab) {
           return null;
@@ -71,10 +112,18 @@
         return tab.browser.browsingContext;
       },
 
-      createContentWindowInFrame() {
+      // Yazdırma statik kopyası (window.print / sessiz yazdırma) buradan ister ve tarayıcı ÖĞESİNİ bekler.
+      // Başka her şey (sekme içi sekme) desteklenmez.
+      createContentWindowInFrame(uri, params, where) {
+        if (where === BDW.OPEN_PRINT_BROWSER) {
+          return printBrowser(params.openWindowInfo);
+        }
         throw Components.Exception("desteklenmiyor", Cr.NS_ERROR_NOT_IMPLEMENTED);
       },
-      openURIInFrame() {
+      openURIInFrame(uri, params, where) {
+        if (where === BDW.OPEN_PRINT_BROWSER) {
+          return printBrowser(params.openWindowInfo);
+        }
         throw Components.Exception("desteklenmiyor", Cr.NS_ERROR_NOT_IMPLEMENTED);
       },
       isTabContentWindow(win) {

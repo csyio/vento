@@ -30,6 +30,7 @@
   <xul:commandset id="vento-commands">
     <xul:command id="cmd_newTab"/>
     <xul:command id="cmd_closeTab"/>
+    <xul:command id="cmd_print"/>
     <xul:command id="cmd_focusBar"/>
     <xul:command id="cmd_reload"/>
     <xul:command id="cmd_stop"/>
@@ -53,6 +54,7 @@
   <xul:keyset id="vento-keys">
     <xul:key id="key_newTab" key="t" modifiers="accel" command="cmd_newTab"/>
     <xul:key id="key_closeTab" key="w" modifiers="accel" command="cmd_closeTab"/>
+    <xul:key id="key_print" key="p" modifiers="accel" command="cmd_print"/>
     <xul:key id="key_focusBar" key="l" modifiers="accel" command="cmd_focusBar"/>
     <xul:key id="key_focusBar2" key="k" modifiers="accel" command="cmd_focusBar"/>
     <xul:key id="key_reload" key="r" modifiers="accel" command="cmd_reload"/>
@@ -88,6 +90,8 @@
             <xul:menupopup id="menu_FilePopup">
               <xul:menuitem id="menu_newTab" label="Yeni Sekme" command="cmd_newTab" key="key_newTab"/>
               <xul:menuitem id="menu_closeTab" label="Sekmeyi Kapat" command="cmd_closeTab" key="key_closeTab"/>
+              <xul:menuseparator/>
+              <xul:menuitem id="menu_print" label="Yazdır…" command="cmd_print" key="key_print"/>
               <xul:menuseparator/>
               <xul:menuitem id="menu_FileQuitItem" label="Vento'dan Çık" command="cmd_quit" key="key_quit"/>
             </xul:menupopup>

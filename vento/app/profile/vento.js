@@ -34,3 +34,7 @@ pref("security.certerrors.mitm.priming.enabled", false);
 // "Daha fazla bilgi" bağlantıları (Gecko'nun kendi yardım makaleleri — Mozilla'nın yardım sitesi)
 pref("app.support.baseURL", "https://support.mozilla.org/1/firefox/%VERSION%/%OS%/%LOCALE%/");
 
+// Yazdırma: macOS'un yerel yazdırma paneli (PDF olarak kaydet dahil). Firefox'un sekme-içi önizlemesi
+// browser/'daki TabDialogBox'a bağlı olduğu için kullanılmaz.
+pref("print.prefer_system_dialog", true);
+
