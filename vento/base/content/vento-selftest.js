@@ -440,6 +440,90 @@
       check("liste boşalınca düğme ve panel gizlendi", await wait(() => $("nav-downloads").hidden && $("downloads-panel").hidden));
       D.dryRun = false;
     }
+
+    // ===================== Sayfa diyalogları =====================
+    {
+      const $ = id => document.getElementById(id);
+      const D = Vento.dialogs;
+      const tab = tabs.selected;
+      const shown = () => D.state.shown;
+      const card = () => shown()?.ui?.card;
+      const btn = i => card().querySelector(`button[data-index="${i}"]`);
+      const key = k => card().dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true }));
+      const du = h => "data:text/html," + encodeURIComponent(`<meta charset="utf-8">${h}`);
+      const load = h => tab.browser.fixupAndLoadURIString(du(h), { triggeringPrincipal: Vento.SYSTEM_PRINCIPAL });
+      const visible = () => !$("dialog-layer").hidden;
+
+      // -- confirm → prompt → alert zinciri: sessizce iptal EDİLMEMELİ
+      load(`<title>d</title><script>setTimeout(() => { const a = confirm("Emin misin?"); const b = prompt("Adın?", "varsayılan"); alert("bitti"); document.title = "sonuç:" + a + ":" + b; }, 300);</script>`);
+      check("confirm diyaloğu göründü (artık sessizce iptal edilmiyor)", await wait(() => shown() && visible(), 10000));
+      check("confirm: metin + Tamam/İptal", card().querySelector(".dlg-text").textContent === "Emin misin?" && card().querySelectorAll("button").length === 2 && btn(0).hasAttribute("primary"));
+      btn(0).click();
+      check("prompt: varsayılan değerli alan", await wait(() => card()?.querySelector(".dlg-value")?.value === "varsayılan"));
+      card().querySelector(".dlg-value").value = "Can";
+      btn(0).click();
+      check("alert: tek düğme", await wait(() => card()?.querySelectorAll("button").length === 1 && card().querySelector(".dlg-text").textContent === "bitti"));
+      key("Enter");
+      check("sayfa cevapları aldı (confirm=true, prompt='Can')", await wait(() => tab.title === "sonuç:true:Can"), tab.title);
+      check("bitince katman gizlendi", await wait(() => !visible()));
+
+      // -- iptal (Esc): confirm=false, prompt=null
+      load(`<title>e</title><script>setTimeout(() => { const a = confirm("x?"); const b = prompt("y?"); document.title = "sonuç:" + a + ":" + b; }, 300);</script>`);
+      await wait(() => shown());
+      key("Escape");
+      await wait(() => card()?.querySelector(".dlg-value"));
+      key("Escape");
+      check("Esc: confirm=false, prompt=null", await wait(() => tab.title === "sonuç:false:null"), tab.title);
+
+      // -- arka plandaki sekmenin diyaloğu o sekme seçilene kadar görünmez
+      const bg = tabs.open(du(`<title>bg</title><script>setTimeout(() => { document.title = "bg:" + confirm("arka plan?"); }, 300);</script>`), { select: false });
+      check("arka plan diyaloğu kuyruğa alındı", await wait(() => D.pending === 1, 10000), String(D.pending));
+      check("ama önde görünmedi", !visible());
+      tabs.select(bg);
+      check("sekmeye geçince göründü", await wait(() => visible() && card()?.querySelector(".dlg-text").textContent === "arka plan?"));
+      tabs.select(tab);
+      check("başka sekmeye geçince gizlendi ama bekliyor", !visible() && D.pending === 1);
+      tabs.select(bg);
+      btn(0).click();
+      check("cevap sayfaya ulaştı (bg:true)", await wait(() => bg.title === "bg:true"), bg.title);
+      tabs.close(bg);
+      tabs.select(tab);
+
+      // -- sekme kapanınca bekleyen istem iptal edilir
+      const bg2 = tabs.open(du(`<script>setTimeout(() => confirm("kapanacak"), 300);</script>`), { select: false });
+      await wait(() => D.pending === 1, 10000);
+      tabs.close(bg2);
+      check("sekme kapanınca bekleyen istem temizlendi", await wait(() => D.pending === 0), String(D.pending));
+      tabs.select(tab);
+
+      // -- confirmEx: 3 düğme, varsayılan 2, onay kutusu
+      const p1 = D.open(tab.browser, { promptType: "confirmEx", text: "Üç seçenek", button0Label: "Kaydet", button1Label: "Vazgeç", button2Label: "Kaydetme", defaultButtonNum: 2, checkLabel: "Bir daha sorma", checked: false });
+      await wait(() => card());
+      check("confirmEx: 3 düğme, 2. varsayılan (birincil)", card().querySelectorAll("button").length === 3 && btn(2).hasAttribute("primary") && !btn(0).hasAttribute("primary"));
+      card().querySelector("input[type=checkbox]").checked = true;
+      btn(2).click();
+      const r1 = await p1;
+      check("confirmEx sonucu: buttonNumClicked=2, ok=false, checked=true", r1.buttonNumClicked === 2 && r1.ok === false && r1.checked === true, JSON.stringify(r1));
+
+      // -- kimlik doğrulama (HTTP auth) alanları
+      const p2 = D.open(tab.browser, { promptType: "promptUserAndPass", text: "Giriş gerekli", authOrigin: "example.com", isInsecureAuth: true, user: "", pass: "" });
+      await wait(() => card());
+      check("kimlik: kullanıcı + parola (gizli) + güvensiz uyarı + kaynak",
+        !!card().querySelector(".dlg-user") && card().querySelector(".dlg-pass").type === "password" && !!card().querySelector(".dlg-warn") && card().querySelector(".dlg-origin").textContent.includes("example.com"));
+      card().querySelector(".dlg-user").value = "can";
+      card().querySelector(".dlg-pass").value = "gizli";
+      btn(0).click();
+      const r2 = await p2;
+      check("kimlik sonucu: user, pass, ok", r2.user === "can" && r2.pass === "gizli" && r2.ok === true);
+
+      // -- iptalde alan değerleri geri verilmez
+      const p3 = D.open(tab.browser, { promptType: "promptPassword", text: "Parola", pass: "" });
+      await wait(() => card());
+      card().querySelector(".dlg-pass").value = "sızmamalı";
+      btn(1).click();
+      const r3 = await p3;
+      check("İptal'de parola sonuca yazılmadı", r3.ok === false && (r3.pass ?? "") === "", JSON.stringify(r3));
+    }
   } catch (e) {
     check("öz-test istisna fırlatmadı", false, String(e) + "\n" + (e.stack || ""));
   }

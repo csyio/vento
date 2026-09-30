@@ -47,6 +47,13 @@ VentoStartup.prototype = {
         messageManagerGroups: ["browsers"],
       });
       trace("startup: VentoContextMenu aktörü kaydedildi");
+      // alert/confirm/prompt/kimlik doğrulama: toolkit'in Prompter'ı "Prompt" adlı aktörü arar
+      ChromeUtils.registerWindowActor("Prompt", {
+        parent: { esModuleURI: "resource:///actors/VentoPromptParent.sys.mjs" },
+        includeChrome: true,
+        allFrames: true,
+      });
+      trace("startup: Prompt aktörü kaydedildi");
     } catch (e) {
       trace(`startup: ActorManagerParent HATA: ${e}`);
     }
