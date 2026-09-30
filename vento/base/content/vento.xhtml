@@ -16,6 +16,7 @@
   <script src="chrome://vento/content/vento-markdown.js"/>
   <script src="chrome://vento/content/vento-ui.js"/>
   <script src="chrome://vento/content/vento-esin.js"/>
+  <script src="chrome://vento/content/vento-menu.js"/>
   <script src="chrome://vento/content/vento-shell.js"/>
 </head>
 <body>
@@ -61,6 +62,11 @@
     <xul:key id="key_toggleEsin" key="e" modifiers="accel" command="cmd_toggleEsin"/>
     <xul:key id="key_quit" key="q" modifiers="accel" command="cmd_quit"/>
   </xul:keyset>
+
+  <!-- Sayfa sağ tık menüsü: içeriği vento-menu.js dinamik kurar. -->
+  <xul:popupset>
+    <xul:menupopup id="page-context-menu"/>
+  </xul:popupset>
 
   <!-- Yerel menü kaynağı (ekranda görünmez). -->
   <div id="vento-menus">

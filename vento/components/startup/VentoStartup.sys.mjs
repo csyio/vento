@@ -37,6 +37,16 @@ VentoStartup.prototype = {
         messageManagerGroups: ["browsers"],
       });
       trace("startup: VentoPageText aktörü kaydedildi");
+      ChromeUtils.registerWindowActor("VentoContextMenu", {
+        parent: { esModuleURI: "resource:///actors/VentoContextMenuParent.sys.mjs" },
+        child: {
+          esModuleURI: "resource:///actors/VentoContextMenuChild.sys.mjs",
+          events: { contextmenu: { mozSystemGroup: true } },
+        },
+        allFrames: true,
+        messageManagerGroups: ["browsers"],
+      });
+      trace("startup: VentoContextMenu aktörü kaydedildi");
     } catch (e) {
       trace(`startup: ActorManagerParent HATA: ${e}`);
     }
