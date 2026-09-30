@@ -24,19 +24,27 @@ Vento.ui = (() => {
   }
 
   // Simge varsa <img>, yoksa (ya da yüklenemezse) harf işareti. Simge değişmedikçe öğe yeniden kurulmaz (titremesin).
+  // Boş sekmenin (yeni sekme) simgesi: Ebabil'in başı (sitenin kendi simgesi yok)
+  const BLANK_ICON = "chrome://vento/content/art/pose-icon.webp";
+
   function setMark(mark, tab) {
-    if (tab.icon) {
-      if (mark.dataset.icon !== tab.icon) {
+    const icon = tab.icon || (tab.blank ? BLANK_ICON : "");
+    if (icon) {
+      if (mark.dataset.icon !== icon) {
         const img = document.createElement("img");
         img.alt = "";
         img.addEventListener("error", () => {
-          if (tab.icon === mark.dataset.icon) {
-            tab.icon = "";
-            setMark(mark, tab);
+          if (icon === mark.dataset.icon) {
+            if (tab.icon === icon) {
+              tab.icon = "";
+            }
+            delete mark.dataset.icon;
+            mark.classList.remove("has-icon");
+            mark.textContent = markLetter(tab);
           }
         }, { once: true });
-        img.src = tab.icon;
-        mark.dataset.icon = tab.icon;
+        img.src = icon;
+        mark.dataset.icon = icon;
         mark.classList.add("has-icon");
         mark.replaceChildren(img);
       }

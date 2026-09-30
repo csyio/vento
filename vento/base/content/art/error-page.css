@@ -1,0 +1,20 @@
+/* Vento hata sayfası (about:neterror) süsü: VentoErrorPageChild bu dosyayı ve Ebabil görselini sayfaya ekler. */
+.vento-ebabil {
+  display: block;
+  width: 150px;
+  height: auto;
+  margin: 0 0 14px;
+  pointer-events: none;
+  user-select: none;
+  animation: vento-eb-float 4.8s ease-in-out infinite;
+}
+/* Uyuyan Ebabil (çevrimdışı): yavaş nefes alır */
+[data-vento-pose="idle"] .vento-ebabil {
+  width: 170px;
+  transform-origin: 50% 92%;
+  animation: vento-eb-breathe 5.2s ease-in-out infinite;
+}
+@keyframes vento-eb-float { 0%, 100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(-7px) rotate(1deg); } }
+@keyframes vento-eb-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.03, 1.045); } }
+@media (max-height: 600px) { .vento-ebabil { width: 96px; } [data-vento-pose="idle"] .vento-ebabil { width: 110px; } }
+@media (prefers-reduced-motion: reduce) { .vento-ebabil, [data-vento-pose="idle"] .vento-ebabil { animation: none; } }

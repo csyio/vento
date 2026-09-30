@@ -797,6 +797,69 @@
       }
     }
 
+    // ===================== Ebabil pozları (hata sayfası, boş durumlar) =====================
+    {
+      const $ = id => document.getElementById(id);
+      const llm = Services.env.get("VENTO_ESIN_ENDPOINT").replace(/\/v1$/, "");
+      const https = Services.env.get("VENTO_TEST_HTTPS");
+      const tab = tabs.open("about:blank");
+      const load = u => tab.browser.fixupAndLoadURIString(u, { triggeringPrincipal: Vento.SYSTEM_PRINCIPAL });
+      const docURI = () => tab.browser.browsingContext?.currentWindowGlobal?.documentURI?.spec ?? "";
+      const inPage = (body, ms = 8000) => new Promise(resolve => {
+        const id = "vento:poz:" + Math.random();
+        const mm = tab.browser.messageManager;
+        mm.addMessageListener(id, m => resolve(m.data), { once: true });
+        mm.loadFrameScript("data:,(" + encodeURIComponent(`function(){ Promise.resolve().then(() => (${body})()).then(r => sendAsyncMessage(${JSON.stringify(id)}, r), e => sendAsyncMessage(${JSON.stringify(id)}, "HATA " + e)); }`) + ")()", false);
+        setTimeout(() => resolve("ZAMAN ASIMI"), ms);
+      });
+      // Sayfadaki Ebabil: {pose, yuklendi, gorunur}; yoksa null
+      const probe = () => inPage(`() => { const i = content.document.querySelector(".vento-ebabil"); return i ? { pose: content.document.documentElement.dataset.ventoPose, yuklendi: i.complete && i.naturalWidth > 0, gorunur: content.getComputedStyle(i).display === "block", src: i.src } : null; }`);
+
+      // Bağlantı hatası → Ebabil (şaşkın)
+      load("http://nonexistent.invalid/");
+      await wait(() => docURI().startsWith("about:neterror?e=dnsNotFound"), 15000);
+      await wait(async () => (await probe())?.yuklendi, 8000);
+      const dns = await probe();
+      check("DNS hatası: şaşkın Ebabil görünür ve yüklendi (stil uygulandı)", dns?.pose === "error" && dns.yuklendi && dns.gorunur && dns.src.endsWith("pose-error.webp"), JSON.stringify(dns));
+      check("hata sayfasında tek Ebabil (çift eklenmedi)", (await inPage(`() => content.document.querySelectorAll(".vento-ebabil").length`)) === 1);
+
+      // Çevrimdışı → uyuyan Ebabil
+      load("about:neterror?e=netOffline&u=http%3A//x.invalid/&c=UTF-8&d=x");
+      await wait(() => docURI().startsWith("about:neterror?e=netOffline"), 10000);
+      await wait(async () => (await probe())?.yuklendi, 8000);
+      const off = await probe();
+      check("çevrimdışı: uyuyan Ebabil", off?.pose === "idle" && off.src.endsWith("pose-idle.webp"), JSON.stringify(off));
+
+      // Ciddi uyarılarda Ebabil YOK
+      load("about:neterror?e=blockedByPolicy&u=http%3A//x.invalid/&c=UTF-8&d=x");
+      await wait(() => docURI().startsWith("about:neterror?e=blockedByPolicy"), 10000);
+      await new Promise(r => setTimeout(r, 1200));
+      check("güvenlik engelinde (blockedByPolicy) Ebabil YOK", (await probe()) === null);
+      load(`${https}/`);
+      await wait(() => docURI().startsWith("about:certerror"), 15000);
+      await new Promise(r => setTimeout(r, 1200));
+      check("sertifika uyarısında Ebabil YOK (ciddi risk sevimli kuşla yumuşatılmaz)", (await probe()) === null);
+
+      // Güvenlik: web sayfası yalnız SANAT paketine erişir, Vento'nun asıl arayüz paketine erişemez
+      load(`${llm}/oturum/guvenlik`);
+      await wait(() => tab.title === "Sayfa GUVENLIK" && !tab.loading, 15000);
+      const yukle = url => inPage(`() => new Promise(res => { const i = new content.Image(); i.onload = () => res("yuklendi"); i.onerror = () => res("engellendi"); i.src = ${JSON.stringify(url)}; content.setTimeout(() => res("zaman"), 4000); })`);
+      check("web sayfası sanat paketini (vento-art) yükleyebilir", (await yukle("chrome://vento-art/content/pose-icon.webp")) === "yuklendi");
+      check("web sayfası Vento arayüz paketine (chrome://vento/) ERİŞEMEZ", (await yukle("chrome://vento/content/art/pose-icon.webp")) === "engellendi");
+      check("web sayfası Ebabil animasyon katmanlarına (vento) erişemez", (await yukle("chrome://vento/content/ebabil/body.webp")) === "engellendi");
+      tabs.close(tab);
+
+      // Boş durumlar ve boş sekme simgesi
+      const emptyImgs = [$("esin-empty").querySelector(".empty-ebabil"), $("dl-empty").querySelector(".empty-ebabil")];
+      await wait(() => emptyImgs.every(i => i.complete), 5000);
+      check("Esin ve indirme boş durumlarında tünemiş Ebabil yüklendi", emptyImgs.every(i => i.complete && i.naturalWidth > 0 && i.src.endsWith("pose-empty.webp")), emptyImgs.map(i => i.naturalWidth).join(","));
+      const bl = tabs.open("about:blank");
+      await wait(() => document.querySelector(`.tab[data-id="${bl.id}"] .tab-mark img`)?.complete, 5000);
+      const markImg = document.querySelector(`.tab[data-id="${bl.id}"] .tab-mark img`);
+      check("boş sekmenin simgesi Ebabil'in başı (harf değil)", !!markImg && markImg.src.endsWith("pose-icon.webp") && markImg.naturalWidth > 0, markImg?.src);
+      tabs.close(bl);
+    }
+
     // ===================== Arayüz dili (Türkçe) =====================
     {
       const L = Services.locale;

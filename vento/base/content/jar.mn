@@ -1,5 +1,6 @@
 vento.jar:
 % content vento %content/
+% content vento-art %content/art/ contentaccessible=yes
   content/vento.xhtml (vento.xhtml)
   content/vento.css (vento.css)
   content/vento-tabs.js (vento-tabs.js)
@@ -17,6 +18,11 @@ vento.jar:
   content/ebabil/wing-r.webp (ebabil/wing-r.webp)
   content/ebabil/tail.webp (ebabil/tail.webp)
   content/ebabil/still.webp (ebabil/still.webp)
+  content/art/pose-error.webp (art/pose-error.webp)
+  content/art/pose-empty.webp (art/pose-empty.webp)
+  content/art/pose-idle.webp (art/pose-idle.webp)
+  content/art/pose-icon.webp (art/pose-icon.webp)
+  content/art/error-page.css (art/error-page.css)
   content/vento-session.js (vento-session.js)
   content/vento-shell.js (vento-shell.js)
   content/vento-selftest.js (vento-selftest.js)

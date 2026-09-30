@@ -613,6 +613,20 @@ button {
   gap: 8px;
 }
 
+/* Boş durumlar: telde tünemiş Ebabil, hafifçe sallanır */
+.empty-ebabil {
+  display: block;
+  width: 132px;
+  height: auto;
+  margin-bottom: 6px;
+  pointer-events: none;
+  transform-origin: 50% 88%;
+  animation: v-eb-perch 6s ease-in-out infinite;
+}
+#dl-empty .empty-ebabil { width: 104px; margin: 0 auto 8px; }
+@keyframes v-eb-perch { 0%, 100% { transform: rotate(-1.4deg); } 50% { transform: rotate(1.4deg) translateY(-1px); } }
+@media (prefers-reduced-motion: reduce) { .empty-ebabil { animation: none; } }
+
 .empty-title { font-size: 18px; font-weight: 300; margin-bottom: 6px; color: var(--v-muted); }
 
 #esin-empty button {

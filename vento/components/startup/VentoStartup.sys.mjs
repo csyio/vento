@@ -47,6 +47,16 @@ VentoStartup.prototype = {
         messageManagerGroups: ["browsers"],
       });
       trace("startup: VentoContextMenu aktörü kaydedildi");
+      // Hata sayfasına Ebabil (yalnız bağlantı hatalarında; sertifika uyarısında yok)
+      ChromeUtils.registerWindowActor("VentoErrorPage", {
+        child: {
+          esModuleURI: "resource:///actors/VentoErrorPageChild.sys.mjs",
+          events: { DOMContentLoaded: {} },
+        },
+        matches: ["about:neterror?*"],
+        messageManagerGroups: ["browsers"],
+      });
+      trace("startup: VentoErrorPage aktörü kaydedildi");
       // Sekme simgeleri (favicon): <link rel=icon> + /favicon.ico; Firefox'un FaviconLoader'ı içerik sürecinde çalışır
       ChromeUtils.registerWindowActor("VentoLink", {
         parent: { esModuleURI: "resource:///actors/VentoLinkParent.sys.mjs" },

@@ -226,7 +226,10 @@
     <div id="downloads-panel" hidden="true">
       <div id="dl-head"><span>İndirilenler</span><button id="dl-clear">Temizle</button></div>
       <div id="dl-rows"></div>
-      <div id="dl-empty">Henüz indirme yok</div>
+      <div id="dl-empty">
+        <img class="empty-ebabil" src="chrome://vento/content/art/pose-empty.webp" alt="" aria-hidden="true"/>
+        <div>Henüz indirme yok</div>
+      </div>
     </div>
 
     <aside id="esin" hidden="true">
@@ -253,6 +256,7 @@
           <button id="esin-consent-ok">Anladım</button>
         </div>
         <div id="esin-empty">
+          <img class="empty-ebabil" src="chrome://vento/content/art/pose-empty.webp" alt="" aria-hidden="true"/>
           <div class="empty-title">Bu sayfayı sor</div>
           <button data-q="Bu sayfayı kısaca özetle.">Özetle</button>
           <button data-q="Bu sayfanın ana noktalarını madde madde çıkar.">Ana noktalar</button>
