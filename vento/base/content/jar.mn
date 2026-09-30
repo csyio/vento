@@ -1,4 +1,8 @@
 vento.jar:
 % content vento %content/
   content/vento.xhtml (vento.xhtml)
-  content/vento.js (vento.js)
+  content/vento.css (vento.css)
+  content/vento-tabs.js (vento-tabs.js)
+  content/vento-ui.js (vento-ui.js)
+  content/vento-shell.js (vento-shell.js)
+  content/vento-selftest.js (vento-selftest.js)

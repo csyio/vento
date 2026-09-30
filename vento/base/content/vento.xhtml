@@ -1,20 +1,147 @@
 <?xml version="1.0"?>
 <?xml-stylesheet href="chrome://global/skin/global.css"?>
+<?xml-stylesheet href="chrome://vento/content/vento.css"?>
 <html xmlns="http://www.w3.org/1999/xhtml"
       xmlns:xul="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+      xmlns:svg="http://www.w3.org/2000/svg"
       id="vento-main" windowtype="vento:main" scrolling="false"
-      width="1200" height="800" persist="screenX screenY width height">
+      customtitlebar="true" macnativefullscreen="true" macanimationtype="document"
+      width="1280" height="820" persist="screenX screenY width height sizemode">
 <head>
   <meta charset="utf-8"/>
   <title>Vento</title>
   <script src="chrome://global/content/customElements.js"/>
-  <script src="chrome://vento/content/vento.js"/>
+  <script src="chrome://global/content/globalOverlay.js"/>
+  <script src="chrome://vento/content/vento-tabs.js"/>
+  <script src="chrome://vento/content/vento-ui.js"/>
+  <script src="chrome://vento/content/vento-shell.js"/>
 </head>
-<body style="margin:0; height:100vh; display:flex; flex-direction:column;">
-  <div id="bar" style="padding:8px; font:13px system-ui; background:#1f1f24; color:#eee;">
-    Vento — spike: browser.xhtml yok
+<body>
+
+  <!-- Komutlar ve kısayollar: macOS yerel menüsü bunlardan kurulur. -->
+  <xul:commandset id="vento-commands">
+    <xul:command id="cmd_newTab"/>
+    <xul:command id="cmd_closeTab"/>
+    <xul:command id="cmd_focusBar"/>
+    <xul:command id="cmd_reload"/>
+    <xul:command id="cmd_stop"/>
+    <xul:command id="cmd_back"/>
+    <xul:command id="cmd_forward"/>
+    <xul:command id="cmd_nextTab"/>
+    <xul:command id="cmd_prevTab"/>
+    <xul:command id="cmd_undo"/>
+    <xul:command id="cmd_redo"/>
+    <xul:command id="cmd_cut"/>
+    <xul:command id="cmd_copy"/>
+    <xul:command id="cmd_paste"/>
+    <xul:command id="cmd_selectAll"/>
+    <xul:command id="cmd_quit"/>
+  </xul:commandset>
+
+  <xul:keyset id="vento-keys">
+    <xul:key id="key_newTab" key="t" modifiers="accel" command="cmd_newTab"/>
+    <xul:key id="key_closeTab" key="w" modifiers="accel" command="cmd_closeTab"/>
+    <xul:key id="key_focusBar" key="l" modifiers="accel" command="cmd_focusBar"/>
+    <xul:key id="key_focusBar2" key="k" modifiers="accel" command="cmd_focusBar"/>
+    <xul:key id="key_reload" key="r" modifiers="accel" command="cmd_reload"/>
+    <xul:key id="key_stop" key="." modifiers="accel" command="cmd_stop"/>
+    <xul:key id="key_back" key="[" modifiers="accel" command="cmd_back"/>
+    <xul:key id="key_forward" key="]" modifiers="accel" command="cmd_forward"/>
+    <xul:key id="key_nextTab" key="]" modifiers="accel,shift" command="cmd_nextTab"/>
+    <xul:key id="key_prevTab" key="[" modifiers="accel,shift" command="cmd_prevTab"/>
+    <xul:key id="key_undo" key="z" modifiers="accel" command="cmd_undo"/>
+    <xul:key id="key_redo" key="z" modifiers="accel,shift" command="cmd_redo"/>
+    <xul:key id="key_cut" key="x" modifiers="accel" command="cmd_cut"/>
+    <xul:key id="key_copy" key="c" modifiers="accel" command="cmd_copy"/>
+    <xul:key id="key_paste" key="v" modifiers="accel" command="cmd_paste"/>
+    <xul:key id="key_selectAll" key="a" modifiers="accel" command="cmd_selectAll"/>
+    <xul:key id="key_quit" key="q" modifiers="accel" command="cmd_quit"/>
+  </xul:keyset>
+
+  <!-- Yerel menü kaynağı (ekranda görünmez). -->
+  <div id="vento-menus">
+    <xul:toolbox>
+      <xul:toolbar type="menubar" id="toolbar-menubar">
+        <xul:menubar id="main-menubar">
+          <xul:menu id="file-menu" label="Dosya">
+            <xul:menupopup id="menu_FilePopup">
+              <xul:menuitem id="menu_newTab" label="Yeni Sekme" command="cmd_newTab" key="key_newTab"/>
+              <xul:menuitem id="menu_closeTab" label="Sekmeyi Kapat" command="cmd_closeTab" key="key_closeTab"/>
+              <xul:menuseparator/>
+              <xul:menuitem id="menu_FileQuitItem" label="Vento'dan Çık" command="cmd_quit" key="key_quit"/>
+            </xul:menupopup>
+          </xul:menu>
+          <xul:menu id="edit-menu" label="Düzen">
+            <xul:menupopup id="menu_EditPopup">
+              <xul:menuitem id="menu_undo" label="Geri Al" command="cmd_undo" key="key_undo"/>
+              <xul:menuitem id="menu_redo" label="Yinele" command="cmd_redo" key="key_redo"/>
+              <xul:menuseparator/>
+              <xul:menuitem id="menu_cut" label="Kes" command="cmd_cut" key="key_cut"/>
+              <xul:menuitem id="menu_copy" label="Kopyala" command="cmd_copy" key="key_copy"/>
+              <xul:menuitem id="menu_paste" label="Yapıştır" command="cmd_paste" key="key_paste"/>
+              <xul:menuitem id="menu_selectAll" label="Tümünü Seç" command="cmd_selectAll" key="key_selectAll"/>
+            </xul:menupopup>
+          </xul:menu>
+          <xul:menu id="view-menu" label="Görünüm">
+            <xul:menupopup id="menu_ViewPopup">
+              <xul:menuitem id="menu_focusBar" label="Akıllı Çubuğa Git" command="cmd_focusBar" key="key_focusBar"/>
+              <xul:menuitem id="menu_reload" label="Sayfayı Yenile" command="cmd_reload" key="key_reload"/>
+              <xul:menuitem id="menu_stop" label="Yüklemeyi Durdur" command="cmd_stop" key="key_stop"/>
+            </xul:menupopup>
+          </xul:menu>
+          <xul:menu id="history-menu" label="Geçmiş">
+            <xul:menupopup id="menu_HistoryPopup">
+              <xul:menuitem id="menu_back" label="Geri" command="cmd_back" key="key_back"/>
+              <xul:menuitem id="menu_forward" label="İleri" command="cmd_forward" key="key_forward"/>
+              <xul:menuseparator/>
+              <xul:menuitem id="menu_nextTab" label="Sonraki Sekme" command="cmd_nextTab" key="key_nextTab"/>
+              <xul:menuitem id="menu_prevTab" label="Önceki Sekme" command="cmd_prevTab" key="key_prevTab"/>
+            </xul:menupopup>
+          </xul:menu>
+        </xul:menubar>
+      </xul:toolbar>
+    </xul:toolbox>
   </div>
-  <xul:browser id="content" type="content" remote="true" maychangeremoteness="true"
-               src="https://example.com" style="flex:1;"/>
+
+  <!-- Sekme şeridi -->
+  <div id="tabstrip">
+    <!-- macOS trafik ışıkları bu kutunun içine yerleştirilir (boş kutu; boyutunu tema verir). -->
+    <div class="titlebar-buttonbox"></div>
+    <div id="tabs"></div>
+    <button id="newtab" title="Yeni sekme (⌘T)">
+      <svg:svg viewBox="0 0 16 16"><svg:path d="M8 3.5v9M3.5 8h9"/></svg:svg>
+    </button>
+  </div>
+
+  <!-- Araç çubuğu: gezinme + akıllı çubuk -->
+  <div id="toolbar">
+    <button id="nav-back" class="nav" title="Geri (⌘[)" disabled="true">
+      <svg:svg viewBox="0 0 16 16"><svg:path d="M10 3.5 5.5 8l4.5 4.5"/></svg:svg>
+    </button>
+    <button id="nav-forward" class="nav" title="İleri (⌘])" disabled="true">
+      <svg:svg viewBox="0 0 16 16"><svg:path d="M6 3.5 10.5 8 6 12.5"/></svg:svg>
+    </button>
+    <button id="nav-reload" class="nav" title="Yenile (⌘R)">
+      <svg:svg viewBox="0 0 16 16"><svg:path d="M13 8a5 5 0 1 1-1.6-3.7M13 2.8v2.6h-2.6"/></svg:svg>
+    </button>
+    <div id="smartbar-slot">
+      <div id="smartbar">
+        <svg:svg id="smartbar-icon" viewBox="0 0 16 16"><svg:circle cx="7" cy="7" r="4.2"/><svg:path d="M10.2 10.2 13 13"/></svg:svg>
+        <input id="smartbar-input" type="text" spellcheck="false" autocomplete="off"
+               placeholder="Adres yaz ya da ara"/>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sahne: sayfa kartı -->
+  <div id="stage">
+    <div id="gust"></div>
+    <div id="start">
+      <div id="start-word">Vento</div>
+      <div id="start-hint"><kbd>⌘L</kbd> ile yaz, <kbd>↵</kbd> ile git</div>
+    </div>
+    <div id="browsers"></div>
+  </div>
+
 </body>
 </html>
