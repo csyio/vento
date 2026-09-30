@@ -36,12 +36,14 @@ Vento.contextMenu = (() => {
     if (data.linkUrl) {
       add("Bağlantıyı Yeni Sekmede Aç", () => t.open(data.linkUrl, { select: false, afterCurrent: true }));
       add("Bağlantı Adresini Kopyala", () => copy(data.linkUrl));
+      add("Bağlantıdaki Dosyayı İndir", () => Vento.downloads.saveURL(data.linkUrl, { referrer: data.pageUrl }));
       sep();
     }
 
     if (data.imageUrl) {
       add("Resmi Yeni Sekmede Aç", () => t.open(data.imageUrl, { afterCurrent: true }));
       add("Resim Adresini Kopyala", () => copy(data.imageUrl));
+      add("Resmi İndirilenler'e Kaydet", () => Vento.downloads.saveURL(data.imageUrl, { referrer: data.pageUrl }));
       sep();
     }
 
@@ -49,6 +51,7 @@ Vento.contextMenu = (() => {
       const kind = data.mediaKind === "video" ? "Videoyu" : "Sesi";
       add(`${kind} Yeni Sekmede Aç`, () => t.open(data.mediaUrl, { afterCurrent: true }));
       add(`${data.mediaKind === "video" ? "Video" : "Ses"} Adresini Kopyala`, () => copy(data.mediaUrl));
+      add(`${kind} İndir`, () => Vento.downloads.saveURL(data.mediaUrl, { referrer: data.pageUrl }));
       sep();
     }
 

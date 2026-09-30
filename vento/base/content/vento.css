@@ -288,6 +288,7 @@ button {
 /* ---- Sahne: sayfa kartı --------------------------------------------------- */
 
 #workspace {
+  position: relative;
   flex: 1;
   min-height: 0;
   display: flex;
@@ -778,3 +779,113 @@ button {
 
 .find-btn:hover { background: var(--v-surface-hover); color: var(--v-text); }
 .find-btn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+
+/* ---- İndirmeler --------------------------------------------------------------------- */
+
+.nav { position: relative; }
+#nav-downloads[hidden] { display: none; }
+#nav-downloads[active-panel] { background: var(--v-accent-soft); color: var(--v-accent); }
+
+/* İndirme sürerken düğmenin çevresinde ilerleme halkası */
+#nav-downloads[downloading]::before {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: 50%;
+  background: conic-gradient(var(--v-accent) var(--dl-progress, 8%), var(--v-line) 0);
+  -webkit-mask: radial-gradient(circle, transparent 13px, #000 14px);
+  mask: radial-gradient(circle, transparent 13px, #000 14px);
+}
+
+#downloads-panel {
+  position: absolute;
+  z-index: 15;
+  top: 6px;
+  right: 6px;
+  width: 360px;
+  max-height: 70%;
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  background: var(--v-surface);
+  box-shadow: 0 10px 34px light-dark(rgba(20,40,65,0.20), rgba(0,0,0,0.6)), inset 0 0 0 1px var(--v-line);
+  overflow: hidden;
+}
+
+#downloads-panel[hidden] { display: none; }
+
+#dl-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 42px;
+  padding: 0 10px 0 16px;
+  font-weight: 650;
+}
+
+#dl-clear { padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 500; color: var(--v-muted); }
+#dl-clear:hover { background: var(--v-surface-hover); color: var(--v-text); }
+
+#dl-rows { overflow-y: auto; padding: 0 6px 6px; }
+#dl-empty { padding: 18px 16px 22px; color: var(--v-faint); text-align: center; }
+#dl-empty[hidden] { display: none; }
+
+.dl-row {
+  display: grid;
+  grid-template-columns: 34px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px;
+  border-radius: 10px;
+}
+
+.dl-row:hover { background: var(--v-surface-hover); }
+.dl-row[data-kind="done"] { cursor: pointer; }
+
+.dl-mark {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: var(--v-accent-soft);
+  color: var(--v-accent);
+}
+
+.dl-info { min-width: 0; }
+.dl-name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 550; }
+.dl-meta { font-size: 11.5px; color: var(--v-muted); }
+.dl-row[data-kind="error"] .dl-meta { color: light-dark(#b3261e, #ff8a80); }
+
+.dl-bar { height: 3px; margin-top: 5px; border-radius: 2px; background: var(--v-line); overflow: hidden; }
+.dl-row:not([data-kind="active"]):not([data-kind="paused"]) .dl-bar { display: none; }
+.dl-fill { height: 100%; border-radius: 2px; background: var(--v-accent); transition: width 160ms var(--v-ease); }
+.dl-fill[indeterminate] { width: 30% !important; animation: v-gust 1.1s var(--v-ease) infinite; }
+
+.dl-actions { display: flex; gap: 2px; }
+
+.dl-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--v-muted);
+}
+
+.dl-btn:hover { background: var(--v-surface-press); color: var(--v-text); }
+.dl-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Duruma göre yalnızca ilgili eylemler */
+.dl-cancel, .dl-retry, .dl-reveal { display: none; }
+.dl-row[data-kind="active"] .dl-cancel,
+.dl-row[data-kind="paused"] .dl-cancel { display: grid; }
+.dl-row[data-kind="error"] .dl-retry,
+.dl-row[data-kind="canceled"] .dl-retry { display: grid; }
+.dl-row[data-kind="done"] .dl-reveal { display: grid; }
+.dl-row[data-kind="active"] .dl-remove { display: none; }

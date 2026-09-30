@@ -378,6 +378,68 @@
       Vento.find.close(false);
       check("boş sekmede ⌘F açmaz", (() => { const b = tabs.open("about:blank"); Vento.find.open(); const ok = $("findbar").hidden; tabs.close(b); tabs.select(tab); return ok; })());
     }
+
+    // ===================== İndirmeler =====================
+    {
+      const $ = id => document.getElementById(id);
+      const D = Vento.downloads;
+      D.dryRun = true;
+      const dir = Services.dirsvc.get("TmpD", Ci.nsIFile);
+      dir.append(`vento-indirme-${Date.now()}`);
+      dir.create(Ci.nsIFile.DIRECTORY_TYPE, 0o755);
+      Services.prefs.setIntPref("browser.download.folderList", 2);
+      Services.prefs.setComplexValue("browser.download.dir", Ci.nsIFile, dir);
+      const llm = Services.env.get("VENTO_ESIN_ENDPOINT").replace(/\/v1$/, "");
+      const rowOf = d => D.state.rows.get(d)?.row;
+      const sizeOf = async name => (await IOUtils.exists(PathUtils.join(dir.path, name))) ? (await IOUtils.stat(PathUtils.join(dir.path, name))).size : -1;
+
+      check("indirme düğmesi başta gizli", $("nav-downloads").hidden === true);
+
+      // -- sayfadan gelen ek (Content-Disposition: attachment) otomatik iner
+      const tab = tabs.selected;
+      tab.browser.fixupAndLoadURIString(`${llm}/dosya.bin`, { triggeringPrincipal: Vento.SYSTEM_PRINCIPAL });
+      check("ek dosya indirme listesine düştü", await wait(() => D.state.rows.size === 1, 15000), String(D.state.rows.size));
+      const first = [...D.state.rows.keys()][0];
+      check("indirme tamamlandı", await wait(() => first.succeeded, 15000), `succeeded=${first.succeeded} error=${first.error}`);
+      check("dosya doğru adla, tam boyutta kaydedildi (rapor.bin, 200 KB)", (await sizeOf("rapor.bin")) === 204800, String(await sizeOf("rapor.bin")));
+      check("soru sormadı: yardımcı-uygulama diyaloğu açılmadı (tek pencere)", [...Services.wm.getEnumerator(null)].length === 1);
+      check("indirme düğmesi göründü", $("nav-downloads").hidden === false);
+      D.showPanel(true);
+      check("panel satırı: ad + Tamamlandı", rowOf(first)?.querySelector(".dl-name").textContent === "rapor.bin" && rowOf(first)?.querySelector(".dl-meta").textContent.includes("Tamamlandı"), rowOf(first)?.querySelector(".dl-meta").textContent);
+      check("bitmiş satırda yalnızca 'Finder'da göster' ve 'kaldır' görünür", getComputedStyle(rowOf(first).querySelector(".dl-reveal")).display !== "none" && getComputedStyle(rowOf(first).querySelector(".dl-cancel")).display === "none");
+
+      // -- adresi kaydet (sağ tık "Resmi kaydet" yolu) + benzersiz ad
+      const d1 = await D.saveURL(`${llm}/dosya.bin?a=1`);
+      check("saveURL tamamlandı (dosya.bin)", await wait(() => d1.succeeded, 15000) && (await sizeOf("dosya.bin")) === 204800, String(await sizeOf("dosya.bin")));
+      const d2 = await D.saveURL(`${llm}/dosya.bin?a=2`);
+      check("aynı ad varsa benzersiz ad (dosya (1).bin)", await wait(() => d2.succeeded, 15000) && PathUtils.filename(d2.target.path) === "dosya (1).bin", PathUtils.filename(d2.target.path));
+
+      // -- iptal
+      const slow = await D.saveURL(`${llm}/yavas.bin`);
+      check("yavaş indirme ilerliyor", await wait(() => slow.currentBytes > 0 && !slow.stopped, 15000), String(slow.currentBytes));
+      check("sürerken iptal düğmesi görünür, kaldır gizli", getComputedStyle(rowOf(slow).querySelector(".dl-cancel")).display !== "none" && getComputedStyle(rowOf(slow).querySelector(".dl-remove")).display === "none");
+      check("ilerleme çubuğu genişliği yükseldi", rowOf(slow).querySelector(".dl-fill").style.width !== "");
+      rowOf(slow).querySelector(".dl-cancel").click();
+      check("iptal edince indirme durdu", await wait(() => slow.canceled, 10000));
+      check("iptal satırı 'İptal edildi' + yeniden dene görünür", await wait(() => rowOf(slow)?.dataset.kind === "canceled") && getComputedStyle(rowOf(slow).querySelector(".dl-retry")).display !== "none");
+
+      // -- kaldır
+      const n = D.state.rows.size;
+      rowOf(slow).querySelector(".dl-remove").click();
+      check("kaldırınca satır listeden gitti", await wait(() => D.state.rows.size === n - 1), String(D.state.rows.size));
+
+      // -- bağlam menüsü öğeleri
+      const cmb = Vento.contextMenu.build({ imageUrl: "https://x/y.png", linkUrl: "https://x/f.pdf", pageUrl: "https://x/" });
+      const lb = cmb.filter(d => d !== Vento.contextMenu.SEP).map(d => d.label);
+      check("bağlam menüsünde 'Resmi İndirilenler'e Kaydet' ve 'Bağlantıdaki Dosyayı İndir'", lb.includes("Resmi İndirilenler'e Kaydet") && lb.includes("Bağlantıdaki Dosyayı İndir"), lb.join(","));
+
+      // -- hepsi kalkınca düğme gizlenir
+      for (const d of [...D.state.rows.keys()]) {
+        await D.state.list.remove(d);
+      }
+      check("liste boşalınca düğme ve panel gizlendi", await wait(() => $("nav-downloads").hidden && $("downloads-panel").hidden));
+      D.dryRun = false;
+    }
   } catch (e) {
     check("öz-test istisna fırlatmadı", false, String(e) + "\n" + (e.stack || ""));
   }

@@ -10,6 +10,23 @@ const srv = http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "application/json" });
     return res.end(JSON.stringify(stats));
   }
+  // İndirme testi: ek olarak sunulan bir dosya (Content-Disposition: attachment)
+  if (req.method === "GET" && req.url.startsWith("/dosya.bin")) {
+    const body = Buffer.alloc(200 * 1024, 65);
+    res.writeHead(200, {
+      "Content-Type": "application/octet-stream",
+      "Content-Disposition": 'attachment; filename="rapor.bin"',
+      "Content-Length": body.length,
+    });
+    return res.end(body);
+  }
+  if (req.method === "GET" && req.url.startsWith("/yavas.bin")) {
+    // İptal testi: 5 MB'ı ağır ağır yollar (bitmesi ~30 sn sürer)
+    res.writeHead(200, { "Content-Type": "application/octet-stream", "Content-Length": 5 * 1024 * 1024 });
+    const iv = setInterval(() => res.write(Buffer.alloc(8192, 66)), 50);
+    res.on("close", () => clearInterval(iv));
+    return;
+  }
   if (req.method !== "POST" || !req.url.endsWith("/chat/completions")) {
     res.writeHead(404);
     return res.end();

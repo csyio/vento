@@ -16,3 +16,9 @@ pref("intl.accept_languages", "tr-TR, tr, en-US, en");
 pref("vento.esin.endpoint", "https://esin.cansoykanyilmaz.com/v1");
 // İlk kullanımda gösterilen veri aktarımı bilgilendirmesi onaylandı mı?
 pref("vento.esin.consented", false);
+
+// İndirmeler: soru sormadan Downloads klasörüne kaydet (Firefox bu tercihleri browser/'ın kendi dosyasında
+// açar; bizde yoksa yardımcı-uygulama diyaloğunda takılıp .part dosyası bırakır).
+pref("browser.download.useDownloadDir", true);
+pref("browser.download.folderList", 1); // 1 = ~/Downloads
+pref("browser.download.always_ask_before_handling_new_types", false);

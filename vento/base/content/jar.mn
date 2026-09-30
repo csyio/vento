@@ -8,5 +8,6 @@ vento.jar:
   content/vento-esin.js (vento-esin.js)
   content/vento-menu.js (vento-menu.js)
   content/vento-find.js (vento-find.js)
+  content/vento-downloads.js (vento-downloads.js)
   content/vento-shell.js (vento-shell.js)
   content/vento-selftest.js (vento-selftest.js)
