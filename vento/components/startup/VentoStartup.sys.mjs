@@ -54,6 +54,21 @@ VentoStartup.prototype = {
         allFrames: true,
       });
       trace("startup: Prompt aktörü kaydedildi");
+      // Kamera/mikrofon: süreç aktörü bildirimi dinler, pencere aktörü kartı ana sürece taşır
+      ChromeUtils.registerProcessActor("VentoMediaProcess", {
+        child: {
+          esModuleURI: "resource:///actors/VentoMediaProcessChild.sys.mjs",
+          observers: ["getUserMedia:request"],
+        },
+        includeParent: false,
+      });
+      ChromeUtils.registerWindowActor("VentoMedia", {
+        parent: { esModuleURI: "resource:///actors/VentoMediaParent.sys.mjs" },
+        child: { esModuleURI: "resource:///actors/VentoMediaChild.sys.mjs" },
+        allFrames: true,
+        messageManagerGroups: ["browsers"],
+      });
+      trace("startup: VentoMedia aktörleri kaydedildi");
     } catch (e) {
       trace(`startup: ActorManagerParent HATA: ${e}`);
     }

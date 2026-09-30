@@ -97,6 +97,7 @@
     Vento.esin.init();
     Vento.find.init();
     Vento.dialogs.init();
+    Vento.permissions.init();
     Vento.downloads.init().catch(e => Vento.trace(`indirmeler başlatılamadı: ${e}`));
     bindCommands();
     window.browserDOMWindow = makeBrowserAccess();

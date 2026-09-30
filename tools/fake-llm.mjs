@@ -20,6 +20,18 @@ const srv = http.createServer((req, res) => {
     });
     return res.end(body);
   }
+  // İzin testi: güvenli bağlam (127.0.0.1) gerektiren API'ler için sayfa; davranış #hash ile seçilir
+  if (req.method === "GET" && req.url.startsWith("/izin.html")) {
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    return res.end(`<!doctype html><meta charset="utf-8"><title>hazır</title><script>
+      const mode = location.search.slice(1); // ?notif — hash değişimi sayfayı yeniden yüklemez
+      const set = t => (document.title = t);
+      if (mode === "notif") Notification.requestPermission().then(r => set("n:" + r));
+      if (mode === "geo") navigator.geolocation.getCurrentPosition(() => set("geo:ok"), e => set("geo:" + e.code));
+      if (mode === "media") navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(st => set("media:ok:" + st.getTracks().length), e => set("media:" + e.name));
+      if (mode === "cam") navigator.mediaDevices.getUserMedia({ video: true }).then(st => set("cam:ok:" + st.getTracks().length), e => set("cam:" + e.name));
+    </script>`);
+  }
   if (req.method === "GET" && req.url.startsWith("/yavas.bin")) {
     // İptal testi: 5 MB'ı ağır ağır yollar (bitmesi ~30 sn sürer)
     res.writeHead(200, { "Content-Type": "application/octet-stream", "Content-Length": 5 * 1024 * 1024 });

@@ -21,7 +21,7 @@ Vento.dialogs = (() => {
     }
     try {
       const p = args.promptPrincipal;
-      if (p?.URI && /^https?:/.test(p.URI.scheme)) {
+      if (p?.URI && /^https?$/.test(p.URI.scheme)) {
         return p.URI.host;
       }
     } catch (e) {

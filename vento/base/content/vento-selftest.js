@@ -4,6 +4,7 @@
 // Gerçek ağ kullanır (example.com/org/net). `tools/selftest.sh` ile çalıştırılır.
 
 (async () => {
+  const PM_test = (principal, type) => Services.perms.testExactPermissionFromPrincipal(principal, type);
   const results = [];
   const check = (name, ok, extra = "") => {
     results.push(!!ok);
@@ -458,6 +459,7 @@
       load(`<title>d</title><script>setTimeout(() => { const a = confirm("Emin misin?"); const b = prompt("Adın?", "varsayılan"); alert("bitti"); document.title = "sonuç:" + a + ":" + b; }, 300);</script>`);
       check("confirm diyaloğu göründü (artık sessizce iptal edilmiyor)", await wait(() => shown() && visible(), 10000));
       check("confirm: metin + Tamam/İptal", card().querySelector(".dlg-text").textContent === "Emin misin?" && card().querySelectorAll("button").length === 2 && btn(0).hasAttribute("primary"));
+      // data: sayfasında site adı yoktur (boş kaynak); http sayfasında görünmesi aşağıdaki izin testlerinde ölçülür
       btn(0).click();
       check("prompt: varsayılan değerli alan", await wait(() => card()?.querySelector(".dlg-value")?.value === "varsayılan"));
       card().querySelector(".dlg-value").value = "Can";
@@ -523,6 +525,104 @@
       btn(1).click();
       const r3 = await p3;
       check("İptal'de parola sonuca yazılmadı", r3.ok === false && (r3.pass ?? "") === "", JSON.stringify(r3));
+    }
+
+    // ===================== Site izinleri =====================
+    {
+      const $ = id => document.getElementById(id);
+      const P = Vento.permissions;
+      const tab = tabs.selected;
+      const llm = Services.env.get("VENTO_ESIN_ENDPOINT").replace(/\/v1$/, "");
+      const page = mode => `${llm}/izin.html?${mode}`;
+      const card = () => P.state.shown?.ui?.card;
+      const visible = () => !$("perm-layer").hidden;
+      const btn = cls => card().querySelector(cls);
+      Services.prefs.setBoolPref("dom.webnotifications.requireuserinteraction", false);
+      Services.prefs.setBoolPref("media.navigator.streams.fake", true);
+      const principal = Services.scriptSecurityManager.createContentPrincipalFromOrigin(new URL(llm).origin);
+      const goto = async (mode, expectTitlePrefix) => {
+        tab.browser.fixupAndLoadURIString(page(mode), { triggeringPrincipal: Vento.SYSTEM_PRINCIPAL });
+      };
+      const titleIs = async t => wait(() => tab.title === t, 10000);
+
+      // -- bildirim: Engelle
+      goto("notif");
+      check("bildirim isteği kartı çıktı", await wait(() => visible() && card(), 10000));
+      check("kart: site + 'sana bildirim göndermek'", card().querySelector(".perm-origin").textContent === new URL(llm).host && card().querySelector(".perm-text").textContent.includes("bildirim göndermek"),
+        `origin=${card().querySelector(".perm-origin").textContent} beklenen=${new URL(llm).host}`);
+      check("'Hatırla' varsayılan KAPALI (gizlilik)", card().querySelector(".perm-remember input").checked === false);
+      btn(".perm-block").click();
+      check("Engelle → sayfa 'denied' aldı", await titleIs("n:denied"), tab.title);
+      const denied = Services.perms.getPermissionObject(principal, "desktop-notification", true);
+      check("Engelle: kart kayboldu; karar YALNIZ oturum boyunca saklandı (kalıcı değil)", !visible() && denied?.capability === Services.perms.DENY_ACTION && denied?.expireType === Services.perms.EXPIRE_SESSION, `${denied?.capability}/${denied?.expireType}`);
+      Services.perms.removeAll();
+
+      // -- bildirim: İzin Ver + hatırla → ikinci sefer sormadan izin
+      goto("notif");
+      await wait(() => visible() && card(), 10000);
+      card().querySelector(".perm-remember input").checked = true;
+      btn(".perm-allow").click();
+      check("İzin Ver → 'granted'", await titleIs("n:granted"), tab.title);
+      check("hatırlandı (kalıcı izin yöneticisinde)", PM_test(principal, "desktop-notification") === Services.perms.ALLOW_ACTION);
+      goto("notif");
+      check("hatırlanan bildirim izninde kart çıkmadan 'granted' (platform kendisi cevaplar)", await wait(() => tab.title === "n:granted", 10000) && !visible());
+      Services.perms.removeAll();
+
+      // -- konum: Engelle → PERMISSION_DENIED (1)
+      goto("geo");
+      await wait(() => visible() && card(), 10000);
+      check("konum kartı: 'konumunu görmek'", card().querySelector(".perm-text").textContent.includes("konumunu görmek"));
+      btn(".perm-block").click();
+      check("konum Engelle → hata kodu 1 (PERMISSION_DENIED)", await titleIs("geo:1"), tab.title);
+
+      // -- kamera + mikrofon (sahte cihazlarla)
+      goto("media");
+      check("kamera+mikrofon kartı çıktı", await wait(() => visible() && card(), 10000));
+      check("metin: 'kameranı ve mikrofonunu kullanmak'", card().querySelector(".perm-text").textContent.includes("kameranı ve mikrofonunu kullanmak"), card().querySelector(".perm-text").textContent);
+      btn(".perm-allow").click();
+      check("İzin Ver → akış geldi (2 iz: video+ses)", await titleIs("media:ok:2"), tab.title);
+      check("kamera/mikrofon 'bu seferlik': hatırla kapalıyken HİÇ saklanmadı", PM_test(principal, "camera") === 0 && PM_test(principal, "microphone") === 0);
+      goto("media");
+      await wait(() => visible() && card(), 10000);
+      btn(".perm-block").click();
+      check("Engelle → NotAllowedError", await titleIs("media:NotAllowedError"), tab.title);
+      // -- kamera+mikrofon: "hatırla" işaretliyse bir dahaki istek kartsız (bizim otomatik cevap yolumuz)
+      goto("media");
+      await wait(() => visible() && card(), 10000);
+      card().querySelector(".perm-remember input").checked = true;
+      btn(".perm-allow").click();
+      await titleIs("media:ok:2");
+      check("hatırla açıkken kamera+mikrofon KALICI saklandı", PM_test(principal, "camera") === Services.perms.ALLOW_ACTION && PM_test(principal, "microphone") === Services.perms.ALLOW_ACTION);
+      const autoBefore = P.state.autoAnswered.length;
+      goto("media");
+      // Başlık önceki denemeden zaten "media:ok:2" kalmış olabilir → önce yeni isteğin bize ulaşmasını bekle
+      const answered = await wait(() => P.state.autoAnswered.length > autoBefore, 10000);
+      await new Promise(r => setTimeout(r, 700)); // akış sayfaya ulaşsın
+      check("hatırlanan kamera izninde kart çıkmadan (otomatik cevapla) akış geldi", answered && tab.title === "media:ok:2" && !visible(), `otomatik=${answered} başlık=${tab.title}`);
+      Services.perms.removeAll();
+      goto("cam");
+      await wait(() => visible() && card(), 10000);
+      check("yalnız kamera: metin 'kameranı kullanmak'", card().querySelector(".perm-text").textContent.includes("kameranı kullanmak") && !card().querySelector(".perm-text").textContent.includes("mikrofon"));
+      btn(".perm-block").click();
+      await titleIs("cam:NotAllowedError");
+
+      // -- sekmeye bağlı: arka plandaki sekmenin kartı görünmez
+      const bg = tabs.open(page("notif"), { select: false });
+      check("arka plan isteği kuyruğa alındı, görünmüyor", await wait(() => P.pending === 1, 10000) && !visible());
+      tabs.select(bg);
+      check("sekmeye geçince kart göründü", await wait(() => visible() && !!card()));
+      tabs.select(tab);
+      check("başka sekmeye geçince gizlendi ama bekliyor", !visible() && P.pending === 1);
+      tabs.close(bg);
+      check("sekme kapanınca istek temizlendi", await wait(() => P.pending === 0));
+      tabs.select(tab);
+
+      // -- başka siteye gidilince bekleyen istek reddedilir
+      goto("notif");
+      await wait(() => visible() && card(), 10000);
+      tab.browser.fixupAndLoadURIString("data:text/html," + encodeURIComponent("<meta charset=utf-8><title>gitti</title>"), { triggeringPrincipal: Vento.SYSTEM_PRINCIPAL });
+      check("siteden ayrılınca bekleyen kart kalktı", await wait(() => tab.title === "gitti" && !visible() && P.pending === 0), String(P.pending));
+      Services.perms.removeAll();
     }
   } catch (e) {
     check("öz-test istisna fırlatmadı", false, String(e) + "\n" + (e.stack || ""));
