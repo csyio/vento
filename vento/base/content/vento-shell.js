@@ -15,6 +15,12 @@
     on("cmd_newTab", () => t.open("about:blank", { afterCurrent: true }));
     on("cmd_closeTab", () => t.close(t.selected));
     on("cmd_print", () => Vento.print());
+    on("cmd_reopenTab", () => t.reopenClosed());
+    // Komut, yeniden açılacak sekme yokken devre dışı (menü soluk görünür, ⌘⇧T boşa basmaz)
+    const syncReopen = () => $("cmd_reopenTab").toggleAttribute("disabled", !t.closed.length);
+    t.addEventListener("tabclose", syncReopen);
+    t.addEventListener("tabopen", syncReopen);
+    t.addEventListener("closedchange", syncReopen);
     on("cmd_focusBar", () => Vento.ui.focusBar());
     on("cmd_reload", () => t.reload());
     on("cmd_stop", () => t.stop());

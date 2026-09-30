@@ -68,6 +68,9 @@ ChromeUtils.defineESModuleGetters(lazyPlaces, {
   PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
 });
 
+// Bellekte tutulan kapatılmış sekme sayısı (Firefox'ta da 25'e yakın)
+const CLOSED_LIMIT = 25;
+
 let nextTabId = 1;
 
 class VentoTab {
@@ -112,6 +115,7 @@ function contentTitle(browser) {
 
 Vento.tabs = new (class TabManager extends EventTarget {
   #tabs = [];
+  #closed = []; // kapatılan sekmeler, en yeni SONDA: {url, title, index}
   #selected = null;
   #container = null;
 
@@ -125,6 +129,11 @@ Vento.tabs = new (class TabManager extends EventTarget {
 
   get selected() {
     return this.#selected;
+  }
+
+  /** Yeniden açılabilecek kapatılmış sekmeler (en yeni başta). */
+  get closed() {
+    return [...this.#closed].reverse();
   }
 
   #emit(type, tab) {
@@ -209,8 +218,9 @@ Vento.tabs = new (class TabManager extends EventTarget {
    * @param openWindowInfo  window.open() ile gelen bilgi (varsa sayfa yüklenmez, içerik kendi yükler)
    * @param afterCurrent true → seçili sekmenin hemen sağına
    * @param lazy         {url, title} → sayfa şimdi yüklenmez (oturum geri yükleme); sekme seçilince yüklenir
+   * @param at           sekmenin konacağı sıra (verilmezse sona / afterCurrent'e göre)
    */
-  open(url = "about:blank", { select = true, openWindowInfo = null, afterCurrent = false, lazy = null } = {}) {
+  open(url = "about:blank", { select = true, openWindowInfo = null, afterCurrent = false, lazy = null, at = null } = {}) {
     const browser = document.createXULElement("browser");
     const attrs = {
       type: "content",
@@ -241,8 +251,12 @@ Vento.tabs = new (class TabManager extends EventTarget {
       tab.title = lazy.title || "";
       this.#iconFromCache(tab);
     }
-    const at = afterCurrent && this.#selected ? this.#tabs.indexOf(this.#selected) + 1 : this.#tabs.length;
-    this.#tabs.splice(at, 0, tab);
+    const pos = Number.isInteger(at)
+      ? Math.min(Math.max(at, 0), this.#tabs.length)
+      : afterCurrent && this.#selected
+        ? this.#tabs.indexOf(this.#selected) + 1
+        : this.#tabs.length;
+    this.#tabs.splice(pos, 0, tab);
     this.#wire(tab);
     this.#setActive(tab, false);
     this.#emit("tabopen", tab);
@@ -316,6 +330,13 @@ Vento.tabs = new (class TabManager extends EventTarget {
       return;
     }
     const wasSelected = tab === this.#selected;
+    // Son sekme kapanınca pencere (uygulama) de kapanır; o durum oturum geri yüklemenin işi, burada kaydedilmez.
+    if (this.#tabs.length > 1 && /^(https?|file):/i.test(tab.url || "")) {
+      this.#closed.push({ url: tab.url, title: tab.title, index: i });
+      if (this.#closed.length > CLOSED_LIMIT) {
+        this.#closed.shift();
+      }
+    }
     this.#tabs.splice(i, 1);
     tab.browser.remove();
     this.#emit("tabclose", tab);
@@ -328,6 +349,21 @@ Vento.tabs = new (class TabManager extends EventTarget {
       this.#selected = null;
       this.select(this.#tabs[Math.min(i, this.#tabs.length - 1)]);
     }
+  }
+
+  /** Kapatılmış sekme yığınını unutur (geçmişi temizle / gizlilik). */
+  forgetClosed() {
+    this.#closed.length = 0;
+    this.dispatchEvent(new CustomEvent("closedchange"));
+  }
+
+  /** En son kapatılan sekmeyi eski yerine açar ve seçer. Kapatılmış sekme yoksa null. */
+  reopenClosed() {
+    const entry = this.#closed.pop();
+    if (!entry) {
+      return null;
+    }
+    return this.open(entry.url, { select: true, at: entry.index });
   }
 
   navigate(tab, text) {

@@ -31,6 +31,7 @@
     <xul:command id="cmd_newTab"/>
     <xul:command id="cmd_closeTab"/>
     <xul:command id="cmd_print"/>
+    <xul:command id="cmd_reopenTab" disabled="true"/>
     <xul:command id="cmd_focusBar"/>
     <xul:command id="cmd_reload"/>
     <xul:command id="cmd_stop"/>
@@ -55,6 +56,7 @@
     <xul:key id="key_newTab" key="t" modifiers="accel" command="cmd_newTab"/>
     <xul:key id="key_closeTab" key="w" modifiers="accel" command="cmd_closeTab"/>
     <xul:key id="key_print" key="p" modifiers="accel" command="cmd_print"/>
+    <xul:key id="key_reopenTab" key="t" modifiers="accel,shift" command="cmd_reopenTab"/>
     <xul:key id="key_focusBar" key="l" modifiers="accel" command="cmd_focusBar"/>
     <xul:key id="key_focusBar2" key="k" modifiers="accel" command="cmd_focusBar"/>
     <xul:key id="key_reload" key="r" modifiers="accel" command="cmd_reload"/>
@@ -123,6 +125,8 @@
             <xul:menupopup id="menu_HistoryPopup">
               <xul:menuitem id="menu_back" label="Geri" command="cmd_back" key="key_back"/>
               <xul:menuitem id="menu_forward" label="İleri" command="cmd_forward" key="key_forward"/>
+              <xul:menuseparator/>
+              <xul:menuitem id="menu_reopenTab" label="Kapatılan Sekmeyi Yeniden Aç" command="cmd_reopenTab" key="key_reopenTab"/>
               <xul:menuseparator/>
               <xul:menuitem id="menu_nextTab" label="Sonraki Sekme" command="cmd_nextTab" key="key_nextTab"/>
               <xul:menuitem id="menu_prevTab" label="Önceki Sekme" command="cmd_prevTab" key="key_prevTab"/>

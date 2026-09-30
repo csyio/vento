@@ -936,6 +936,52 @@
       tabs.close(tab);
     }
 
+    // ===================== Kapatılan sekmeyi yeniden aç (⌘⇧T) =====================
+    {
+      const llm = Services.env.get("VENTO_ESIN_ENDPOINT").replace(/\/v1$/, "");
+      const u = n => `${llm}/kapali/${n}`;
+      const cmd = document.getElementById("cmd_reopenTab");
+      tabs.forgetClosed(); // önceki testlerin kapattığı sekmeler karışmasın
+      const base = tabs.all.length;
+      const open = (n, select = false) => tabs.open(u(n), { select, lazy: { url: u(n), title: "Sayfa " + n } });
+      const key = document.getElementById("key_reopenTab");
+      check("⌘⇧T kısayolu ve Geçmiş menüsü bağlı", key?.getAttribute("key") === "t" && key.getAttribute("modifiers") === "accel,shift" && document.getElementById("menu_reopenTab")?.getAttribute("command") === "cmd_reopenTab");
+      check("kapatılmış sekme yokken komut devre dışı, reopenClosed() null", cmd.hasAttribute("disabled") && tabs.closed.length === 0 && tabs.reopenClosed() === null);
+
+      const [A, B, C] = [open("a"), open("b"), open("c")];
+      tabs.close(B);
+      check("kapatılan sekme yığına girdi (adres + başlık + sıra)", tabs.closed.length === 1 && tabs.closed[0].url === u("b") && tabs.closed[0].title === "Sayfa b" && tabs.closed[0].index === base + 1, JSON.stringify(tabs.closed));
+      check("komut etkinleşti", !cmd.hasAttribute("disabled"));
+
+      const back = tabs.reopenClosed();
+      check("⌘⇧T: sekme ESKİ yerine döndü (A ile C arasında) ve seçildi", back && tabs.all.indexOf(back) === base + 1 && tabs.all[base] === A && tabs.all[base + 2] === C && tabs.selected === back, String(tabs.all.indexOf(back)));
+      check("yeniden açılan sekmenin sayfası yüklendi", await wait(() => back.url === u("b") && back.browser.currentURI?.spec === u("b"), 15000), back.url);
+      check("yığın boşaldı, komut yine devre dışı", tabs.closed.length === 0 && cmd.hasAttribute("disabled"));
+
+      // sıra: en son kapatılan önce döner
+      tabs.close(A); tabs.close(C);
+      check("en yeni başta: C, sonra A", tabs.closed[0].url === u("c") && tabs.closed[1].url === u("a"), JSON.stringify(tabs.closed.map(c => c.url)));
+      const r1 = tabs.reopenClosed();
+      const r2 = tabs.reopenClosed();
+      check("ilk ⌘⇧T C'yi, ikincisi A'yı açar, yığın boşalır", tabs.closed.length === 0 && !!r1 && !!r2 && await wait(() => r1.url === u("c") && r2.url === u("a"), 15000), `${r1?.url} ${r2?.url}`);
+
+      // yalnız gerçek sayfalar: boş sekme, data: ve hata sayfası yığına girmez
+      const blank = tabs.open("about:blank", { select: false });
+      const dat = tabs.open("data:text/html,<title>d</title>", { select: false });
+      await wait(() => dat.url.startsWith("data:"), 10000);
+      tabs.close(blank); tabs.close(dat);
+      check("boş sekme ve data: sekmesi yığına girmez", tabs.closed.length === 0, JSON.stringify(tabs.closed));
+
+      // sınır: 25
+      const many = Array.from({ length: 30 }, (_, i) => open("m" + i));
+      many.forEach(t => tabs.close(t));
+      check("yığın en fazla 25 kayıt tutar, en yenisi başta", tabs.closed.length === 25 && tabs.closed[0].url === u("m29") && tabs.closed.at(-1).url === u("m5"), `${tabs.closed.length} ${tabs.closed[0]?.url.slice(-3)}`);
+      tabs.forgetClosed();
+      check("forgetClosed: yığın boşaldı ve komut devre dışı", tabs.closed.length === 0 && cmd.hasAttribute("disabled"));
+      for (const t of tabs.all.slice(base)) { tabs.close(t); }
+      tabs.forgetClosed();
+    }
+
     // ===================== Sekme simgeleri (favicon) =====================
     {
       const llm = Services.env.get("VENTO_ESIN_ENDPOINT").replace(/\/v1$/, "");
@@ -1038,12 +1084,12 @@
       tabs.close(tabs.all[tabs.all.length - 1]);
       check("restore(null) ve boş durum: false", S.restore(null) === false && S.restore({ selected: 0, tabs: [] }) === false);
 
-      // -- Son durum: 2. aşamada (yeniden başlatma) doğrulanır. Başlıklar bilerek verilir (sunucu başlıksız).
+      // -- Son durum: 2. aşamada (yeniden başlatma) doğrulanır. Başlıklar sunucunun döndürdüğü gerçek sayfa başlığıdır.
       for (const t of tabs.all) { if (t !== tabs.selected) { tabs.close(t); } }
       const keep = tabs.selected;
       const [a2, b2, c2] = [tabs.open(u("a"), { select: false }), tabs.open(u("b"), { select: false }), tabs.open(u("c"), { select: false })];
       await wait(() => [a2, b2, c2].every(t => !t.loading && t.browser.currentURI?.spec === t.url && t.url.startsWith("http")), 15000);
-      a2.title = "Sayfa A"; c2.title = "Sayfa C";
+      await wait(() => a2.title === "Sayfa A" && c2.title === "Sayfa C", 10000); // başlıklar sunucudan gerçek sayfa başlığı olarak gelir
       tabs.close(keep); // boş/data sekmesi geri gelmesin
       tabs.select(c2);
       await S.flush();       // ara durum: seçili C

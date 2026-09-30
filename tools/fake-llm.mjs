@@ -72,6 +72,14 @@ const srv = http.createServer((req, res) => {
         document.getElementById("dir").addEventListener("change", e => { document.title = "dosya:dir:" + e.target.files.length; });
       </script>`);
   }
+  // Oturum/kapalı sekme testleri: /oturum/<ad> ve /kapali/<ad> → başlığı "Sayfa <AD>" olan gerçek bir sayfa
+  {
+    const m = req.method === "GET" && /^\/(oturum|kapali)\/([^/?#]+)/.exec(req.url);
+    if (m) {
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      return res.end(`<!doctype html><meta charset="utf-8"><title>Sayfa ${decodeURIComponent(m[2]).toUpperCase()}</title><p>${m[2]}</p>`);
+    }
+  }
   // Yazdırma testi: ?pencere → sayfa kendi window.print()'ini çağırır
   if (req.method === "GET" && req.url.startsWith("/yazdir.html")) {
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
