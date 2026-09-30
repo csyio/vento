@@ -24,6 +24,22 @@ VentoStartup.prototype = {
       trace("startup: preventDefault zaten set, çıkılıyor");
       return;
     }
+    // Toolkit'in pencere/süreç aktörlerini (PageExtractor, Select, Find, Pdfjs …) kaydeder. Firefox'ta bunu
+    // browser/'ın DesktopActorRegistry'si yapar; bizde kimse yapmadığı için burada yüklenir.
+    try {
+      ChromeUtils.importESModule("resource://gre/modules/ActorManagerParent.sys.mjs");
+      trace("startup: toolkit aktörleri kaydedildi");
+      ChromeUtils.registerWindowActor("VentoPageText", {
+        parent: { esModuleURI: "resource:///actors/VentoPageTextParent.sys.mjs" },
+        child: { esModuleURI: "resource:///actors/VentoPageTextChild.sys.mjs" },
+        allFrames: false,
+        matches: ["http://*/*", "https://*/*"],
+        messageManagerGroups: ["browsers"],
+      });
+      trace("startup: VentoPageText aktörü kaydedildi");
+    } catch (e) {
+      trace(`startup: ActorManagerParent HATA: ${e}`);
+    }
     try {
       const win = Services.ww.openWindow(null, MAIN_WINDOW, "_blank", WINDOW_FEATURES, cmdLine);
       trace(`startup: openWindow döndü, pencere=${!!win}`);

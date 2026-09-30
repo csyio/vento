@@ -9,6 +9,12 @@ if [ "$1" != "--no-build" ]; then
 fi
 APP="$ROOT/engine/obj-vento/dist/Vento.app/Contents/MacOS/vento"
 TMP="$(mktemp -d)"
+# Sahte LLM (Esin testleri için)
+node "$ROOT/tools/fake-llm.mjs" "$TMP/llm-port" &
+LLM=$!
+trap 'kill $LLM 2>/dev/null' EXIT
+i=0; while [ ! -s "$TMP/llm-port" ] && [ $i -lt 50 ]; do sleep 0.1; i=$((i+1)); done
+export VENTO_ESIN_ENDPOINT="http://127.0.0.1:$(cat "$TMP/llm-port")/v1"
 env -u CLAUDECODE VENTO_SELFTEST=1 VENTO_TRACE="$TMP/trace.txt" MOZ_CRASHREPORTER_DISABLE=1 \
   "$APP" --profile "$TMP/profile" --no-remote --headless >"$TMP/out.log" 2>&1 &
 PID=$!

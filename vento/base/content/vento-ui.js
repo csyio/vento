@@ -107,6 +107,54 @@ Vento.ui = (() => {
     refreshBar();
   }
 
+  // ---- Öneriler: adres olmayan metin için "Esin'e sor / Ara" -----------------------------
+  let suggestIndex = 0;
+
+  function suggestVisible() {
+    return !els.suggest.hidden;
+  }
+
+  function selectSuggest(i) {
+    suggestIndex = (i + els.rows.length) % els.rows.length;
+    els.rows.forEach((r, k) => r.toggleAttribute("selected", k === suggestIndex));
+  }
+
+  function updateSuggest() {
+    const text = els.input.value.trim();
+    const show = document.activeElement === els.input && !!text && Vento.isSearchText(text);
+    if (!show) {
+      hideSuggest(); // seçimi de sıfırlar: sonraki açılışta varsayılan yine "Esin'e sor"
+    }
+    els.suggest.hidden = !show;
+    if (show) {
+      els.rows.forEach(r => (r.querySelector(".suggest-text").textContent = text));
+      if (!els.rows.some(r => r.hasAttribute("selected"))) {
+        selectSuggest(0); // varsayılan: Esin
+      }
+    }
+  }
+
+  function hideSuggest() {
+    els.suggest.hidden = true;
+    els.rows.forEach(r => r.removeAttribute("selected"));
+  }
+
+  function runSuggest(kind) {
+    const text = els.input.value.trim();
+    hideSuggest();
+    if (!text) {
+      return;
+    }
+    if (kind === "esin") {
+      els.input.value = "";
+      els.input.blur();
+      Vento.esin.ask(text);
+      document.getElementById("esin-input").focus();
+    } else if (Vento.tabs.navigate(Vento.tabs.selected, text)) {
+      focusPage();
+    }
+  }
+
   /** Odakta çubuk tam adresi gösterir. Değeri odak olayına bırakmayız: pencere etkin değilken tetiklenmez. */
   function showFullUrl() {
     const tab = Vento.tabs.selected;
@@ -131,7 +179,9 @@ Vento.ui = (() => {
       back: $("nav-back"),
       forward: $("nav-forward"),
       reload: $("nav-reload"),
+      suggest: $("smartbar-suggest"),
     });
+    els.rows = [...els.suggest.querySelectorAll(".suggest-row")];
 
     const t = Vento.tabs;
     t.addEventListener("tabopen", renderTabs);
@@ -159,16 +209,33 @@ Vento.ui = (() => {
       showFullUrl();
       els.input.select();
     });
-    els.input.addEventListener("blur", refreshBar);
+    els.input.addEventListener("blur", () => {
+      hideSuggest();
+      refreshBar();
+    });
+    els.input.addEventListener("input", updateSuggest);
+    els.rows.forEach((row, i) => {
+      // mousedown'da odağı çubukta tut, yoksa blur önce öneriyi gizler ve tıklama kaybolur
+      row.addEventListener("mousedown", e => e.preventDefault());
+      row.addEventListener("mouseenter", () => selectSuggest(i));
+      row.addEventListener("click", () => runSuggest(row.dataset.kind));
+    });
     els.input.addEventListener("keydown", e => {
-      if (e.key === "Enter") {
+      if ((e.key === "ArrowDown" || e.key === "ArrowUp") && suggestVisible()) {
         e.preventDefault();
-        if (t.navigate(t.selected, els.input.value)) {
+        selectSuggest(suggestIndex + (e.key === "ArrowDown" ? 1 : -1));
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        if (suggestVisible()) {
+          runSuggest(els.rows[suggestIndex].dataset.kind);
+        } else if (t.navigate(t.selected, els.input.value)) {
           focusPage();
         }
       } else if (e.key === "Escape") {
         e.preventDefault();
-        if (t.selected?.blank) {
+        if (suggestVisible()) {
+          hideSuggest();
+        } else if (t.selected?.blank) {
           els.input.select();
         } else {
           focusPage();
@@ -177,5 +244,5 @@ Vento.ui = (() => {
     });
   }
 
-  return { init, focusBar, focusPage, renderTabs, refreshChrome };
+  return { init, focusBar, focusPage, renderTabs, refreshChrome, updateSuggest };
 })();

@@ -21,6 +21,7 @@
     on("cmd_forward", () => t.forward());
     on("cmd_nextTab", () => t.selectRelative(1));
     on("cmd_prevTab", () => t.selectRelative(-1));
+    on("cmd_toggleEsin", () => Vento.esin.toggle());
     on("cmd_quit", () => Services.startup.quit(Ci.nsIAppStartup.eAttemptQuit));
 
     // Düzen komutları odaktaki öğeye (sayfa ya da akıllı çubuk) gider.
@@ -90,6 +91,7 @@
   window.addEventListener("load", () => {
     Vento.tabs.init($("browsers"));
     Vento.ui.init();
+    Vento.esin.init();
     bindCommands();
     window.browserDOMWindow = makeBrowserAccess();
 

@@ -64,6 +64,19 @@ Toolkit'in `browser/`'a sert bağımlılığı **yok** — ama her Gecko uygulam
 
 Tam derleme ~45 dk (M-serisi, sıfırdan). Sonraki derlemeler artımlı.
 
+## Esin (asistan) mimarisi
+
+- **Panel:** `vento-esin.js` (istemci + panel), `vento-markdown.js` (güvenli çizici: model çıktısı asla HTML
+  olarak yorumlanmaz). Sağlayıcıdan bağımsız: OpenAI uyumlu `/chat/completions` + akış.
+- **Uç nokta:** tercih `vento.esin.endpoint` (varsayılan `https://esin.cansoykanyilmaz.com/v1`, Vento vekili);
+  geliştirme: `VENTO_ESIN_ENDPOINT` ortam değişkeni. **Anahtar tarayıcıda yok**, yalnızca `server/esin-proxy`.
+- **Sayfa metni:** `vento/actors/VentoPageText*` (Reader modu + DOMExtractor, `waitForPageReady` yok → arka plan
+  sekmeleri de ~70 ms). Yalnızca kullanıcı soru gönderince ve sekme bağlamdayken okunur/gönderilir;
+  mesajın altında "host · N karakter" görünür. İlk kullanımda onay kartı (`vento.esin.consented`).
+- **Akıllı çubuk:** adres olmayan metinde altta "Esin'e sor / Ara" (varsayılan Esin, ↑↓, Enter).
+- **Bağlam:** çipler; açık sayfa varsayılan (sekme değişince izler), "+ Sekme" ile en çok 5 sekme (çoklu bağlam).
+- **Test:** `tools/selftest.sh` + `tools/fake-llm.mjs` (66 kontrol); vekil: `server/esin-proxy` `node --test` (11).
+
 ## Tuzaklar (yaşandıkça eklenecek)
 
 - `mach` `CLAUDECODE` görünce çıktıyı kısar: `env -u CLAUDECODE ./mach ...`

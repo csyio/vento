@@ -115,6 +115,116 @@
     Vento.ui.focusPage();
     check("odak sayfaya dönünce kısa biçim", await wait(() => document.getElementById("smartbar-input").value === "example.com"),
       document.getElementById("smartbar-input").value);
+
+    // ===================== Esin =====================
+    {
+      const $ = id => document.getElementById(id);
+      const llm = Services.env.get("VENTO_ESIN_ENDPOINT").replace(/\/v1$/, "");
+      const stats = async () => (await fetch(`${llm}/stats`)).json();
+      const reqs = async () => (await stats()).requests;
+      const bots = () => [...$("esin-thread").querySelectorAll(".msg-assistant .msg-body")];
+      const botText = () => bots().at(-1)?.textContent ?? "";
+      const idle = () => !Vento.esin.state.busy;
+
+      // -- panel ve yerleşim
+      Services.prefs.setBoolPref("vento.esin.consented", false);
+      const stageBefore = $("stage").getBoundingClientRect().width;
+      Vento.esin.open();
+      const er = $("esin").getBoundingClientRect();
+      const sr = $("stage").getBoundingClientRect();
+      check("Esin paneli sayfa kartının yanında", er.left >= sr.right - 1 && Math.round(er.width) === 380,
+        `panel=[${Math.round(er.left)}..${Math.round(er.right)}] kart sağı=${Math.round(sr.right)}`);
+      check("panel açılınca kart daraldı", sr.width < stageBefore, `${Math.round(stageBefore)} → ${Math.round(sr.width)}`);
+      check("açılışta açık sayfa bağlama eklendi (1 çip)", $("esin-chips").children.length === 1);
+
+      // -- onay kapısı: onaysız hiçbir şey gitmemeli
+      check("onay kartı görünür", !$("esin-consent").hidden);
+      Vento.esin.send("Merhaba?");
+      await new Promise(r => setTimeout(r, 300));
+      check("onaysız gönderim sağlayıcıya gitmedi", (await reqs()).length === 0);
+      $("esin-consent-ok").click();
+      check("onaydan sonra bekleyen soru gitti", await wait(async () => (await reqs()).length === 1));
+      check("cevap akışla geldi", await wait(() => botText().includes("Soru: Merhaba?") && idle()), botText());
+      const r1 = (await reqs())[0];
+      check("istek: sayfa adresi + soru + sistem istemi", r1.urls.join() === "https://example.com/" && r1.question === "Merhaba?" && r1.systemOk, JSON.stringify(r1));
+      check("sayfa metni çıkarıldı ve gönderildi (>200 karakter)", r1.pageChars > 200, `pageChars=${r1.pageChars}`);
+      check("istemci Authorization göndermedi (anahtar sunucuda)", r1.hasAuth === false);
+      check("gönderilen sayfa kullanıcıya gösterildi", document.querySelector(".msg-ctx")?.textContent.includes("example.com"),
+        document.querySelector(".msg-ctx")?.textContent);
+
+      // -- çoklu sekme (c)
+      const e2 = tabs.open("https://example.org");
+      check("e2 yüklendi", await wait(() => /Example Domain/.test(e2.title)), e2.title);
+      check("sekme değişince bağlam yeni sayfayı izledi", Vento.esin.state.attached.length === 1 && Vento.esin.state.attached[0] === e2);
+      check("t1 elle eklendi", Vento.esin.attach(t1) === true);
+      check("iki çip var", $("esin-chips").children.length === 2);
+      Vento.esin.send("İkisini karşılaştır");
+      check("çoklu sekmeli cevap geldi", await wait(() => botText().includes("İkisini karşılaştır") && idle()), botText());
+      const r2 = (await reqs())[1];
+      check("iki sayfa da gitti", r2.urls.length === 2 && r2.urls.includes("https://example.com/") && r2.urls.includes("https://example.org/"), r2.urls.join());
+      check("önceki tur geçmişte (2 mesaj)", r2.historyLen === 2, String(r2.historyLen));
+
+      // -- durdurma
+      Vento.esin.send("YAVAS bir soru");
+      check("yavaş cevap akmaya başladı", await wait(() => botText().startsWith("Başlıyorum")), botText());
+      Vento.esin.stop();
+      check("durdurunca sağlayıcı bağlantısı kapandı", await wait(async () => (await stats()).aborted >= 1));
+      check("durdurunca meşgul değil", await wait(idle));
+      check("kısmi cevap korundu, 'Durduruldu' notu var", $("esin-thread").textContent.includes("Durduruldu") && botText().startsWith("Başlıyorum"));
+
+      // -- model çıktısı HTML olarak çizilmez
+      const tHtml = Date.now();
+      Vento.esin.send("HTML dene");
+      check("markdown cevabı geldi", await wait(() => idle() && !!bots().at(-1)?.querySelector("strong")), botText());
+      Vento.trace(`TEST bilgi: HTML dene ${Date.now() - tHtml} ms sürdü`);
+      const body = bots().at(-1);
+      check("HTML etiketleri çizilmedi (b/img yok)", !body.querySelector("b, img") && body.textContent.includes("<b>x</b>"));
+      check("markdown çizildi (strong, code, 2 li)", !!body.querySelector("strong") && !!body.querySelector("code") && body.querySelectorAll("li").length === 2);
+
+      // -- bağlamsız soruda sayfa metni GİTMEZ
+      for (const tab of [...Vento.esin.state.attached]) {
+        Vento.esin.detach(tab);
+      }
+      check("çipler boşaldı", $("esin-chips").children.length === 0);
+      Vento.esin.send("Sadece soru");
+      check("bağlamsız cevap geldi", await wait(() => botText().includes("Sadece soru") && idle()), botText());
+      const rs = await reqs();
+      const rn = rs[rs.length - 1];
+      check("bağlamsız istekte sayfa metni gitmedi", rn.urls.length === 0 && rn.pageChars === 0, JSON.stringify(rn));
+
+      // -- akıllı çubuk önerileri
+      tabs.close(e2);
+      tabs.select(t1);
+      const input = $("smartbar-input");
+      Vento.ui.focusBar();
+      input.value = "rüzgar nedir";
+      input.dispatchEvent(new Event("input"));
+      const rows = [...$("smartbar-suggest").querySelectorAll(".suggest-row")];
+      check("arama metninde öneri listesi çıktı (Esin varsayılan)", !$("smartbar-suggest").hidden && rows.length === 2 && rows[0].hasAttribute("selected") && rows[0].dataset.kind === "esin");
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+      check("↓ ile 'Ara' seçildi", rows[1].hasAttribute("selected") && !rows[0].hasAttribute("selected"));
+      input.value = "example.com";
+      input.dispatchEvent(new Event("input"));
+      check("adres yazınca öneri yok", $("smartbar-suggest").hidden);
+
+      // -- çubuktan Esin'e sor: açık sayfa bağlam olur
+      Vento.ui.focusBar();
+      input.value = "Bu sayfa nedir?";
+      input.dispatchEvent(new Event("input"));
+      const before = (await reqs()).length;
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      check("çubuktan sorulan soru Esin'e gitti", await wait(async () => (await reqs()).length === before + 1));
+      const rq = (await reqs()).at(-1);
+      check("çubuktan sorulunca açık sayfa bağlamda", rq.question === "Bu sayfa nedir?" && rq.urls.join() === "https://example.com/", JSON.stringify(rq));
+      check("soru gönderilince çubuk sayfanın kısa adresine döndü", input.value === "example.com", input.value);
+      await wait(idle);
+
+      // -- yeni sohbet ve kapatma
+      Vento.esin.clearChat();
+      check("yeni sohbet mesajları sildi", $("esin-thread").querySelectorAll(".msg").length === 0 && !$("esin-empty").hidden);
+      Vento.esin.close();
+      check("panel kapandı, kart eski genişliğe döndü", $("esin").hidden && Math.abs($("stage").getBoundingClientRect().width - stageBefore) < 2);
+    }
   } catch (e) {
     check("öz-test istisna fırlatmadı", false, String(e) + "\n" + (e.stack || ""));
   }

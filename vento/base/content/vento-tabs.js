@@ -44,6 +44,9 @@ Vento.resolveInput = function resolveInput(raw) {
   return SEARCH_URL + encodeURIComponent(text);
 };
 
+/** Girdi bir adres değil, arama/soru metni mi? (çubuktaki "Ara / Esin'e sor" önerisi için) */
+Vento.isSearchText = text => Vento.resolveInput(text)?.startsWith(SEARCH_URL) ?? false;
+
 /** Çubukta gösterilecek kısa biçim: alan adı + yol. */
 Vento.formatDisplay = function formatDisplay(url) {
   if (!url || url === "about:blank") {
