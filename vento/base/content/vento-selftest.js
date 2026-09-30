@@ -330,6 +330,54 @@
       await wait(idle);
       cm.dryRun = false;
     }
+
+    // ===================== Sayfada ara =====================
+    {
+      const $ = id => document.getElementById(id);
+      const tab = tabs.selected;
+      const count = () => $("find-count").textContent;
+      const input = $("find-input");
+      const key = (k, extra = {}) => input.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, ...extra }));
+      tab.browser.fixupAndLoadURIString("data:text/html," + encodeURIComponent(
+        `<meta charset="utf-8"><title>bul</title><p>elma armut elma muz elma</p>`), { triggeringPrincipal: Vento.SYSTEM_PRINCIPAL });
+      check("arama sayfası yüklendi", await wait(() => tab.title === "bul"), tab.title);
+
+      check("menüde 'Sayfada Ara…' ve ⌘F kısayolu var", !!$("menu_find") && $("key_find").getAttribute("key") === "f");
+      Vento.find.open();
+      check("⌘F çubuğu açtı, odak arama kutusunda", !$("findbar").hidden && document.activeElement === input);
+
+      input.value = "elma";
+      input.dispatchEvent(new Event("input"));
+      check("'elma' → 1/3", await wait(() => count() === "1/3"), count());
+      key("Enter");
+      check("Enter → sonraki 2/3", await wait(() => count() === "2/3"), count());
+      Vento.find.next();
+      check("⌘G → 3/3", await wait(() => count() === "3/3"), count());
+      Vento.find.next();
+      check("sonuncudan sonra başa sardı 1/3", await wait(() => count() === "1/3"), count());
+      key("Enter", { shiftKey: true });
+      check("⇧Enter → geri (3/3)", await wait(() => count() === "3/3"), count());
+
+      input.value = "yokkelime";
+      input.dispatchEvent(new Event("input"));
+      check("olmayan kelime → 'Bulunamadı' ve kırmızı", await wait(() => count() === "Bulunamadı" && input.hasAttribute("notfound")), count());
+      input.value = "armut";
+      input.dispatchEvent(new Event("input"));
+      check("bulunca kırmızı kalktı, 1/1", await wait(() => count() === "1/1" && !input.hasAttribute("notfound")), count());
+
+      key("Escape");
+      check("Esc çubuğu kapattı", $("findbar").hidden === true && Vento.find.state.open === false);
+
+      // arama sekmeye bağlı: sekme değişince kapanır
+      Vento.find.open();
+      const other = tabs.open("about:blank");
+      check("sekme değişince arama çubuğu kapandı", $("findbar").hidden === true);
+      tabs.close(other);
+      tabs.select(tab);
+      Vento.find.open();
+      Vento.find.close(false);
+      check("boş sekmede ⌘F açmaz", (() => { const b = tabs.open("about:blank"); Vento.find.open(); const ok = $("findbar").hidden; tabs.close(b); tabs.select(tab); return ok; })());
+    }
   } catch (e) {
     check("öz-test istisna fırlatmadı", false, String(e) + "\n" + (e.stack || ""));
   }

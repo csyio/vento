@@ -17,6 +17,7 @@
   <script src="chrome://vento/content/vento-ui.js"/>
   <script src="chrome://vento/content/vento-esin.js"/>
   <script src="chrome://vento/content/vento-menu.js"/>
+  <script src="chrome://vento/content/vento-find.js"/>
   <script src="chrome://vento/content/vento-shell.js"/>
 </head>
 <body>
@@ -38,6 +39,9 @@
     <xul:command id="cmd_copy"/>
     <xul:command id="cmd_paste"/>
     <xul:command id="cmd_selectAll"/>
+    <xul:command id="cmd_find"/>
+    <xul:command id="cmd_findNext"/>
+    <xul:command id="cmd_findPrev"/>
     <xul:command id="cmd_toggleEsin"/>
     <xul:command id="cmd_quit"/>
   </xul:commandset>
@@ -59,6 +63,9 @@
     <xul:key id="key_copy" key="c" modifiers="accel" command="cmd_copy"/>
     <xul:key id="key_paste" key="v" modifiers="accel" command="cmd_paste"/>
     <xul:key id="key_selectAll" key="a" modifiers="accel" command="cmd_selectAll"/>
+    <xul:key id="key_find" key="f" modifiers="accel" command="cmd_find"/>
+    <xul:key id="key_findNext" key="g" modifiers="accel" command="cmd_findNext"/>
+    <xul:key id="key_findPrev" key="g" modifiers="accel,shift" command="cmd_findPrev"/>
     <xul:key id="key_toggleEsin" key="e" modifiers="accel" command="cmd_toggleEsin"/>
     <xul:key id="key_quit" key="q" modifiers="accel" command="cmd_quit"/>
   </xul:keyset>
@@ -90,6 +97,10 @@
               <xul:menuitem id="menu_copy" label="Kopyala" command="cmd_copy" key="key_copy"/>
               <xul:menuitem id="menu_paste" label="Yapıştır" command="cmd_paste" key="key_paste"/>
               <xul:menuitem id="menu_selectAll" label="Tümünü Seç" command="cmd_selectAll" key="key_selectAll"/>
+              <xul:menuseparator/>
+              <xul:menuitem id="menu_find" label="Sayfada Ara…" command="cmd_find" key="key_find"/>
+              <xul:menuitem id="menu_findNext" label="Sonrakini Bul" command="cmd_findNext" key="key_findNext"/>
+              <xul:menuitem id="menu_findPrev" label="Öncekini Bul" command="cmd_findPrev" key="key_findPrev"/>
             </xul:menupopup>
           </xul:menu>
           <xul:menu id="view-menu" label="Görünüm">
@@ -161,6 +172,14 @@
   <div id="workspace">
     <div id="stage">
       <div id="gust"></div>
+      <div id="findbar" hidden="true">
+        <svg:svg id="find-icon" viewBox="0 0 16 16"><svg:circle cx="7" cy="7" r="4.2"/><svg:path d="M10.2 10.2 13 13"/></svg:svg>
+        <input id="find-input" type="text" spellcheck="false" autocomplete="off" placeholder="Sayfada ara"/>
+        <span id="find-count"></span>
+        <button id="find-prev" class="find-btn" title="Önceki (⇧⌘G)"><svg:svg viewBox="0 0 16 16"><svg:path d="M4 10l4-4 4 4"/></svg:svg></button>
+        <button id="find-next" class="find-btn" title="Sonraki (⌘G)"><svg:svg viewBox="0 0 16 16"><svg:path d="M4 6l4 4 4-4"/></svg:svg></button>
+        <button id="find-close" class="find-btn" title="Kapat (esc)"><svg:svg viewBox="0 0 16 16"><svg:path d="M4 4l8 8M12 4l-8 8"/></svg:svg></button>
+      </div>
       <div id="start">
         <div id="start-word">Vento</div>
         <div id="start-hint"><kbd>⌘L</kbd> ile yaz, <kbd>↵</kbd> ile git</div>

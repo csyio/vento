@@ -21,6 +21,9 @@
     on("cmd_forward", () => t.forward());
     on("cmd_nextTab", () => t.selectRelative(1));
     on("cmd_prevTab", () => t.selectRelative(-1));
+    on("cmd_find", () => Vento.find.open());
+    on("cmd_findNext", () => Vento.find.next());
+    on("cmd_findPrev", () => Vento.find.prev());
     on("cmd_toggleEsin", () => Vento.esin.toggle());
     on("cmd_quit", () => Services.startup.quit(Ci.nsIAppStartup.eAttemptQuit));
 
@@ -92,6 +95,7 @@
     Vento.tabs.init($("browsers"));
     Vento.ui.init();
     Vento.esin.init();
+    Vento.find.init();
     bindCommands();
     window.browserDOMWindow = makeBrowserAccess();
 

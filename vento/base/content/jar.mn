@@ -7,5 +7,6 @@ vento.jar:
   content/vento-ui.js (vento-ui.js)
   content/vento-esin.js (vento-esin.js)
   content/vento-menu.js (vento-menu.js)
+  content/vento-find.js (vento-find.js)
   content/vento-shell.js (vento-shell.js)
   content/vento-selftest.js (vento-selftest.js)
