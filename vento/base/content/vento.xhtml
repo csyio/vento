@@ -197,6 +197,24 @@
         <button id="find-close" class="find-btn" title="Kapat (esc)"><svg:svg viewBox="0 0 16 16"><svg:path d="M4 4l8 8M12 4l-8 8"/></svg:svg></button>
       </div>
       <div id="start">
+        <!-- Ebabil (maskot): dört katman toplamsal karışımla üst üste; kanat/kuyruk ayrı döner (tools/make-ebabil.py) -->
+        <div id="ebabil" aria-hidden="true">
+          <div id="ebabil-glow"></div>
+          <svg id="ebabil-wind" viewBox="0 0 320 240" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="eb-wind-grad" x1="0" x2="1"><stop offset="0" stop-color="#40a0f0" stop-opacity="0"/><stop offset="0.5" stop-color="#3ccfe8" stop-opacity="0.9"/><stop offset="1" stop-color="#20e0d0" stop-opacity="0"/></linearGradient>
+            </defs>
+            <path class="eb-streak s1" d="M-20 150 C 60 130, 120 168, 190 146 S 290 140, 340 150" />
+            <path class="eb-streak s2" d="M-20 188 C 50 176, 120 204, 200 186 S 300 184, 340 192" />
+            <path class="eb-streak s3" d="M-20 108 C 70 96, 130 124, 200 104 S 290 100, 340 110" />
+          </svg>
+          <div id="ebabil-rig">
+            <img class="eb eb-wr" src="chrome://vento/content/ebabil/wing-r.webp" alt=""/>
+            <img class="eb eb-body" src="chrome://vento/content/ebabil/body.webp" alt=""/>
+            <img class="eb eb-tail" src="chrome://vento/content/ebabil/tail.webp" alt=""/>
+            <img class="eb eb-wl" src="chrome://vento/content/ebabil/wing-l.webp" alt=""/>
+          </div>
+        </div>
         <div id="start-word">Vento</div>
         <div id="start-hint"><kbd>⌘L</kbd> ile yaz, <kbd>↵</kbd> ile git</div>
       </div>

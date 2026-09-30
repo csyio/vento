@@ -394,10 +394,57 @@ button {
   letter-spacing: 0.02em;
   color: var(--v-text);
 }
+/* ---- Ebabil (maskot): süzülür, kanat çırpar, kuyruk sallanır; arkasında rüzgâr çizgileri ---- */
+#ebabil {
+  position: relative;
+  width: min(300px, 36vh);
+  aspect-ratio: 1;
+  margin-bottom: 4px;
+  pointer-events: none;
+}
+#ebabil-glow {
+  position: absolute;
+  inset: 12% 8%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, light-dark(rgba(7, 150, 179, 0.22), rgba(60, 207, 232, 0.20)), transparent 72%);
+  filter: blur(14px);
+  animation: eb-glow 5.4s ease-in-out infinite;
+}
+#ebabil-wind { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.eb-streak {
+  fill: none;
+  stroke: url(#eb-wind-grad);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-dasharray: 120 240;
+  opacity: 0;
+  animation: eb-wind 4.6s linear infinite;
+}
+.eb-streak.s2 { animation-delay: -1.6s; animation-duration: 5.4s; stroke-width: 1.6; }
+.eb-streak.s3 { animation-delay: -3.1s; animation-duration: 6.2s; stroke-width: 1.3; }
+/* Katmanlar önceden-çarpılmış renkte TOPLANIR: dinlenme hâli orijinalle aynı, döndüklerinde kenarlar yumuşak birleşir */
+#ebabil-rig { position: absolute; inset: 0; isolation: isolate; transform-origin: 56% 55%; animation: eb-float 5.4s ease-in-out infinite; will-change: transform; }
+.eb { position: absolute; inset: 0; width: 100%; height: 100%; mix-blend-mode: plus-lighter; will-change: transform; }
+.eb-wl { transform-origin: 55.8% 51.8%; animation: eb-flap-l 2.9s ease-in-out infinite; }
+.eb-wr { transform-origin: 78.5% 51%; animation: eb-flap-r 2.9s ease-in-out -0.18s infinite; }
+.eb-tail { transform-origin: 51% 68.6%; animation: eb-tail 3.7s ease-in-out infinite; }
+@keyframes eb-float { 0%, 100% { transform: translateY(2px) rotate(0.8deg); } 50% { transform: translateY(-9px) rotate(-0.9deg); } }
+@keyframes eb-flap-l { 0%, 100% { transform: rotate(-3.2deg); } 50% { transform: rotate(4.6deg); } }
+@keyframes eb-flap-r { 0%, 100% { transform: rotate(3.2deg); } 50% { transform: rotate(-4.6deg); } }
+@keyframes eb-tail { 0%, 100% { transform: rotate(-1.6deg); } 50% { transform: rotate(2.6deg); } }
+@keyframes eb-glow { 0%, 100% { opacity: 0.55; transform: scale(0.96); } 50% { opacity: 1; transform: scale(1.05); } }
+@keyframes eb-wind {
+  0% { stroke-dashoffset: 240; opacity: 0; }
+  15% { opacity: 0.85; }
+  80% { opacity: 0.6; }
+  100% { stroke-dashoffset: -120; opacity: 0; }
+}
+
 /* display:none → flex olunca animasyon yeniden başlar: boş sekme açılınca içerik hafifçe yükselerek belirir */
 #stage[blank] #start { animation: v-start-in 420ms var(--v-ease) both; }
 #stage[blank] #start-word { animation: v-rise 520ms var(--v-ease) 60ms both; }
 #stage[blank] #start-hint { animation: v-rise 520ms var(--v-ease) 160ms both; }
+#stage[blank] #ebabil { animation: v-rise 620ms var(--v-ease) both; }
 @keyframes v-start-in { from { opacity: 0; } }
 @keyframes v-rise { from { opacity: 0; transform: translateY(10px); } }
 
@@ -1041,6 +1088,9 @@ button {
 
 /* ---- Hareketi azalt: kayma/ölçek/dönme yok; yalnız çok kısa solma (JS tarafı vento-motion.js'te) ---- */
 @media (prefers-reduced-motion: reduce) {
+  /* Ebabil durur (dinlenme hâli özgün maskotla aynı); rüzgâr çizgileri ve parıltı gizlenir */
+  #ebabil-rig, .eb, #ebabil-glow { animation: none; }
+  #ebabil-wind { display: none; }
   #stage[blank] #start,
   #stage[blank] #start-word,
   #stage[blank] #start-hint { animation: v-start-in 90ms linear both; }

@@ -764,6 +764,34 @@
         const start = $("start");
         const names = [start, $("start-word"), $("start-hint")].map(e => getComputedStyle(e).animationName);
         check("boş sekme görünümü: kap, başlık ve ipucu kademeli giriş animasyonuna sahip", names.every(n => n !== "none") && start.getAnimations().length > 0, names.join(","));
+        // Ebabil: 4 katman yüklenir, yalnız transform ile (GPU) hareket eder, toplamsal karışır
+        const eb = $("ebabil");
+        const layers = [...eb.querySelectorAll(".eb")];
+        await wait(() => layers.every(i => i.complete && i.naturalWidth === 640), 5000);
+        check("Ebabil: 4 katman (sağ kanat, gövde, kuyruk, sol kanat) yüklendi (640 px)", layers.length === 4 && layers.every(i => i.complete && i.naturalWidth === 640), layers.map(i => `${i.className}:${i.naturalWidth}`).join(" "));
+        check("Ebabil: görünür boyutta (>100 px)", eb.getBoundingClientRect().width > 100, String(Math.round(eb.getBoundingClientRect().width)));
+        check("Ebabil: bütün kuş süzülür; 2 kanat + kuyruk ayrı çırpar, gövde yalnız süzülmeyi taşır", $("ebabil-rig").getAnimations().length === 1 && ["wl", "wr", "tail"].every(k => eb.querySelector(`.eb-${k}`).getAnimations().length === 1) && eb.querySelector(".eb-body").getAnimations().length === 0, layers.map(i => `${i.className.split(" ")[1]}:${i.getAnimations().length}`).join(" "));
+        check("Ebabil hareketi yalnız transform (GPU'da, yerleşimi bozmaz)", only(new Set([...layers, $("ebabil-rig")].flatMap(e => [...animProps(e)])), ["transform"]), [...new Set([...layers, $("ebabil-rig")].flatMap(e => [...animProps(e)]))].join(","));
+        check("Ebabil katmanları toplamsal karışır (plus-lighter), grup yalıtılmış", layers.every(i => getComputedStyle(i).mixBlendMode === "plus-lighter") && getComputedStyle($("ebabil-rig")).isolation === "isolate");
+        check("kanatlar zıt yönde, kuyruk ayrı sürede çırpar", (() => { const d = e => e.getAnimations()[0].effect.getTiming().duration; return d(eb.querySelector(".eb-wl")) === d(eb.querySelector(".eb-wr")) && d(eb.querySelector(".eb-tail")) !== d(eb.querySelector(".eb-wl")); })());
+        check("CSS'te Ebabil için hareketi-azalt kuralı var (durur)", [...document.styleSheets].some(sh => { try { return [...sh.cssRules].some(r => r.media && /prefers-reduced-motion/.test(r.media.mediaText) && [...r.cssRules].some(x => x.cssText.includes("#ebabil-rig") && x.cssText.includes("animation: none"))); } catch (e) { return false; } }));
+        // Dinlenme hâli özgün maskotla AYNI mı? Katmanları tarayıcının tuvalinde toplayıp (lighter = toplamsal) still.webp ile karşılaştır
+        {
+          const still = new Image();
+          still.src = "chrome://vento/content/ebabil/still.webp";
+          await still.decode();
+          const mk = () => { const c = document.createElementNS("http://www.w3.org/1999/xhtml", "canvas"); c.width = c.height = 640; return c.getContext("2d", { willReadFrequently: true }); };
+          const A = mk(), B = mk();
+          A.fillStyle = B.fillStyle = "#000"; A.fillRect(0, 0, 640, 640); B.fillRect(0, 0, 640, 640);
+          A.drawImage(still, 0, 0);
+          B.globalCompositeOperation = "lighter";
+          for (const i of layers) { B.drawImage(i, 0, 0); }
+          const a = A.getImageData(0, 0, 640, 640).data, b = B.getImageData(0, 0, 640, 640).data;
+          let max = 0, sum = 0;
+          for (let k = 0; k < a.length; k += 4) { for (let c = 0; c < 3; c++) { const d = Math.abs(a[k + c] - b[k + c]); sum += d; if (d > max) { max = d; } } }
+          const mean = sum / (a.length / 4 * 3);
+          check("Ebabil dinlenme hâli özgün maskotla aynı (katman toplamı ≈ still; tuvalde ölçüldü)", max <= 24 && mean < 1.2, `maks fark ${max}, ortalama ${mean.toFixed(3)}`);
+        }
         M.reducedOverride = null;
         tabs.close(blank);
       }
