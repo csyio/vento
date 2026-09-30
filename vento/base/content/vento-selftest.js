@@ -668,6 +668,7 @@
       });
       check("hata sayfası başlığı çözüldü (boş değil)", tab.title === "Server Not Found", `"${tab.title}"`);
       check("hata sayfası metni çevrildi ('Hmm. We’re having trouble…')", text.includes("having trouble finding that site"), text.slice(0, 120));
+      check("marka adı Vento (Nightly/Firefox değil)", text.includes("Check that Vento has permission") && !/Nightly|Firefox/.test(text), text.match(/Check that .{0,20}/)?.[0]);
       check("dil kaynağı eksikliği raporlanmadı (brand.ftl)", missing.length === 0, missing.join(" | "));
       check("uygulama dil kaynağı kayıtlı", L10nRegistry.getInstance().getSourceNames().some(n => n.includes("vento")));
     }
