@@ -8,6 +8,9 @@ if [ "$1" != "--no-build" ]; then
   (cd "$ROOT/engine" && env -u CLAUDECODE ./mach build faster 2>&1 | tail -n 3)
   sh "$ROOT/tools/build-locale.sh"
 fi
+# disk.icns yalnız DMG paketlemede kullanılır (uygulama paketine girmez): kaynakta uygulama simgesiyle aynı olmalı
+cmp -s "$ROOT/vento/branding/default/disk.icns" "$ROOT/vento/branding/default/firefox.icns" \
+  || { echo "HATA: vento/branding/default/disk.icns uygulama simgesiyle (firefox.icns) aynı değil (tools/make-doc-icon.py)"; exit 1; }
 APP="$ROOT/engine/obj-vento/dist/Vento.app/Contents/MacOS/vento"
 TMP="$(mktemp -d)"
 # Sahte LLM (Esin testleri için)

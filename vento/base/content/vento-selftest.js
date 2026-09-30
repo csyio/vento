@@ -860,6 +860,78 @@
       tabs.close(bl);
     }
 
+    // ===================== Başlangıç kişiselleştirme (duvar kâğıdı, Ebabil), Esin logosu, belge simgeleri =====================
+    {
+      const $ = id => document.getElementById(id);
+      const S = Vento.start;
+      const prefs = Services.prefs;
+      const lum = c => { const m = c.match(/\d+(\.\d+)?/g).map(Number); return (0.2126 * m[0] + 0.7152 * m[1] + 0.0722 * m[2]) / 255; };
+      const setWall = id => prefs.setStringPref("vento.start.wallpaper", id);
+
+      check("açılışta panel GİZLİ, duvar kâğıdı yok (sade varsayılan)", $("custom-panel").hidden === true && !$("start").hasAttribute("data-wallpaper") && prefs.getStringPref("vento.start.wallpaper", "?") === "", `panel.hidden=${$("custom-panel").hidden}`);
+      check("6 duvar kâğıdı (4 koyu, 2 açık) + 'Yok' karosu = 7 karo; varsayılanda 'Yok' seçili", S.WALLPAPERS.length === 6 && S.WALLPAPERS.filter(w => w.tone === "dark").length === 4 && $("cp-walls").querySelectorAll("button").length === 7 && $("cp-walls").querySelector('button[data-id=""]').getAttribute("aria-pressed") === "true");
+
+      // Görünür bir boş sekmede ölç (başlangıç ekranı yalnız boş sekmede görünür)
+      const blank = tabs.open("about:blank");
+      await wait(() => $("stage").hasAttribute("blank"), 3000);
+      const word = () => getComputedStyle($("start-word")).color;
+
+      setWall("tide");
+      check("koyu duvar kâğıdı: uygulandı, ton 'dark', yazı AÇIK renk (okunur)", await wait(() => $("start").dataset.wallpaper === "tide" && $("start").dataset.tone === "dark", 8000) && lum(word()) > 0.6 && $("start-wall").style.backgroundImage.includes("vento-tide.jpg"), word());
+      setWall("mist");
+      check("açık duvar kâğıdı: ton 'light', yazı KOYU renk (okunur)", await wait(() => $("start").dataset.tone === "light", 8000) && lum(word()) < 0.4, word());
+      check("seçili karo güncellendi (aria-pressed)", $("cp-walls").querySelector('button[data-id="mist"]').getAttribute("aria-pressed") === "true" && $("cp-walls").querySelector('button[data-id="tide"]').getAttribute("aria-pressed") === "false");
+      setWall("");
+      check("'Yok': duvar kâğıdı ve ton kalktı", await wait(() => !$("start").hasAttribute("data-wallpaper") && !$("start").hasAttribute("data-tone") && $("start-wall").style.backgroundImage === "", 4000));
+      setWall("bozuk-kimlik");
+      await new Promise(r => setTimeout(r, 400));
+      check("bozuk tercih değeri güvenli: 'yok' sayılır", !$("start").hasAttribute("data-wallpaper"));
+      // yarış: hızlı art arda seçim → SON seçim kazanır
+      for (const id of ["ink", "tide", "mist", "dusk"]) { setWall(id); }
+      check("hızlı art arda seçimde son seçim kazanır (yarış güvenli)", await wait(() => $("start").dataset.wallpaper === "dusk", 8000) && await new Promise(r => setTimeout(() => r($("start").dataset.wallpaper === "dusk" && $("start").dataset.tone === "dark"), 900)));
+
+      // Panel: düğmeyle açılır/kapanır, karo tıklayınca tercih yazılır
+      $("start-custom").click();
+      check("Özelleştir düğmesi paneli açar (pop animasyonuyla)", S.isOpen() && !$("custom-panel").hidden && $("custom-panel").getAnimations().length > 0);
+      $("cp-walls").querySelector('button[data-id="paper"]').click();
+      check("karo tıklanınca tercih yazıldı ve uygulandı", prefs.getStringPref("vento.start.wallpaper") === "paper" && await wait(() => $("start").dataset.wallpaper === "paper" && $("start").dataset.tone === "light", 8000));
+      check("panel ton değişiminden etkilenmez: yazı rengi uygulamanın kendi rengi (başlangıç yazısından bağımsız)", getComputedStyle($("custom-panel")).color === getComputedStyle(document.body).color && $("start").dataset.tone === "light", `${getComputedStyle($("custom-panel")).color} / gövde ${getComputedStyle(document.body).color}`);
+      // Ebabil aç/kapa
+      $("cp-ebabil").checked = false;
+      $("cp-ebabil").dispatchEvent(new Event("change"));
+      check("'Ebabil'i göster' kapatılınca Ebabil gizlenir, tercih yazılır", $("ebabil").hidden === true && prefs.getBoolPref("vento.start.ebabil") === false);
+      prefs.setBoolPref("vento.start.ebabil", true);
+      check("tercih dışarıdan değişince (gözlemci) Ebabil geri gelir ve kutu işaretlenir", $("ebabil").hidden === false && $("cp-ebabil").checked === true);
+      // kapanma yolları
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      check("Esc paneli kapatır", await wait(() => $("custom-panel").hidden, 3000));
+      S.open();
+      $("stage").dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+      check("panel dışına tıklayınca kapanır", await wait(() => $("custom-panel").hidden, 3000));
+      S.open();
+      const other = tabs.open(`${Services.env.get("VENTO_ESIN_ENDPOINT").replace(/\/v1$/, "")}/oturum/baska`);
+      check("başlangıç ekranı gidince (sayfaya geçince) panel de kapanır", await wait(() => $("custom-panel").hidden, 5000));
+      tabs.close(other);
+      tabs.select(blank);
+      setWall("");
+      prefs.setBoolPref("vento.start.ebabil", true);
+      await wait(() => !$("start").hasAttribute("data-wallpaper"), 3000);
+
+      // Esin logosu: araç çubuğunda tek renk maske, panel başlığında renkli
+      const g = document.querySelector("#nav-esin .esin-glyph");
+      const logo = document.querySelector(".esin-logo");
+      await wait(() => logo.complete, 4000);
+      check("Esin düğmesi: tek renk logo maskesi (renk = currentColor), eski ✦ yok", getComputedStyle(g).maskImage.includes("esin-mask.png") && g.getBoundingClientRect().width >= 16 && !document.querySelector("#nav-esin svg"), getComputedStyle(g).maskImage);
+      check("Esin panel başlığında renkli logo yüklendi", logo.complete && logo.naturalWidth === 256 && logo.src.endsWith("esin-color.png"), String(logo.naturalWidth));
+
+      // Belge simgeleri: pakette ve Vento'ya ait
+      const res = Services.dirsvc.get("GreD", Ci.nsIFile);
+      const readIcns = async name => { const f = res.clone(); f.append(name); return IOUtils.read(f.path); };
+      const [doc, app] = [await readIcns("document.icns"), await readIcns("firefox.icns")];
+      const magic = b => new TextDecoder().decode(b.slice(0, 4));
+      check("document.icns geçerli bir icns ve Vento belge simgesi (uygulama simgesinden farklı)", magic(doc) === "icns" && doc.length > 50000 && doc.length !== app.length, `${doc.length} B`);
+    }
+
     // ===================== Arayüz dili (Türkçe) =====================
     {
       const L = Services.locale;

@@ -42,3 +42,7 @@ pref("print.prefer_system_dialog", true);
 // Boş bırakılırsa macOS'un sistem dilini izler (İngilizce bir Mac'te arayüz İngilizce olurdu).
 pref("intl.locale.requested", "tr");
 
+// Başlangıç ekranı kişiselleştirme: duvar kâğıdı ("" = yok, sade varsayılan) ve Ebabil'in görünürlüğü
+pref("vento.start.wallpaper", "");
+pref("vento.start.ebabil", true);
+

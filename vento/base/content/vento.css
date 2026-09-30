@@ -1111,3 +1111,120 @@ button {
   #toolbar button:not(:disabled):active, .tab-close:active, #newtab:active { transform: none; }
   * { transition-duration: 1ms !important; }
 }
+
+/* ---- Başlangıç ekranı: duvar kâğıdı ve "Özelleştir" ---- */
+#start-wall {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  pointer-events: none;
+}
+/* Duvar kâğıdı varken ortası sakin kalsın: yumuşak bir perde (okunurluk) */
+#start[data-wallpaper] #start-wall::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(55% 60% at 50% 52%, var(--st-scrim), transparent 78%);
+}
+#start > :not(#start-wall) { position: relative; z-index: 1; }
+/* Ton: yazı rengi duvar kâğıdına göre (sistem açık/koyu temasından bağımsız) */
+#start[data-tone="dark"] {
+  --v-text: #e9eff6;
+  --v-muted: #aebbcb;
+  --v-surface-hover: rgba(255, 255, 255, 0.10);
+  --v-line: rgba(255, 255, 255, 0.16);
+  --st-scrim: rgba(6, 10, 16, 0.42);
+}
+#start[data-tone="light"] {
+  --v-text: #142033;
+  --v-muted: #44546a;
+  --v-surface-hover: rgba(20, 40, 65, 0.08);
+  --v-line: rgba(20, 40, 65, 0.16);
+  --st-scrim: rgba(255, 255, 255, 0.45);
+}
+#ebabil[hidden] { display: none; }
+
+#start-custom {
+  position: absolute !important;
+  right: 18px;
+  bottom: 16px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 12px 0 10px;
+  border-radius: 16px;
+  font-size: 12.5px;
+  color: var(--v-muted);
+  background: color-mix(in srgb, var(--v-surface) 55%, transparent);
+  box-shadow: inset 0 0 0 1px var(--v-line);
+  backdrop-filter: blur(10px);
+  opacity: 0.75;
+  transition: opacity var(--v-dur-fast) var(--v-ease), color var(--v-dur-fast) var(--v-ease);
+}
+#start-custom:hover, #start-custom:focus-visible { opacity: 1; color: var(--v-text); }
+#start-custom svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; }
+#start-custom svg circle { fill: var(--v-bg); }
+#stage:not([blank]) #start-custom { display: none; }
+
+#custom-panel {
+  position: absolute;
+  z-index: 18;
+  right: 18px;
+  bottom: 58px;
+  width: 340px;
+  padding: 14px 14px 12px;
+  box-sizing: border-box;
+  border-radius: 16px;
+  color: var(--v-text);
+  background: var(--v-surface);
+  box-shadow: 0 10px 34px light-dark(rgba(20,40,65,0.22), rgba(0,0,0,0.6)), inset 0 0 0 1px var(--v-line);
+}
+#custom-panel[hidden] { display: none; }
+.cp-head { font-size: 15px; font-weight: 500; margin-bottom: 10px; }
+.cp-label { font-size: 12px; color: var(--v-muted); margin-bottom: 7px; }
+#cp-walls { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
+.cp-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 0;
+  border-radius: 10px;
+  font-size: 10.5px;
+  color: var(--v-muted);
+  text-align: center;
+  background: none;
+}
+.cp-tile img, .cp-tile.none::before {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px var(--v-line);
+}
+.cp-tile.none::before {
+  content: "";
+  background: repeating-linear-gradient(135deg, transparent 0 6px, var(--v-surface-hover) 6px 7px), var(--v-bg);
+}
+.cp-tile[aria-pressed="true"] { color: var(--v-text); }
+.cp-tile[aria-pressed="true"] img, .cp-tile[aria-pressed="true"].none::before {
+  box-shadow: 0 0 0 2px var(--v-accent);
+}
+.cp-tile:hover img, .cp-tile:hover.none::before { filter: brightness(1.12); }
+.cp-row { display: flex; align-items: center; justify-content: space-between; font-size: 13px; padding-top: 10px; border-top: 1px solid var(--v-line); }
+.cp-row input { width: 16px; height: 16px; accent-color: var(--v-accent); }
+
+/* ---- Esin logosu: araç çubuğunda tek renk (maske), panel başlığında renkli ---- */
+.esin-glyph {
+  display: block;
+  width: 18px;
+  height: 18px;
+  background: currentColor;
+  mask: url("chrome://vento/content/esin/esin-mask.png") center / contain no-repeat;
+}
+.esin-logo { width: 18px; height: 18px; margin-right: 2px; vertical-align: -4px; }
+
