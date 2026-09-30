@@ -47,6 +47,19 @@ const srv = http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": red ? "image/png" : "image/x-icon", "Cache-Control": "no-store" });
     return res.end(Buffer.from(red ? "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFklEQVR4nGO4IydHEmIY1TCqYfhqAACaMxgQdGu1YAAAAABJRU5ErkJggg==" : "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFklEQVR4nGOQs7lDEmIY1TCqYfhqAAAQ1jYQxYTP1AAAAABJRU5ErkJggg==", "base64"));
   }
+  // Kimlik doğrulama testi: /kimlik/* → Basic (kullanıcı can, parola gizli). Doğru: 200 "Giris yapildi"; yanlış/yok: 401 "Yetkisiz"
+  if (req.method === "GET" && req.url.startsWith("/kimlik/")) {
+    stats.authAttempts = stats.authAttempts ?? [];
+    const h = req.headers.authorization ?? "";
+    const ok = h === "Basic " + Buffer.from("can:gizli").toString("base64");
+    stats.authAttempts.push({ url: req.url, sent: !!h, ok });
+    if (ok) {
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      return res.end('<!doctype html><meta charset="utf-8"><title>Giris yapildi</title><p>ic sayfa</p>');
+    }
+    res.writeHead(401, { "Content-Type": "text/html; charset=utf-8", "WWW-Authenticate": 'Basic realm="Test Alani"' });
+    return res.end('<!doctype html><meta charset="utf-8"><title>Yetkisiz</title><p>giris gerekli</p>');
+  }
   if (req.method === "GET" && req.url.startsWith("/yavas.bin")) {
     // İptal testi: 5 MB'ı ağır ağır yollar (bitmesi ~30 sn sürer)
     res.writeHead(200, { "Content-Type": "application/octet-stream", "Content-Length": 5 * 1024 * 1024 });

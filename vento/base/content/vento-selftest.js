@@ -722,6 +722,57 @@
       tabs.close(tab);
     }
 
+    // ===================== HTTP kimlik doğrulama (gerçek sunucu, uçtan uca) =====================
+    {
+      const llm = Services.env.get("VENTO_ESIN_ENDPOINT").replace(/\/v1$/, "");
+      const D = Vento.dialogs;
+      const tab = tabs.open("about:blank");
+      const load = u => tab.browser.fixupAndLoadURIString(u, { triggeringPrincipal: Vento.SYSTEM_PRINCIPAL });
+      const card = () => D.state.shown?.ui?.card;
+      const visible = () => !document.getElementById("dialog-layer").hidden;
+      const btn = i => card().querySelector(`button[data-index="${i}"]`);
+      const attempts = async () => (await (await fetch(`${llm}/stats`)).json()).authAttempts ?? [];
+      const clearLogins = () => Services.obs.notifyObservers(null, "net:clear-active-logins");
+      clearLogins();
+
+      load(`${llm}/kimlik/bir`);
+      check("korumalı sayfa: kimlik diyaloğu açıldı", await wait(() => visible() && card()?.querySelector(".dlg-user") && card().querySelector(".dlg-pass"), 15000));
+      const text = card()?.textContent ?? "";
+      // Güvenlik: realm sunucunun kontrolünde (sahte istem metni yazılabilir) → Firefox yalnız proxy için gösterir; biz de göstermemeliyiz
+      check("diyalog: site (127.0.0.1) görünür, sunucunun yazdığı alan adı (realm) GÖRÜNMEZ", text.includes("127.0.0.1") && !text.includes("Test Alani"), text.slice(0, 160));
+      check("diyalog: http için 'güvensiz' uyarısı var", !!card()?.querySelector(".dlg-warn, .dlg-insecure") || /güvens|şifrelen|encrypt/i.test(text), text.slice(0, 160));
+      check("parola alanı gizli (type=password)", card()?.querySelector(".dlg-pass")?.type === "password");
+
+      // yanlış parola → sunucu yine 401 → diyalog YENİDEN açılır
+      card().querySelector(".dlg-user").value = "can";
+      card().querySelector(".dlg-pass").value = "yanlis";
+      btn(0).click();
+      check("yanlış parola: diyalog yeniden sordu", await wait(() => visible() && card()?.querySelector(".dlg-pass")?.value === "", 15000));
+
+      card().querySelector(".dlg-user").value = "can";
+      card().querySelector(".dlg-pass").value = "gizli";
+      btn(0).click();
+      check("doğru parola: sayfa yüklendi", await wait(() => tab.title === "Giris yapildi" && !visible(), 15000), `"${tab.title}"`);
+      const a1 = await attempts();
+      check("sunucu: önce kimliksiz, sonra yanlış, sonra doğru", a1.length >= 3 && !a1[0].sent && a1.some(a => a.sent && !a.ok) && a1.at(-1).ok, JSON.stringify(a1));
+
+      // başarılı girişten sonra aynı alanda yeniden sorulmaz
+      load(`${llm}/kimlik/iki`);
+      check("giriş sonrası aynı alanda diyalog çıkmadı", await wait(() => tab.title === "Giris yapildi" && tab.url.endsWith("/iki"), 15000) && !visible(), `"${tab.title}" diyalog=${visible()}`);
+
+      // iptal → 401 sayfası görünür, diyalog kapanır
+      clearLogins();
+      load(`${llm}/kimlik/uc`);
+      await wait(() => visible() && card()?.querySelector(".dlg-user"), 15000);
+      btn(1).click();
+      check("İptal: sunucunun 401 sayfası gösterildi, diyalog kapandı", await wait(() => tab.title === "Yetkisiz" && !visible(), 15000), `"${tab.title}" diyalog=${visible()}`);
+      const a2 = await attempts();
+      check("İptal: iptalden sonra sunucuya parola GİTMEDİ", !a2.filter(a => a.url.endsWith("/uc")).some(a => a.sent), JSON.stringify(a2.filter(a => a.url.endsWith("/uc"))));
+
+      clearLogins();
+      tabs.close(tab);
+    }
+
     // ===================== Sekme simgeleri (favicon) =====================
     {
       const llm = Services.env.get("VENTO_ESIN_ENDPOINT").replace(/\/v1$/, "");
