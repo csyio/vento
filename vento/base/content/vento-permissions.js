@@ -162,7 +162,10 @@ Vento.permissions = (() => {
     if (slot && !slot.current && !slot.queue.length) {
       perBrowser.delete(entry.browser);
     }
-    entry.ui?.card.remove();
+    // Görünen kartı sync() kaldırır (kapsayıcı solarken yerinde kalsın); görünmeyen kart hemen gider.
+    if (entry !== state.shown) {
+      entry.ui?.card.remove();
+    }
     try {
       entry.answer(allow, devices);
     } catch (e) {
@@ -272,18 +275,30 @@ Vento.permissions = (() => {
     const browser = Vento.tabs.selected?.browser;
     const entry = perBrowser.get(browser)?.current ?? null;
     if (entry === state.shown && (!entry || entry.ui?.card.isConnected)) {
-      els.layer.hidden = !entry;
+      Vento.motion.set(els.layer, !!entry, "drop");
       return;
     }
-    state.shown?.ui?.card.remove();
+    const old = state.shown?.ui?.card;
     state.shown = entry;
-    els.layer.hidden = !entry;
-    if (entry) {
-      if (!entry.ui) {
-        build(entry);
-      }
-      els.layer.append(entry.ui.card);
+    if (!entry) {
+      // Çıkış: kart, kapsayıcı solarken yerinde kalır; bitince kaldırılır
+      state.leaving = old ?? null;
+      Vento.motion.hide(els.layer, "drop").then(() => {
+        if (!state.shown && state.leaving === old) {
+          old?.remove();
+          state.leaving = null;
+        }
+      });
+      return;
     }
+    state.leaving?.remove();
+    state.leaving = null;
+    old?.remove();
+    if (!entry.ui) {
+      build(entry);
+    }
+    els.layer.append(entry.ui.card);
+    Vento.motion.show(els.layer, "drop");
   }
 
   function init() {

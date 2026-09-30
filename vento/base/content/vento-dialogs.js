@@ -203,7 +203,10 @@ Vento.dialogs = (() => {
     if (slot && !slot.current && !slot.queue.length) {
       perBrowser.delete(entry.browser);
     }
-    entry.ui?.card.remove();
+    // Görünen kartı sync() kaldırır (karartma solarken yerinde kalsın); görünmeyen (sırada bekleyen) kart hemen gider.
+    if (entry !== state.shown) {
+      entry.ui?.card.remove();
+    }
     entry.resolve(result);
     sync();
   }
@@ -223,17 +226,35 @@ Vento.dialogs = (() => {
     const browser = Vento.tabs.selected?.browser;
     const entry = perBrowser.get(browser)?.current ?? null;
     if (entry === state.shown && (!entry || entry.ui?.card.isConnected)) {
-      els.layer.hidden = !entry;
+      Vento.motion.set(els.layer, !!entry, "fade");
       return;
     }
-    state.shown?.ui?.card.remove();
+    const old = state.shown?.ui?.card;
     state.shown = entry;
-    els.layer.hidden = !entry;
-    if (entry) {
+    if (!entry) {
+      // Çıkış: kart, karartma solarken yerinde kalır; bitince kaldırılır (bu arada yeni diyalog geldiyse dokunulmaz)
+      state.leaving = old ?? null;
+      Vento.motion.hide(els.layer, "fade").then(() => {
+        if (!state.shown && state.leaving === old) {
+          old?.remove();
+          state.leaving = null;
+        }
+      });
+      return;
+    }
+    state.leaving?.remove();
+    state.leaving = null;
+    old?.remove();
+    {
       if (!entry.ui) {
         build(entry); // entry.ui = { card, inputs, checkbox } kurar
       }
+      const wasShown = Vento.motion.isShown(els.layer);
       els.layer.append(entry.ui.card);
+      Vento.motion.show(els.layer, "fade");
+      if (!wasShown) {
+        Vento.motion.enter(entry.ui.card, "pop"); // kart da kendi girişini yapar (karartma yalnız solar)
+      }
       const first = entry.ui.card.querySelector("input:not([type=checkbox])") ?? entry.ui.card.querySelector("button[primary]");
       first?.focus();
       first?.select?.();

@@ -228,7 +228,7 @@
       check("↓ ile 'Ara' seçildi", rows[1].hasAttribute("selected") && !rows[0].hasAttribute("selected"));
       input.value = "example.com";
       input.dispatchEvent(new Event("input"));
-      check("adres yazınca öneri yok", $("smartbar-suggest").hidden);
+      check("adres yazınca öneri yok (çıkış animasyonu bitince gizli)", await wait(() => $("smartbar-suggest").hidden));
 
       // -- çubuktan Esin'e sor: açık sayfa bağlam olur
       Vento.ui.focusBar();
@@ -246,7 +246,7 @@
       Vento.esin.clearChat();
       check("yeni sohbet mesajları sildi", $("esin-thread").querySelectorAll(".msg").length === 0 && !$("esin-empty").hidden);
       Vento.esin.close();
-      check("panel kapandı, kart eski genişliğe döndü", $("esin").hidden && Math.abs($("stage").getBoundingClientRect().width - stageBefore) < 2);
+      check("panel kapandı, kart eski genişliğe döndü", await wait(() => $("esin").hidden) && Math.abs($("stage").getBoundingClientRect().width - stageBefore) < 2);
     }
 
     // ===================== Sağ tık menüsü =====================
@@ -389,16 +389,17 @@
       check("bulunca kırmızı kalktı, 1/1", await wait(() => count() === "1/1" && !input.hasAttribute("notfound")), count());
 
       key("Escape");
-      check("Esc çubuğu kapattı", $("findbar").hidden === true && Vento.find.state.open === false);
+      check("Esc çubuğu kapattı", Vento.find.state.open === false && await wait(() => $("findbar").hidden === true));
 
       // arama sekmeye bağlı: sekme değişince kapanır
       Vento.find.open();
       const other = tabs.open("about:blank");
-      check("sekme değişince arama çubuğu kapandı", $("findbar").hidden === true);
+      check("sekme değişince arama çubuğu kapandı", await wait(() => $("findbar").hidden === true));
       tabs.close(other);
       tabs.select(tab);
       Vento.find.open();
       Vento.find.close(false);
+      await wait(() => $("findbar").hidden); // önceki kapanışın animasyonu bitsin
       check("boş sekmede ⌘F açmaz", (() => { const b = tabs.open("about:blank"); Vento.find.open(); const ok = $("findbar").hidden; tabs.close(b); tabs.select(tab); return ok; })());
     }
 
@@ -506,7 +507,7 @@
       tabs.select(bg);
       check("sekmeye geçince göründü", await wait(() => visible() && card()?.querySelector(".dlg-text").textContent === "arka plan?"));
       tabs.select(tab);
-      check("başka sekmeye geçince gizlendi ama bekliyor", !visible() && D.pending === 1);
+      check("başka sekmeye geçince gizlendi ama bekliyor", await wait(() => !visible()) && D.pending === 1);
       tabs.select(bg);
       btn(0).click();
       check("cevap sayfaya ulaştı (bg:true)", await wait(() => bg.title === "bg:true"), bg.title);
@@ -576,7 +577,7 @@
       btn(".perm-block").click();
       check("Engelle → sayfa 'denied' aldı", await titleIs("n:denied"), tab.title);
       const denied = Services.perms.getPermissionObject(principal, "desktop-notification", true);
-      check("Engelle: kart kayboldu; karar YALNIZ oturum boyunca saklandı (kalıcı değil)", !visible() && denied?.capability === Services.perms.DENY_ACTION && denied?.expireType === Services.perms.EXPIRE_SESSION, `${denied?.capability}/${denied?.expireType}`);
+      check("Engelle: kart kayboldu; karar YALNIZ oturum boyunca saklandı (kalıcı değil)", await wait(() => !visible()) && denied?.capability === Services.perms.DENY_ACTION && denied?.expireType === Services.perms.EXPIRE_SESSION, `${denied?.capability}/${denied?.expireType}`);
       Services.perms.removeAll();
 
       // -- bildirim: İzin Ver + hatırla → ikinci sefer sormadan izin
@@ -587,7 +588,7 @@
       check("İzin Ver → 'granted'", await titleIs("n:granted"), tab.title);
       check("hatırlandı (kalıcı izin yöneticisinde)", PM_test(principal, "desktop-notification") === Services.perms.ALLOW_ACTION);
       goto("notif");
-      check("hatırlanan bildirim izninde kart çıkmadan 'granted' (platform kendisi cevaplar)", await wait(() => tab.title === "n:granted", 10000) && !visible());
+      check("hatırlanan bildirim izninde kart çıkmadan 'granted' (platform kendisi cevaplar)", await wait(() => tab.title === "n:granted", 10000) && await wait(() => !visible()));
       Services.perms.removeAll();
 
       // -- konum: Engelle → PERMISSION_DENIED (1)
@@ -634,7 +635,7 @@
       tabs.select(bg);
       check("sekmeye geçince kart göründü", await wait(() => visible() && !!card()));
       tabs.select(tab);
-      check("başka sekmeye geçince gizlendi ama bekliyor", !visible() && P.pending === 1);
+      check("başka sekmeye geçince gizlendi ama bekliyor", await wait(() => !visible()) && P.pending === 1);
       tabs.close(bg);
       check("sekme kapanınca istek temizlendi", await wait(() => P.pending === 0));
       tabs.select(tab);
@@ -645,6 +646,127 @@
       tab.browser.fixupAndLoadURIString("data:text/html," + encodeURIComponent("<meta charset=utf-8><title>gitti</title>"), { triggeringPrincipal: Vento.SYSTEM_PRINCIPAL });
       check("siteden ayrılınca bekleyen kart kalktı", await wait(() => tab.title === "gitti" && !visible() && P.pending === 0), String(P.pending));
       Services.perms.removeAll();
+    }
+
+    // ===================== Hareket / efekt =====================
+    {
+      const M = Vento.motion;
+      const $ = id => document.getElementById(id);
+      const animProps = el => new Set(el.getAnimations().flatMap(a => a.effect.getKeyframes().flatMap(k => Object.keys(k))).filter(p => !["offset", "computedOffset", "easing", "composite", "simulateComputeValuesFailure"].includes(p)));
+      const only = (set, allowed) => [...set].every(p => allowed.includes(p));
+      const rootStyle = getComputedStyle(document.documentElement);
+
+      check("hareket değişkenleri tanımlı (--v-dur-fast/--v-dur/--v-dur-slow)", rootStyle.getPropertyValue("--v-dur-fast").trim() === "110ms" && rootStyle.getPropertyValue("--v-dur").trim() === "180ms" && rootStyle.getPropertyValue("--v-dur-slow").trim() === "260ms");
+      check("her ön ayarda çıkış girişten KISA (kullanıcı beklemez)", Object.values(M.PRESETS).every(p => p.exit < p.enter), JSON.stringify(Object.fromEntries(Object.entries(M.PRESETS).map(([k, p]) => [k, `${p.enter}/${p.exit}`]))));
+      check("hiçbir süre 260 ms'yi aşmıyor", Object.values(M.PRESETS).every(p => p.enter <= 260 && p.exit <= 260));
+
+      // -- çekirdek: giriş/çıkış/yarış (tek başına bir öğede)
+      const box = document.createElement("div");
+      box.hidden = true;
+      box.style.cssText = "position:absolute;top:0;left:0;width:10px;height:10px";
+      $("stage").append(box);
+      M.show(box, "pop");
+      check("show: hemen görünür ve giriş animasyonu çalışıyor", !box.hidden && M.isShown(box) && box.getAnimations().length === 1);
+      check("giriş yalnız opacity + transform kullanır (yerleşimi bozmaz)", only(animProps(box), ["opacity", "transform"]), [...animProps(box)].join(","));
+      await wait(() => box.getAnimations().length === 0, 2000);
+      check("giriş bitince animasyon kalıntısı yok", box.getAnimations().length === 0 && !box.hidden);
+
+      const hid = M.hide(box, "pop");
+      check("hide: çıkış sürerken öğe hâlâ DOM'da görünür, 'closing' var, isShown=false", !box.hidden && box.hasAttribute("closing") && !M.isShown(box));
+      check("ikinci hide aynı sözü döner (çift çıkış yok)", M.hide(box, "pop") === hid);
+      await hid;
+      check("çıkış bitince hidden konur, kalıntı yok", box.hidden && !box.hasAttribute("closing") && box.getAnimations().length === 0);
+      check("zaten gizliyken hide hemen çözülür", (await Promise.race([M.hide(box), new Promise(r => setTimeout(() => r("ZAMAN"), 500))])) !== "ZAMAN");
+
+      // yarış: çıkarken yeniden göster → öğe takılı 'hidden' kalmaz
+      M.show(box, "pop");
+      await wait(() => box.getAnimations().length === 0, 2000);
+      const p1 = M.hide(box, "pop");
+      await new Promise(r => setTimeout(r, 40));
+      M.show(box, "pop");
+      await p1;
+      await new Promise(r => setTimeout(r, 400));
+      check("çıkarken yeniden göster: öğe görünür kalır (yarış güvenli)", !box.hidden && !box.hasAttribute("closing") && M.isShown(box));
+      // hızlı aç/kapa/aç/kapa
+      for (let i = 0; i < 6; i++) { M.show(box, "drop"); await new Promise(r => setTimeout(r, 15)); M.hide(box, "drop"); await new Promise(r => setTimeout(r, 15)); }
+      await wait(() => box.hidden && !box.hasAttribute("closing"), 2000);
+      check("hızlı aç/kapa zinciri sonunda tutarlı durum (gizli, kalıntı yok)", box.hidden && !box.hasAttribute("closing") && box.getAnimations().length === 0);
+
+      // -- hareketi azalt
+      M.reducedOverride = true;
+      try {
+        M.show(box, "pop");
+        check("hareketi azalt: yalnız opacity, konum/ölçek hareketi yok, ≤100 ms", only(animProps(box), ["opacity"]) && box.getAnimations()[0].effect.getTiming().duration <= 100, `${[...animProps(box)]} ${box.getAnimations()[0]?.effect.getTiming().duration}`);
+        await M.hide(box, "pop");
+        check("hareketi azalt: çıkış da tamamlanıyor", box.hidden && !box.hasAttribute("closing"));
+      } finally {
+        M.reducedOverride = null;
+      }
+      box.remove();
+      check("CSS'te prefers-reduced-motion kuralı var", [...document.styleSheets].some(sh => { try { return [...sh.cssRules].some(r => r.media && /prefers-reduced-motion/.test(r.media.mediaText)); } catch (e) { return false; } }));
+
+      // -- gerçek bileşenler
+      // Sekme: açılış animasyonu, kapanışta hayalet, takılı kalıntı yok
+      const strip = $("tabs");
+      const live = () => [...strip.querySelectorAll(".tab:not(.closing)")].length;
+      await wait(() => !document.documentElement.hasAttribute("booting"), 3000);
+      const t1 = tabs.open("about:blank", { select: false });
+      const el1 = strip.querySelector(`.tab[data-id="${t1.id}"]`);
+      check("yeni sekme animasyonla açıldı (yalnız genişlik/opaklık/ölçek)", el1.getAnimations().length > 0 && only(animProps(el1), ["flexBasis", "width", "minWidth", "paddingLeft", "paddingRight", "opacity", "transform"]), [...animProps(el1)].join(","));
+      tabs.close(t1);
+      check("kapanan sekmenin hayaleti şeritte (tıklanamaz)", !!strip.querySelector(".tab.closing") && getComputedStyle(strip.querySelector(".tab.closing")).pointerEvents === "none");
+      check("hayalet bitince kalkar", await wait(() => !strip.querySelector(".tab.closing"), 2000));
+      const batch = Array.from({ length: 8 }, () => tabs.open("about:blank", { select: false }));
+      batch.forEach(t => tabs.close(t));
+      check("8 sekme hızla aç/kapa: hayalet kalmaz, sekme sayısı modelle aynı", await wait(() => !strip.querySelector(".tab.closing") && live() === tabs.all.length, 3000), `${live()} / ${tabs.all.length}`);
+      M.reducedOverride = true;
+      try {
+        const t2 = tabs.open("about:blank", { select: false });
+        const el2 = strip.querySelector(`.tab[data-id="${t2.id}"]`);
+        check("hareketi azalt: sekme yalnız solarak açılır", only(animProps(el2), ["opacity"]), [...animProps(el2)].join(","));
+        tabs.close(t2);
+        await wait(() => !strip.querySelector(".tab.closing"), 2000);
+      } finally {
+        M.reducedOverride = null;
+      }
+
+      // Diyalog: karartma solar + kart belirir; kapanınca kart karartma solarken yerinde kalır, sonra kalkar
+      {
+        const D = Vento.dialogs;
+        const layer = $("dialog-layer");
+        const dtab = tabs.selected;
+        const p = D.open(dtab.browser, { promptType: "alert", text: "hareket" });
+        await wait(() => D.state.shown && !layer.hidden, 10000);
+        const card = D.state.shown.ui.card;
+        check("diyalog: karartma solarak, kart 'pop' ile girdi", layer.getAnimations().length > 0 && card.getAnimations().length > 0 && only(animProps(card), ["opacity", "transform"]));
+        card.querySelector('button[data-index="0"]').click();
+        await p;
+        check("diyalog kapanırken kart solan karartmada yerinde kalır", await wait(() => layer.hasAttribute("closing") || layer.hidden, 3000) && (layer.hidden || !!layer.querySelector(".dlg-card")));
+        check("diyalog kapanınca katman gizli ve kart kaldırılmış", await wait(() => layer.hidden && !layer.querySelector(".dlg-card"), 3000));
+      }
+
+      // Sayfada ara çubuğu
+      {
+        const fb = $("findbar");
+        const ftab = tabs.open(`${Services.env.get("VENTO_ESIN_ENDPOINT").replace(/\/v1$/, "")}/oturum/ara`);
+        await wait(() => ftab.title === "Sayfa ARA" && !ftab.loading, 15000);
+        Vento.find.open();
+        check("⌘F çubuğu 'bar' animasyonuyla açıldı", !fb.hidden && fb.getAnimations().length > 0 && only(animProps(fb), ["opacity", "transform"]));
+        Vento.find.close(false);
+        check("çubuk kapanırken 'closing', sonra gizli", fb.hasAttribute("closing") && await wait(() => fb.hidden && !fb.hasAttribute("closing"), 3000));
+        tabs.close(ftab);
+      }
+
+      // Başlangıç (boş sekme) görünümü: boş sekme seçilince içerik yumuşakça belirir (CSS animasyonu)
+      {
+        const blank = tabs.open("about:blank"); // seçili → #stage[blank]
+        await wait(() => $("stage").hasAttribute("blank"), 3000);
+        const start = $("start");
+        const names = [start, $("start-word"), $("start-hint")].map(e => getComputedStyle(e).animationName);
+        check("boş sekme görünümü: kap, başlık ve ipucu kademeli giriş animasyonuna sahip", names.every(n => n !== "none") && start.getAnimations().length > 0, names.join(","));
+        M.reducedOverride = null;
+        tabs.close(blank);
+      }
     }
 
     // ===================== Arayüz dili (Türkçe) =====================

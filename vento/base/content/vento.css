@@ -25,6 +25,11 @@
   --v-toolbar-h: 48px;
   --v-font: system-ui, -apple-system, "SF Pro Text", sans-serif;
   --v-ease: cubic-bezier(0.22, 0.8, 0.3, 1);
+  --v-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  /* Hareket süreleri (vento-motion.js ile aynı tutulur): hızlı geri bildirim / normal / yavaş */
+  --v-dur-fast: 110ms;
+  --v-dur: 180ms;
+  --v-dur-slow: 260ms;
 }
 
 html, body {
@@ -112,8 +117,11 @@ button {
   border-radius: var(--v-radius-tab);
   color: var(--v-muted);
   -moz-window-dragging: no-drag;
-  transition: background 120ms var(--v-ease), color 120ms var(--v-ease);
+  transition: background var(--v-dur-fast) var(--v-ease), color var(--v-dur-fast) var(--v-ease), box-shadow var(--v-dur) var(--v-ease);
 }
+
+/* Kapanan sekmenin hayaleti: animasyon bitene kadar yerinde durur, tıklanamaz */
+.tab.closing { pointer-events: none; overflow: hidden; }
 
 .tab:hover { background: var(--v-surface-hover); }
 
@@ -386,6 +394,12 @@ button {
   letter-spacing: 0.02em;
   color: var(--v-text);
 }
+/* display:none → flex olunca animasyon yeniden başlar: boş sekme açılınca içerik hafifçe yükselerek belirir */
+#stage[blank] #start { animation: v-start-in 420ms var(--v-ease) both; }
+#stage[blank] #start-word { animation: v-rise 520ms var(--v-ease) 60ms both; }
+#stage[blank] #start-hint { animation: v-rise 520ms var(--v-ease) 160ms both; }
+@keyframes v-start-in { from { opacity: 0; } }
+@keyframes v-rise { from { opacity: 0; transform: translateY(10px); } }
 
 #start-hint {
   font-size: 14px;
@@ -1014,3 +1028,22 @@ button {
 .perm-btn:hover { background: var(--v-surface-hover); }
 .perm-btn[primary] { background: var(--v-accent); color: var(--v-bg); box-shadow: none; }
 .perm-btn[primary]:hover { filter: brightness(1.08); }
+
+/* ---- Basma geri bildirimi: tıklanabilir araç çubuğu öğeleri hafifçe küçülür ---- */
+#toolbar button:not(:disabled):active,
+.tab-close:active,
+#newtab:active {
+  transform: scale(0.92);
+}
+#toolbar button, .tab-close, #newtab {
+  transition: background var(--v-dur-fast) var(--v-ease), color var(--v-dur-fast) var(--v-ease), transform var(--v-dur-fast) var(--v-ease), opacity var(--v-dur-fast) var(--v-ease);
+}
+
+/* ---- Hareketi azalt: kayma/ölçek/dönme yok; yalnız çok kısa solma (JS tarafı vento-motion.js'te) ---- */
+@media (prefers-reduced-motion: reduce) {
+  #stage[blank] #start,
+  #stage[blank] #start-word,
+  #stage[blank] #start-hint { animation: v-start-in 90ms linear both; }
+  #toolbar button:not(:disabled):active, .tab-close:active, #newtab:active { transform: none; }
+  * { transition-duration: 1ms !important; }
+}

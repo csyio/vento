@@ -189,13 +189,13 @@ Vento.downloads = (() => {
   // ---- Panel ------------------------------------------------------------------------------------
 
   function showPanel(show) {
-    els.panel.hidden = !show;
+    Vento.motion.set(els.panel, show, "drop");
     els.button.toggleAttribute("active-panel", show);
   }
 
   function refreshChrome() {
     const all = [...state.rows.keys()];
-    els.button.hidden = all.length === 0;
+    Vento.motion.set(els.button, all.length > 0, "pop");
     els.empty.hidden = all.length > 0;
     const active = all.filter(d => !d.stopped);
     els.button.toggleAttribute("downloading", active.length > 0);
@@ -236,23 +236,23 @@ Vento.downloads = (() => {
       rows: $("dl-rows"),
       empty: $("dl-empty"),
     });
-    els.button.addEventListener("click", () => showPanel(els.panel.hidden));
+    els.button.addEventListener("click", () => showPanel(!Vento.motion.isShown(els.panel)));
     $("dl-clear").addEventListener("click", clearFinished);
 
     // Panel dışına tıklayınca / Esc ile kapanır. Sayfa içeriğine tıklama chrome'a mousedown olarak gelmez;
     // içeriğe odak geçişi (focusin) yakalanır.
     document.addEventListener("mousedown", e => {
-      if (!els.panel.hidden && !els.panel.contains(e.target) && !els.button.contains(e.target)) {
+      if (Vento.motion.isShown(els.panel) && !els.panel.contains(e.target) && !els.button.contains(e.target)) {
         showPanel(false);
       }
     });
     document.addEventListener("focusin", e => {
-      if (!els.panel.hidden && e.target.localName === "browser") {
+      if (Vento.motion.isShown(els.panel) && e.target.localName === "browser") {
         showPanel(false);
       }
     });
     document.addEventListener("keydown", e => {
-      if (e.key === "Escape" && !els.panel.hidden) {
+      if (e.key === "Escape" && Vento.motion.isShown(els.panel)) {
         showPanel(false);
       }
     });

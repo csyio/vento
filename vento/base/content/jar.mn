@@ -3,6 +3,7 @@ vento.jar:
   content/vento.xhtml (vento.xhtml)
   content/vento.css (vento.css)
   content/vento-tabs.js (vento-tabs.js)
+  content/vento-motion.js (vento-motion.js)
   content/vento-markdown.js (vento-markdown.js)
   content/vento-ui.js (vento-ui.js)
   content/vento-esin.js (vento-esin.js)

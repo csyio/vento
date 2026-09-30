@@ -213,13 +213,13 @@ Vento.esin = (() => {
         b.className = "menu-item";
         b.textContent = tab.label;
         b.addEventListener("click", () => {
-          els.menu.hidden = true;
+          Vento.motion.hide(els.menu, "drop");
           attach(tab);
         });
         return b;
       })
     );
-    els.menu.hidden = !candidates.length;
+    Vento.motion.set(els.menu, candidates.length > 0, "drop");
   }
 
   function scrollDown(force = false) {
@@ -248,13 +248,13 @@ Vento.esin = (() => {
   }
 
   function showConsent() {
-    els.consent.hidden = false;
+    Vento.motion.show(els.consent, "pop");
     scrollDown(true);
   }
 
   function grantConsent() {
     Services.prefs.setBoolPref(PREF_CONSENT, true);
-    els.consent.hidden = true;
+    Vento.motion.hide(els.consent, "pop");
     const q = state.pending;
     state.pending = null;
     if (q) {
@@ -381,7 +381,7 @@ Vento.esin = (() => {
 
   function open() {
     state.open = true;
-    els.panel.hidden = false;
+    Vento.motion.show(els.panel, "side");
     $("nav-esin").toggleAttribute("active", true);
     syncFollow();
     if (!consented() && state.pending === null && !state.history.length) {
@@ -392,7 +392,7 @@ Vento.esin = (() => {
 
   function close() {
     state.open = false;
-    els.panel.hidden = true;
+    Vento.motion.hide(els.panel, "side");
     $("nav-esin").toggleAttribute("active", false);
     Vento.ui.focusPage();
   }
@@ -439,7 +439,7 @@ Vento.esin = (() => {
     $("esin-close").addEventListener("click", close);
     $("esin-clear").addEventListener("click", clearChat);
     $("esin-consent-ok").addEventListener("click", grantConsent);
-    els.add.addEventListener("click", () => (els.menu.hidden ? showMenu() : (els.menu.hidden = true)));
+    els.add.addEventListener("click", () => (!Vento.motion.isShown(els.menu) ? showMenu() : Vento.motion.hide(els.menu, "drop")));
 
     // Enter (form gönderimi) yalnızca yeni soru gönderir; yanıt akarken hiçbir şey yapmaz.
     // Durdurmak için yalnızca durdur düğmesi (aynı yerdeki gönder düğmesi) kullanılır.

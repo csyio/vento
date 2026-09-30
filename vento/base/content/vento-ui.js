@@ -93,20 +93,76 @@ Vento.ui = (() => {
     el.title = tab.label;
   }
 
+  // ---- Sekme hareketi --------------------------------------------------------------------------
+  // Açılırken yerinde genişleyip belirir; kapanırken kopyası (hayalet) daralıp solar. Açılışta (booting) hareket yok.
+  // Genişlik animasyonu yerleşimi etkiler ama yalnız 30 px'lik sekme şeridinde; sayfa yeniden boyutlanmaz.
+  const TAB_IN_MS = 200;
+  const TAB_OUT_MS = 170;
+  const ghosts = []; // {el, index, started}
+  const tabMotionOn = () => !document.documentElement.hasAttribute("booting");
+  const COLLAPSED = { flexBasis: "0px", width: "0px", minWidth: "0px", paddingLeft: "0px", paddingRight: "0px", opacity: 0 };
+
+  function animateTabIn(el) {
+    if (!tabMotionOn()) {
+      return;
+    }
+    if (Vento.motion.reduced) {
+      el.animate([{ opacity: 0 }], { duration: 90 });
+      return;
+    }
+    el.animate([{ ...COLLAPSED, transform: "scale(0.92)" }], { duration: TAB_IN_MS, easing: "cubic-bezier(0.22, 0.8, 0.3, 1)" });
+  }
+
+  function captureGhost(tab) {
+    const el = tabEl(tab);
+    if (!el || !tabMotionOn()) {
+      return;
+    }
+    const g = el.cloneNode(true);
+    g.removeAttribute("data-id");
+    g.classList.add("closing");
+    ghosts.push({ el: g, index: [...els.tabs.children].indexOf(el), started: false });
+  }
+
+  function startGhost(g) {
+    g.started = true;
+    const done = () => {
+      g.el.remove();
+      const i = ghosts.indexOf(g);
+      if (i >= 0) {
+        ghosts.splice(i, 1);
+      }
+    };
+    const frames = Vento.motion.reduced ? [{ opacity: 1 }, { opacity: 0 }] : [{}, COLLAPSED];
+    const a = g.el.animate(frames, { duration: Vento.motion.reduced ? 90 : TAB_OUT_MS, easing: "cubic-bezier(0.4, 0, 1, 1)", fill: "forwards" });
+    a.finished.then(done, done);
+    setTimeout(done, TAB_OUT_MS + 200); // güvence: hayalet asla kalıcı takılmaz
+  }
+
   function renderTabs() {
     const tabs = Vento.tabs.all;
-    const existing = new Map([...els.tabs.children].map(c => [c.dataset.id, c]));
+    const existing = new Map([...els.tabs.children].filter(c => !c.classList.contains("closing")).map(c => [c.dataset.id, c]));
     const frag = [];
+    const fresh = [];
     for (const tab of tabs) {
-      const el = existing.get(String(tab.id)) ?? buildTabEl(tab);
+      let el = existing.get(String(tab.id));
+      if (!el) {
+        el = buildTabEl(tab);
+        fresh.push(el);
+      }
       existing.delete(String(tab.id));
       frag.push(el);
     }
     for (const stale of existing.values()) {
       stale.remove();
     }
+    for (const g of ghosts) {
+      frag.splice(Math.min(g.index, frag.length), 0, g.el);
+    }
     els.tabs.replaceChildren(...frag);
     tabs.forEach(updateTab);
+    fresh.forEach(animateTabIn);
+    ghosts.filter(g => !g.started).forEach(startGhost);
   }
 
   /** Çubuğun değeri: odakta tam adres, değilse kısa biçim. */
@@ -135,7 +191,7 @@ Vento.ui = (() => {
   let suggestIndex = 0;
 
   function suggestVisible() {
-    return !els.suggest.hidden;
+    return Vento.motion.isShown(els.suggest);
   }
 
   function selectSuggest(i) {
@@ -148,8 +204,13 @@ Vento.ui = (() => {
     const show = document.activeElement === els.input && !!text && Vento.isSearchText(text);
     if (!show) {
       hideSuggest(); // seçimi de sıfırlar: sonraki açılışta varsayılan yine "Esin'e sor"
+    } else {
+      // Liste yeniden (ya da çıkarken tekrar) göründüğünde seçim sıfırlanır: varsayılan yine "Esin'e sor"
+      if (!Vento.motion.isShown(els.suggest)) {
+        els.rows.forEach(r => r.removeAttribute("selected"));
+      }
+      Vento.motion.show(els.suggest, "drop");
     }
-    els.suggest.hidden = !show;
     if (show) {
       els.rows.forEach(r => (r.querySelector(".suggest-text").textContent = text));
       if (!els.rows.some(r => r.hasAttribute("selected"))) {
@@ -159,8 +220,12 @@ Vento.ui = (() => {
   }
 
   function hideSuggest() {
-    els.suggest.hidden = true;
-    els.rows.forEach(r => r.removeAttribute("selected"));
+    // Seçim, çıkış animasyonu BİTİNCE sıfırlanır (solarken vurgu kaybolup titremesin); bu arada yeniden açıldıysa dokunulmaz.
+    Vento.motion.hide(els.suggest, "drop").then(() => {
+      if (els.suggest.hidden) {
+        els.rows.forEach(r => r.removeAttribute("selected"));
+      }
+    });
   }
 
   function runSuggest(kind) {
@@ -196,6 +261,9 @@ Vento.ui = (() => {
   }
 
   function init() {
+    // Açılışta (oturum geri yükleme dahil) sekme animasyonu yok; kısa süre sonra açılır.
+    document.documentElement.setAttribute("booting", "");
+    setTimeout(() => document.documentElement.removeAttribute("booting"), 900);
     Object.assign(els, {
       tabs: $("tabs"),
       stage: $("stage"),
@@ -209,7 +277,10 @@ Vento.ui = (() => {
 
     const t = Vento.tabs;
     t.addEventListener("tabopen", renderTabs);
-    t.addEventListener("tabclose", renderTabs);
+    t.addEventListener("tabclose", e => {
+      captureGhost(e.detail.tab);
+      renderTabs();
+    });
     t.addEventListener("tabselect", () => {
       renderTabs();
       refreshChrome();

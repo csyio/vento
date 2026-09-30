@@ -94,7 +94,7 @@ Vento.find = (() => {
     state.listener = tab._findListener;
     if (!state.open) {
       state.open = true;
-      els.bar.hidden = false;
+      Vento.motion.show(els.bar, "bar");
       finder.onFindbarOpen();
       finder.getInitialSelection();
     }
@@ -108,7 +108,7 @@ Vento.find = (() => {
     }
     const finder = state.browser?.finder;
     state.open = false;
-    els.bar.hidden = true;
+    Vento.motion.hide(els.bar, "bar");
     els.input.removeAttribute("notfound");
     setCount("");
     if (finder) {
