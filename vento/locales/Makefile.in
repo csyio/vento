@@ -1,0 +1,30 @@
+# Vento: motorun Türkçe (ve ileride başka) dil dosyalarını pakete ekler. Firefox'un browser/locales/Makefile.in'inin
+# browser/'a bağlı kısımları çıkarılmış hâli.
+#
+# Kullanım (tools/build-locale.sh sarar):
+#   make -C obj-vento/vento/locales chrome-tr L10NBASEDIR=<firefox-l10n>
+
+include $(topsrcdir)/config/config.mk
+
+PWD := $(CURDIR)
+
+include $(topsrcdir)/config/rules.mk
+
+# Birleştirilmiş dil dizini (toolkit/locales/l10n.mk ile aynı düzen; alt make'ler REAL_LOCALE_MERGEDIR'i ortamdan okur)
+BASE_MERGE := $(CURDIR)/merge-dir
+export REAL_LOCALE_MERGEDIR = $(BASE_MERGE)/$(AB_CD)
+
+# Eksik dizeleri en-US'ten tamamlayarak birleştirilmiş bir dil dizini üretir (REAL_LOCALE_MERGEDIR).
+# Firefox'un kendi l10n.mk'i ($(srcdir)/l10n.toml bekler) yerine doğrudan toolkit'in yapılandırmasını kullanırız.
+merge-%: IS_LANGUAGE_REPACK=1
+merge-%: AB_CD=$*
+merge-%:
+	$(RM) -rf $(REAL_LOCALE_MERGEDIR)
+	$(PYTHON3) -m moz.l10n.bin.build --config $(topsrcdir)/toolkit/locales/l10n.toml --base $(L10NBASEDIR) --target $(BASE_MERGE) --locales $(AB_CD) --coverage
+
+chrome-%: AB_CD=$*
+chrome-%: IS_LANGUAGE_REPACK=1
+chrome-%:
+	@$(MAKE) merge-$*
+	@$(MAKE) -C $(DEPTH)/toolkit/locales chrome-$*
+	@$(MAKE) -C $(DEPTH)/$(MOZ_BRANDING_DIRECTORY)/locales chrome AB_CD=$*

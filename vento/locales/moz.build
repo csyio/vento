@@ -1,0 +1,2 @@
+# Vento'nun kendi arayüz metinleri kodda Türkçe olarak gömülü; burada yalnız motorun (toolkit/dom/netwerk/security)
+# Türkçe dil dosyalarını paketleme kuralları var. Bkz. Makefile.in ve tools/fetch-l10n.sh.

@@ -6,6 +6,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 export MOZCONFIG="$ROOT/mozconfig"
 if [ "$1" != "--no-build" ]; then
   (cd "$ROOT/engine" && env -u CLAUDECODE ./mach build faster 2>&1 | tail -n 3)
+  sh "$ROOT/tools/build-locale.sh"
 fi
 APP="$ROOT/engine/obj-vento/dist/Vento.app/Contents/MacOS/vento"
 TMP="$(mktemp -d)"

@@ -8,6 +8,7 @@ DIRS += [
     "base",
     "components",
     "app",
+    "locales",
 ]
 
 # Uygulama dil kaynağı (branding/brand.ftl burada). Firefox'ta browser/l10n-registry.manifest yapar;

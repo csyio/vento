@@ -38,3 +38,7 @@ pref("app.support.baseURL", "https://support.mozilla.org/1/firefox/%VERSION%/%OS
 // browser/'daki TabDialogBox'a bağlı olduğu için kullanılmaz.
 pref("print.prefer_system_dialog", true);
 
+// Arayüz dili: Türkçe (motorun dil dosyaları tools/build-locale.sh ile eklenir); eksik dize İngilizceye düşer.
+// Boş bırakılırsa macOS'un sistem dilini izler (İngilizce bir Mac'te arayüz İngilizce olurdu).
+pref("intl.locale.requested", "tr");
+

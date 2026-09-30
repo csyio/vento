@@ -647,6 +647,22 @@
       Services.perms.removeAll();
     }
 
+    // ===================== Arayüz dili (Türkçe) =====================
+    {
+      const L = Services.locale;
+      check("arayüz dili Türkçe (tr), varsayılan en-US kalır", L.appLocaleAsBCP47 === "tr" && L.defaultLocale === "en-US", `${L.appLocaleAsBCP47} / varsayılan ${L.defaultLocale}`);
+      check("paketli diller: tr ve en-US (yedek)", L.packagedLocales.includes("tr") && L.packagedLocales.includes("en-US"), L.packagedLocales.join(","));
+      check("istenen diller: tr, en-US'e düşer", L.requestedLocales[0] === "tr" && L.appLocalesAsBCP47.includes("en-US"), `${L.requestedLocales} → ${L.appLocalesAsBCP47}`);
+      // .properties (chrome://…/locale/) Türkçe
+      const dlg = Services.strings.createBundle("chrome://global/locale/commonDialogs.properties");
+      Vento.trace(`DİL-TANI commonDialogs Yes="${dlg.GetStringFromName("Yes")}" Cancel="${dlg.GetStringFromName("Cancel")}" EnterUserPasswordFor2="${dlg.GetStringFromName("EnterUserPasswordFor2")}"`);
+      check("commonDialogs.properties Türkçe ('&Evet', & = erişim tuşu)", dlg.GetStringFromName("Yes") === "&Evet" && dlg.GetStringFromName("Cancel") === "Vazgeç", `${dlg.GetStringFromName("Yes")} / ${dlg.GetStringFromName("Cancel")}`);
+      // Fluent (.ftl) Türkçe + tek dosya eksikse bile kümenin çökmediği
+      const loc = new Localization(["toolkit/neterror/netError.ftl", "branding/brand.ftl"], true);
+      const v = loc.formatValueSync("neterror-page-title");
+      check("Fluent: neterror-page-title Türkçe", typeof v === "string" && v.length > 0 && v !== "neterror-page-title", String(v));
+    }
+
     // ===================== Hata sayfaları =====================
     // Toolkit'in about:neterror'u, uygulama dil kaynağı (brand.ftl) kayıtlı değilse hiçbir iletiyi çözemez:
     // başlık boş, metinler ham kalır. Kayıt: vento/l10n-registry.manifest.
@@ -658,7 +674,7 @@
       Services.console.registerListener(listener);
       tab.browser.fixupAndLoadURIString("http://nonexistent.invalid/", { triggeringPrincipal: Vento.SYSTEM_PRINCIPAL });
       check("DNS hatası: about:neterror açıldı", await wait(() => docURI().startsWith("about:neterror?e=dnsNotFound"), 15000), docURI());
-      await wait(() => tab.title === "Server Not Found", 10000);
+      await wait(() => tab.title === "Sunucu bulunamadı", 10000);
       Services.console.unregisterListener(listener);
       const text = await new Promise(resolve => {
         const mm = tab.browser.messageManager;
@@ -666,9 +682,9 @@
         mm.loadFrameScript("data:,(" + encodeURIComponent(`function(){ sendAsyncMessage("vento:errtext", content.document.body?.innerText || ""); }`) + ")()", false);
         setTimeout(() => resolve(""), 5000);
       });
-      check("hata sayfası başlığı çözüldü (boş değil)", tab.title === "Server Not Found", `"${tab.title}"`);
-      check("hata sayfası metni çevrildi ('Hmm. We’re having trouble…')", text.includes("having trouble finding that site"), text.slice(0, 120));
-      check("marka adı Vento (Nightly/Firefox değil)", text.includes("Check that Vento has permission") && !/Nightly|Firefox/.test(text), text.match(/Check that .{0,20}/)?.[0]);
+      check("hata sayfası başlığı çözüldü ve Türkçe", tab.title === "Sunucu bulunamadı", `"${tab.title}"`);
+      check("hata sayfası metni Türkçe ('Aradığınız siteyi bulamıyoruz')", text.includes("Aradığınız siteyi bulamıyoruz"), text.slice(0, 120));
+      check("marka adı Vento (Nightly/Firefox değil)", /Vento/.test(text) && !/Nightly|Firefox/.test(text), text.match(/.{0,30}Vento.{0,40}/)?.[0] ?? text.slice(0, 200));
       check("dil kaynağı eksikliği raporlanmadı (brand.ftl)", missing.length === 0, missing.join(" | "));
       check("uygulama dil kaynağı kayıtlı", L10nRegistry.getInstance().getSourceNames().some(n => n.includes("vento")));
     }
@@ -695,7 +711,7 @@
 
       load(`${https}/`);
       check("kendinden imzalı HTTPS: about:certerror açıldı", await wait(() => docURI().startsWith("about:certerror"), 15000), docURI().slice(0, 80));
-      check("sertifika hata sayfasının başlığı çözüldü", await wait(() => tab.title === "Warning: Potential Security Risk Ahead", 10000), `"${tab.title}"`);
+      check("sertifika hata sayfasının başlığı çözüldü ve Türkçe", await wait(() => tab.title === "Uyarı: Güvenlik riskiyle karşılaşabilirsiniz", 10000), `"${tab.title}"`);
       const page = await inPage(`() => ({ text: document.body.innerText, adv: !!document.getElementById("advancedButton"), ret: !!document.getElementById("returnButton"), exc: !!document.getElementById("exceptionDialogButton") })`);
       check("sayfa metni: 'Vento' adı geçiyor, Nightly/Firefox yok", /Vento/.test(page.text) && !/Nightly|Firefox/.test(page.text), String(page.text).slice(0, 160).replace(/\n/g, " | "));
       check("düğmeler: Gelişmiş, Geri dön, İstisna", page.adv && page.ret && page.exc, JSON.stringify(page));

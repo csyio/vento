@@ -1,3 +1,4 @@
 /engine/
 .DS_Store
 /build*.log
+/l10n-base/
