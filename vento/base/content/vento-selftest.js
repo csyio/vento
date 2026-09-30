@@ -624,6 +624,31 @@
       check("siteden ayrılınca bekleyen kart kalktı", await wait(() => tab.title === "gitti" && !visible() && P.pending === 0), String(P.pending));
       Services.perms.removeAll();
     }
+
+    // ===================== Hata sayfaları =====================
+    // Toolkit'in about:neterror'u, uygulama dil kaynağı (brand.ftl) kayıtlı değilse hiçbir iletiyi çözemez:
+    // başlık boş, metinler ham kalır. Kayıt: vento/l10n-registry.manifest.
+    {
+      const tab = tabs.selected;
+      const docURI = () => tab.browser.browsingContext?.currentWindowGlobal?.documentURI?.spec ?? "";
+      const missing = [];
+      const listener = { observe(m) { if (m instanceof Ci.nsIScriptError && /Missing resource/.test(m.errorMessage)) missing.push(m.errorMessage); } };
+      Services.console.registerListener(listener);
+      tab.browser.fixupAndLoadURIString("http://nonexistent.invalid/", { triggeringPrincipal: Vento.SYSTEM_PRINCIPAL });
+      check("DNS hatası: about:neterror açıldı", await wait(() => docURI().startsWith("about:neterror?e=dnsNotFound"), 15000), docURI());
+      await wait(() => tab.title === "Server Not Found", 10000);
+      Services.console.unregisterListener(listener);
+      const text = await new Promise(resolve => {
+        const mm = tab.browser.messageManager;
+        mm.addMessageListener("vento:errtext", m => resolve(m.data), { once: true });
+        mm.loadFrameScript("data:,(" + encodeURIComponent(`function(){ sendAsyncMessage("vento:errtext", content.document.body?.innerText || ""); }`) + ")()", false);
+        setTimeout(() => resolve(""), 5000);
+      });
+      check("hata sayfası başlığı çözüldü (boş değil)", tab.title === "Server Not Found", `"${tab.title}"`);
+      check("hata sayfası metni çevrildi ('Hmm. We’re having trouble…')", text.includes("having trouble finding that site"), text.slice(0, 120));
+      check("dil kaynağı eksikliği raporlanmadı (brand.ftl)", missing.length === 0, missing.join(" | "));
+      check("uygulama dil kaynağı kayıtlı", L10nRegistry.getInstance().getSourceNames().some(n => n.includes("vento")));
+    }
   } catch (e) {
     check("öz-test istisna fırlatmadı", false, String(e) + "\n" + (e.stack || ""));
   }

@@ -10,6 +10,12 @@ DIRS += [
     "app",
 ]
 
+# Uygulama dil kaynağı (branding/brand.ftl burada). Firefox'ta browser/l10n-registry.manifest yapar;
+# yoksa toolkit sayfaları (hata sayfaları …) brand.ftl'i bulamaz ve hiçbir ileti çözülmez.
+EXTRA_COMPONENTS += [
+    "l10n-registry.manifest",
+]
+
 DIST_SUBDIR = "browser"
 export("DIST_SUBDIR")
 
