@@ -11,7 +11,7 @@
 - `tools/build-locale.sh` → Firefox'un kendi adımları: `merge-tr` (eksik dizeleri en-US'ten tamamlar) + `chrome-tr` (toolkit, dom, netwerk, security, devtools, **marka**) → `Vento.app/Contents/Resources/{localization,chrome}/tr`, `res/multilocale.txt` = `tr,en-US`.
   Kuralları `vento/locales/Makefile.in` (Firefox'un `browser/locales/Makefile.in`'inin browser'a bağlı kısımları çıkarılmış hâli).
 - `tools/selftest.sh`, `mach build faster`'tan sonra `build-locale.sh`'ı çalıştırır. **`faster` Vento.app'i yeniden kurar; Türkçeyi silebilir → her zaman `build-locale.sh` çalıştırın.**
-- **Sürüm derlemesinde (DMG/imza, `docs/IMZA.md`) de `tools/build-locale.sh` çalışmalı**; yoksa paket İngilizce çıkar.
+- **Sürüm derlemesinde (paketleme/imza adımı yazıldığında) de `tools/build-locale.sh` çalışmalı**; yoksa paket İngilizce çıkar. (Henüz bir release betiği yok.)
 
 ## Tuzaklar
 - Marka (`branding/brand.ftl`) ayrıca `make -C <marka dizini>/locales chrome AB_CD=tr` ile eklenmeli. **Bir Fluent kümesinde tek dosya eksikse TÜM küme İngilizceye düşer** (hata sayfaları sessizce İngilizce kalır).
