@@ -102,28 +102,36 @@
     bindCommands();
     window.browserDOMWindow = makeBrowserAccess();
 
-    // Komut satırı: -url <adres>
-    let startUrl = null;
+    // Komut satırı: -url <adres> (birden fazla verilebilir; her biri ayrı sekme, sonuncusu seçili)
+    const startUrls = [];
     try {
       const cmdLine = window.arguments?.[0];
       if (cmdLine instanceof Ci.nsICommandLine) {
-        startUrl = cmdLine.handleFlagWithParam("url", false);
+        let u;
+        while ((u = cmdLine.handleFlagWithParam("url", false))) {
+          const resolved = Vento.resolveInput(u);
+          if (resolved) {
+            startUrls.push(resolved);
+          }
+        }
       }
     } catch (e) {
       Vento.trace(`komut satırı okunamadı: ${e}`);
     }
-    // Önceki oturumu geri getir (açık sekmeler); -url verildiyse o adres ayrı bir sekmede açılır.
-    const startTarget = Vento.resolveInput(startUrl);
+    // Önceki oturumu geri getir (açık sekmeler); -url verildiyse o adresler ayrı sekmelerde açılır.
     let restored = false;
     if (Services.prefs.getBoolPref("vento.session.restore", true)) {
       try {
-        restored = Vento.session.restore(await Vento.session.read(), startTarget);
+        restored = Vento.session.restore(await Vento.session.read(), startUrls);
       } catch (e) {
         Vento.trace(`oturum geri yüklenemedi: ${e}`);
       }
     }
     if (!restored) {
-      Vento.tabs.open(startTarget ?? "about:blank");
+      startUrls.forEach(u => Vento.tabs.open(u));
+      if (!startUrls.length) {
+        Vento.tabs.open("about:blank");
+      }
     }
     Vento.session.start();
     Vento.trace(`kabuk hazır (oturum geri yüklendi=${restored})`);

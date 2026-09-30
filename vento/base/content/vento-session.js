@@ -39,20 +39,19 @@ Vento.session = new (class Session {
   }
 
   /**
-   * Okunan durumu sekmelere döker. `extraUrl` verilirse (komut satırı) o adres ayrı bir sekmede açılır ve seçilir.
-   * Hiç sekme geri getirilemezse false döner.
+   * Okunan durumu sekmelere döker. `extra` (komut satırı adresi ya da adres dizisi) verilirse hepsi ayrı sekmede açılır,
+   * sonuncusu seçilir. Hiç sekme geri getirilemezse false döner.
    */
-  restore(state, extraUrl = null) {
+  restore(state, extra = []) {
     if (!state?.tabs?.length) {
       return false;
     }
+    const extras = [extra].flat().filter(Boolean);
     const sel = Math.min(Math.max(state.selected, 0), state.tabs.length - 1);
     state.tabs.forEach((t, i) => {
-      Vento.tabs.open(t.url, { select: !extraUrl && i === sel, lazy: { url: t.url, title: t.title } });
+      Vento.tabs.open(t.url, { select: !extras.length && i === sel, lazy: { url: t.url, title: t.title } });
     });
-    if (extraUrl) {
-      Vento.tabs.open(extraUrl);
-    }
+    extras.forEach((url, i) => Vento.tabs.open(url, { select: i === extras.length - 1 }));
     return true;
   }
 
