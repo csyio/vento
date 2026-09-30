@@ -1,1 +1,1 @@
-DIRS += ["permissions", "session", "shell", "startup"]
+DIRS += ["favicon", "permissions", "session", "shell", "startup"]

@@ -32,6 +32,20 @@ const srv = http.createServer((req, res) => {
       if (mode === "cam") navigator.mediaDevices.getUserMedia({ video: true }).then(st => set("cam:ok:" + st.getTracks().length), e => set("cam:" + e.name));
     </script>`);
   }
+  // Simge testi: /simge/link.html (<link rel=icon> → kırmızı), /simge/kok.html (bağlantısız → /favicon.ico mavi)
+  if (req.method === "GET" && req.url === "/simge/link.html") {
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    return res.end('<!doctype html><meta charset="utf-8"><title>Bağlantılı</title><link rel="icon" type="image/png" href="/simge/kirmizi.png"><p>x</p>');
+  }
+  if (req.method === "GET" && req.url === "/simge/kok.html") {
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    return res.end('<!doctype html><meta charset="utf-8"><title>Köke düşen</title><p>x</p>');
+  }
+  if (req.method === "GET" && (req.url === "/simge/kirmizi.png" || req.url === "/favicon.ico")) {
+    const red = req.url !== "/favicon.ico";
+    res.writeHead(200, { "Content-Type": red ? "image/png" : "image/x-icon", "Cache-Control": "no-store" });
+    return res.end(Buffer.from(red ? "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFklEQVR4nGO4IydHEmIY1TCqYfhqAACaMxgQdGu1YAAAAABJRU5ErkJggg==" : "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFklEQVR4nGOQs7lDEmIY1TCqYfhqAAAQ1jYQxYTP1AAAAABJRU5ErkJggg==", "base64"));
+  }
   if (req.method === "GET" && req.url.startsWith("/yavas.bin")) {
     // İptal testi: 5 MB'ı ağır ağır yollar (bitmesi ~30 sn sürer)
     res.writeHead(200, { "Content-Type": "application/octet-stream", "Content-Length": 5 * 1024 * 1024 });

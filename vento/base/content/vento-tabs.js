@@ -63,6 +63,11 @@ Vento.formatDisplay = function formatDisplay(url) {
   return url;
 };
 
+const lazyPlaces = {};
+ChromeUtils.defineESModuleGetters(lazyPlaces, {
+  PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
+});
+
 let nextTabId = 1;
 
 class VentoTab {
@@ -76,6 +81,8 @@ class VentoTab {
     this.canGoForward = false;
     // Oturumdan geri yüklenen ama henüz yüklenmemiş sekme: seçilince bu adres yüklenir.
     this.pending = null;
+    // Sekme simgesi (favicon): data:/http adresi ya da "" (yok → harf işareti)
+    this.icon = "";
   }
 
   get blank() {
@@ -160,9 +167,12 @@ Vento.tabs = new (class TabManager extends EventTarget {
         }
         this.#emit("tabchange", tab);
       },
-      onLocationChange: (wp, req, uri) => {
+      onLocationChange: (wp, req, uri, flags) => {
         if (!wp.isTopLevel) {
           return;
+        }
+        if (!(flags & Ci.nsIWebProgressListener.LOCATION_CHANGE_SAME_DOCUMENT)) {
+          tab.icon = "";
         }
         tab.url = uri ? uri.spec : "";
         tab.title = contentTitle(browser);
@@ -229,6 +239,7 @@ Vento.tabs = new (class TabManager extends EventTarget {
       tab.pending = lazy.url;
       tab.url = lazy.url;
       tab.title = lazy.title || "";
+      this.#iconFromCache(tab);
     }
     const at = afterCurrent && this.#selected ? this.#tabs.indexOf(this.#selected) + 1 : this.#tabs.length;
     this.#tabs.splice(at, 0, tab);
@@ -257,6 +268,29 @@ Vento.tabs = new (class TabManager extends EventTarget {
     }
     this.#emit("tabselect", tab);
     this.#loadPending(tab);
+  }
+
+  /** İçerik süreci bir sekmenin simgesini bulunca (VentoLinkParent) çağrılır. */
+  setIcon(browser, iconURL) {
+    const tab = this.#tabs.find(t => t.browser === browser);
+    if (!tab || tab.icon === iconURL) {
+      return;
+    }
+    tab.icon = iconURL;
+    this.#emit("tabchange", tab);
+  }
+
+  /** Yüklenmemiş (oturumdan gelen) sekmeler için Places'in önbellekli simgesi; yoksa harf işareti kalır. */
+  async #iconFromCache(tab) {
+    try {
+      const fav = await lazyPlaces.PlacesUtils.favicons.getFaviconForPage(Services.io.newURI(tab.url));
+      if (fav && !tab.icon && this.#tabs.includes(tab)) {
+        tab.icon = fav.dataURI.spec;
+        this.#emit("tabchange", tab);
+      }
+    } catch (e) {
+      // önbellekte simge yok
+    }
   }
 
   #loadPending(tab) {

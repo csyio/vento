@@ -23,6 +23,30 @@ Vento.ui = (() => {
     return m ? m[0] : "V";
   }
 
+  // Simge varsa <img>, yoksa (ya da yüklenemezse) harf işareti. Simge değişmedikçe öğe yeniden kurulmaz (titremesin).
+  function setMark(mark, tab) {
+    if (tab.icon) {
+      if (mark.dataset.icon !== tab.icon) {
+        const img = document.createElement("img");
+        img.alt = "";
+        img.addEventListener("error", () => {
+          if (tab.icon === mark.dataset.icon) {
+            tab.icon = "";
+            setMark(mark, tab);
+          }
+        }, { once: true });
+        img.src = tab.icon;
+        mark.dataset.icon = tab.icon;
+        mark.classList.add("has-icon");
+        mark.replaceChildren(img);
+      }
+      return;
+    }
+    delete mark.dataset.icon;
+    mark.classList.remove("has-icon");
+    mark.textContent = markLetter(tab);
+  }
+
   function buildTabEl(tab) {
     const el = document.createElement("div");
     el.className = "tab";
@@ -64,7 +88,7 @@ Vento.ui = (() => {
     }
     el.toggleAttribute("selected", tab === Vento.tabs.selected);
     el.toggleAttribute("loading", tab.loading);
-    el.querySelector(".tab-mark").textContent = markLetter(tab);
+    setMark(el.querySelector(".tab-mark"), tab);
     el.querySelector(".tab-title").textContent = tab.label;
     el.title = tab.label;
   }

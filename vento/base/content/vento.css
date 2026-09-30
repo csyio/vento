@@ -139,6 +139,22 @@ button {
 
 .tab[selected] .tab-mark { background: var(--v-accent); }
 
+/* Sitenin kendi simgesi: yuvarlak harf işaretinin yerini alır */
+.tab-mark.has-icon,
+.tab[selected] .tab-mark.has-icon {
+  background: none;
+  border-radius: 3px;
+}
+
+.tab-mark img {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
+/* Yüklenirken dönen halka görünür, simge gizlenir */
+.tab[loading] .tab-mark img { display: none; }
+
 .tab[loading] .tab-mark {
   background: none;
   border: 2px solid var(--v-accent-soft);

@@ -673,6 +673,43 @@
       check("uygulama dil kaynağı kayıtlı", L10nRegistry.getInstance().getSourceNames().some(n => n.includes("vento")));
     }
 
+    // ===================== Sekme simgeleri (favicon) =====================
+    {
+      const llm = Services.env.get("VENTO_ESIN_ENDPOINT").replace(/\/v1$/, "");
+      const tab = tabs.selected;
+      const load = u => tab.browser.fixupAndLoadURIString(u, { triggeringPrincipal: Vento.SYSTEM_PRINCIPAL });
+      const mark = () => document.querySelector(".tab[selected] .tab-mark");
+      const img = () => mark()?.querySelector("img");
+
+      load(`${llm}/simge/link.html`);
+      check("<link rel=icon>: sekme simgesi geldi (data:image)", await wait(() => tab.icon.startsWith("data:image/"), 15000), tab.icon.slice(0, 40));
+      const linkIcon = tab.icon;
+      check("simge sekme şeridinde <img> olarak çizildi", await wait(() => !tab.loading && img()?.complete && img().naturalWidth === 16), `${img()?.naturalWidth}`);
+      check("simge varken harf işareti yok, has-icon sınıfı var", mark()?.classList.contains("has-icon") && !mark().textContent.trim());
+
+      load(`${llm}/simge/kok.html`);
+      check("bağlantısız sayfa: /favicon.ico'ya düşüldü", await wait(() => tab.icon.startsWith("data:image/") && tab.icon !== linkIcon, 15000), tab.icon.slice(0, 40));
+
+      load("data:text/html,<title>x</title>");
+      check("başka sayfaya gidince eski site simgesi kalmadı", await wait(() => tab.icon === "" && !tab.loading), tab.icon.slice(0, 40));
+      check("simge yokken harf işareti geri geldi", await wait(() => !img() && mark()?.textContent.trim() !== "" && !mark().classList.contains("has-icon")));
+
+      Vento.tabs.setIcon(tab.browser, "data:image/png;base64,AAAA");
+      check("bozuk simge → sessizce harf işaretine döner", await wait(() => tab.icon === "" && !img() && mark()?.textContent.trim() !== ""), tab.icon);
+
+      // Ziyaret edilen sayfanın simgesi Places'e saklanır → oturumdan tembel açılan sekme yüklenmeden simgesini gösterir
+      load(`${llm}/simge/link.html`);
+      await wait(() => tab.icon.startsWith("data:image/") && !tab.loading, 15000);
+      await new Promise(r => setTimeout(r, 1500)); // Places yazımı asenkron
+      const before = tabs.all.length;
+      Vento.session.restore({ selected: 1, tabs: [{ url: `${llm}/simge/link.html`, title: "Bağlantılı" }, { url: "http://127.0.0.1:1/bos", title: "b" }] });
+      const cached = tabs.all[before];
+      check("tembel sekme: yüklenmeden önbellekten simge geldi", await wait(() => cached.pending && cached.icon.startsWith("data:image/"), 10000), `bekliyor=${!!cached.pending} icon=${cached.icon.slice(0, 30)}`);
+      for (const t of tabs.all.slice(before)) { tabs.close(t); }
+      load("data:text/html,<title>x</title>");
+      await wait(() => tab.icon === "" && !tab.loading);
+    }
+
     // ===================== Oturum geri yükleme =====================
     {
       const S = Vento.session;

@@ -2,6 +2,8 @@
 FINAL_TARGET_FILES.actors += [
     "VentoContextMenuChild.sys.mjs",
     "VentoContextMenuParent.sys.mjs",
+    "VentoLinkChild.sys.mjs",
+    "VentoLinkParent.sys.mjs",
     "VentoMediaChild.sys.mjs",
     "VentoMediaParent.sys.mjs",
     "VentoMediaProcessChild.sys.mjs",
