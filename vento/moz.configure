@@ -1,0 +1,12 @@
+# Vento — Firefox'un browser/ dizininden bağımsız Gecko uygulaması.
+# Yol: --enable-project=vento (bkz. ../mozconfig). Thunderbird (comm/mail) ile aynı model.
+
+imply_option("MOZ_PLACES", True)
+imply_option("MOZ_APP_VENDOR", "Vento")
+# Profil konumu (macOS: ~/Library/Application Support/<Profile>). Eski tarayıcının "Vento"
+# dizininden ve gerçek Firefox'tan ayrı; yayın öncesi yeniden kararlaştırılacak.
+imply_option("MOZ_APP_PROFILE", "VentoNew")
+imply_option("MOZ_APP_ID", "{ecbe259c-3069-4a3c-bc17-d534fbcb23a1}")
+imply_option("BROWSER_CHROME_URL", "chrome://vento/content/vento.xhtml")
+
+include("../toolkit/moz.configure")

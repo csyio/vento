@@ -1,0 +1,2 @@
+MOZ_BRANDING_DIRECTORY=vento/branding/default
+MOZ_OFFICIAL_BRANDING_DIRECTORY=vento/branding/default

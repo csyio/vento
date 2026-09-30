@@ -1,0 +1,7 @@
+# widget/cocoa/nsMenuBarX.mm nsIShellService.h ister; her Gecko uygulaması bunu sağlar
+# (Thunderbird mail/components/shell). Uygulaması yok — yalnızca arayüz.
+XPIDL_SOURCES += [
+    "nsIShellService.idl",
+]
+
+XPIDL_MODULE = "shellservice"

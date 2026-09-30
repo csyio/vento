@@ -1,0 +1,7 @@
+EXTRA_JS_MODULES += [
+    "VentoStartup.sys.mjs",
+]
+
+XPCOM_MANIFESTS += [
+    "components.conf",
+]

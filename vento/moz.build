@@ -1,0 +1,18 @@
+# Vento uygulama dizini. Firefox'un browser/ dizinine bağımlılık YOK — kural.
+
+with Files("**"):
+    BUG_COMPONENT = ("Firefox", "General")
+
+DIRS += [
+    "base",
+    "components",
+    "app",
+]
+
+DIST_SUBDIR = "browser"
+export("DIST_SUBDIR")
+
+# Uygulama tercihleri: app/profile/vento.js (yönergesiz → ön işlemesiz)
+JS_PREFERENCE_FILES += [
+    "app/profile/vento.js",
+]

@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<?xml-stylesheet href="chrome://global/skin/global.css"?>
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:xul="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+      id="vento-main" windowtype="vento:main" scrolling="false"
+      width="1200" height="800" persist="screenX screenY width height">
+<head>
+  <meta charset="utf-8"/>
+  <title>Vento</title>
+  <script src="chrome://global/content/customElements.js"/>
+  <script src="chrome://vento/content/vento.js"/>
+</head>
+<body style="margin:0; height:100vh; display:flex; flex-direction:column;">
+  <div id="bar" style="padding:8px; font:13px system-ui; background:#1f1f24; color:#eee;">
+    Vento — spike: browser.xhtml yok
+  </div>
+  <xul:browser id="content" type="content" remote="true" maychangeremoteness="true"
+               src="https://example.com" style="flex:1;"/>
+</body>
+</html>
