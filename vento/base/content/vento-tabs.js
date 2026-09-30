@@ -74,6 +74,8 @@ class VentoTab {
     this.loading = false;
     this.canGoBack = false;
     this.canGoForward = false;
+    // Oturumdan geri yüklenen ama henüz yüklenmemiş sekme: seçilince bu adres yüklenir.
+    this.pending = null;
   }
 
   get blank() {
@@ -196,8 +198,9 @@ Vento.tabs = new (class TabManager extends EventTarget {
    * @param select       true → sekmeyi seç
    * @param openWindowInfo  window.open() ile gelen bilgi (varsa sayfa yüklenmez, içerik kendi yükler)
    * @param afterCurrent true → seçili sekmenin hemen sağına
+   * @param lazy         {url, title} → sayfa şimdi yüklenmez (oturum geri yükleme); sekme seçilince yüklenir
    */
-  open(url = "about:blank", { select = true, openWindowInfo = null, afterCurrent = false } = {}) {
+  open(url = "about:blank", { select = true, openWindowInfo = null, afterCurrent = false, lazy = null } = {}) {
     const browser = document.createXULElement("browser");
     const attrs = {
       type: "content",
@@ -210,8 +213,8 @@ Vento.tabs = new (class TabManager extends EventTarget {
     for (const [k, v] of Object.entries(attrs)) {
       browser.setAttribute(k, v);
     }
-    const loadNow = !!url && url !== "about:blank" && !openWindowInfo;
-    if (loadNow || openWindowInfo) {
+    const loadNow = !!url && url !== "about:blank" && !openWindowInfo && !lazy;
+    if (loadNow || openWindowInfo || lazy) {
       // Gereksiz ilk about:blank yüklemesini engelle (tabbrowser ile aynı).
       browser.setAttribute("nodefaultsrc", "true");
     }
@@ -222,6 +225,11 @@ Vento.tabs = new (class TabManager extends EventTarget {
     this.#container.appendChild(browser);
 
     const tab = new VentoTab(browser);
+    if (lazy) {
+      tab.pending = lazy.url;
+      tab.url = lazy.url;
+      tab.title = lazy.title || "";
+    }
     const at = afterCurrent && this.#selected ? this.#tabs.indexOf(this.#selected) + 1 : this.#tabs.length;
     this.#tabs.splice(at, 0, tab);
     this.#wire(tab);
@@ -231,7 +239,9 @@ Vento.tabs = new (class TabManager extends EventTarget {
     if (loadNow) {
       browser.fixupAndLoadURIString(url, { triggeringPrincipal: SYSTEM_PRINCIPAL });
     }
-    if (select || !this.#selected) {
+    // Hiç seçili sekme yokken ilk sekme seçilir; ama tembel (geri yüklenen) sekme kendiliğinden seçilmez —
+    // yoksa oturumdaki İLK sekme gereksiz yüklenir. Seçileni çağıran belirler (select: true).
+    if (select || (!this.#selected && !lazy)) {
       this.select(tab);
     }
     return tab;
@@ -246,6 +256,16 @@ Vento.tabs = new (class TabManager extends EventTarget {
       this.#setActive(t, t === tab);
     }
     this.#emit("tabselect", tab);
+    this.#loadPending(tab);
+  }
+
+  #loadPending(tab) {
+    if (!tab.pending) {
+      return;
+    }
+    const url = tab.pending;
+    tab.pending = null;
+    tab.browser.fixupAndLoadURIString(url, { triggeringPrincipal: SYSTEM_PRINCIPAL });
   }
 
   selectRelative(delta) {
@@ -281,6 +301,7 @@ Vento.tabs = new (class TabManager extends EventTarget {
     if (!tab || !url) {
       return false;
     }
+    tab.pending = null;
     tab.browser.fixupAndLoadURIString(url, { triggeringPrincipal: SYSTEM_PRINCIPAL });
     return true;
   }
@@ -298,6 +319,10 @@ Vento.tabs = new (class TabManager extends EventTarget {
   }
 
   reload(tab = this.#selected) {
+    if (tab?.pending) {
+      this.#loadPending(tab);
+      return;
+    }
     tab?.browser.reload();
   }
 

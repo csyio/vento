@@ -11,5 +11,6 @@ vento.jar:
   content/vento-downloads.js (vento-downloads.js)
   content/vento-dialogs.js (vento-dialogs.js)
   content/vento-permissions.js (vento-permissions.js)
+  content/vento-session.js (vento-session.js)
   content/vento-shell.js (vento-shell.js)
   content/vento-selftest.js (vento-selftest.js)

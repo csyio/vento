@@ -91,7 +91,7 @@
 
   // ---- Başlangıç -----------------------------------------------------------------------
 
-  window.addEventListener("load", () => {
+  window.addEventListener("load", async () => {
     Vento.tabs.init($("browsers"));
     Vento.ui.init();
     Vento.esin.init();
@@ -112,8 +112,21 @@
     } catch (e) {
       Vento.trace(`komut satırı okunamadı: ${e}`);
     }
-    Vento.tabs.open(Vento.resolveInput(startUrl) ?? "about:blank");
-    Vento.trace("kabuk hazır");
+    // Önceki oturumu geri getir (açık sekmeler); -url verildiyse o adres ayrı bir sekmede açılır.
+    const startTarget = Vento.resolveInput(startUrl);
+    let restored = false;
+    if (Services.prefs.getBoolPref("vento.session.restore", true)) {
+      try {
+        restored = Vento.session.restore(await Vento.session.read(), startTarget);
+      } catch (e) {
+        Vento.trace(`oturum geri yüklenemedi: ${e}`);
+      }
+    }
+    if (!restored) {
+      Vento.tabs.open(startTarget ?? "about:blank");
+    }
+    Vento.session.start();
+    Vento.trace(`kabuk hazır (oturum geri yüklendi=${restored})`);
 
     if (Services.env.exists("VENTO_SELFTEST")) {
       Services.scriptloader.loadSubScript("chrome://vento/content/vento-selftest.js", window);

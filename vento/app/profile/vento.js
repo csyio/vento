@@ -22,3 +22,6 @@ pref("vento.esin.consented", false);
 pref("browser.download.useDownloadDir", true);
 pref("browser.download.folderList", 1); // 1 = ~/Downloads
 pref("browser.download.always_ask_before_handling_new_types", false);
+
+// Açılışta önceki oturumun sekmelerini geri getir
+pref("vento.session.restore", true);

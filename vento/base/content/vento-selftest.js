@@ -25,6 +25,28 @@
     return false;
   };
 
+  // ===== 2. aşama: aynı profille yeniden açıldı → oturum geri gelmiş olmalı (tools/selftest.sh ikinci kez çalıştırır) =====
+  if (Services.env.exists("VENTO_SELFTEST_PHASE2")) {
+    try {
+      const tabs = Vento.tabs;
+      const llm = Services.env.get("VENTO_ESIN_ENDPOINT").replace(/\/v1$/, "");
+      const u = n => `${llm}/oturum/${n}`;
+      check("yeniden açılış: 3 sekme geri geldi (fazladan boş sekme yok)", tabs.all.length === 3, String(tabs.all.length));
+      check("adresler ve sıra doğru", tabs.all.map(t => t.url).join(" ") === [u("a"), u("b"), u("c")].join(" "), tabs.all.map(t => t.url).join(" "));
+      check("seçili sekme B (kapanışta yazılan son durum)", tabs.selected === tabs.all[1], String(tabs.all.indexOf(tabs.selected)));
+      check("seçili sekme yüklendi, diğerleri bekliyor", !tabs.all[1].pending && !!tabs.all[0].pending && !!tabs.all[2].pending, tabs.all.map(t => t.pending ? "bekliyor" : "yüklü").join(","));
+      check("bekleyen sekmelerde başlık korundu", tabs.all[0].title === "Sayfa A" && tabs.all[2].title === "Sayfa C", tabs.all.map(t => t.title).join("|"));
+      check("seçili sekmenin sayfası gerçekten yüklendi", await wait(() => tabs.all[1].browser.currentURI?.spec === u("b"), 15000), tabs.all[1].browser.currentURI?.spec);
+      tabs.select(tabs.all[0]);
+      check("bekleyen sekmeye geçince sayfa yüklendi", !tabs.all[0].pending && await wait(() => tabs.all[0].browser.currentURI?.spec === u("a"), 15000), tabs.all[0].browser.currentURI?.spec);
+    } catch (e) {
+      check("2. aşama istisna fırlatmadı", false, String(e) + "\n" + (e.stack || ""));
+    }
+    Vento.trace(`ÖZET ${results.filter(Boolean).length}/${results.length} geçti`);
+    Services.startup.quit(Ci.nsIAppStartup.eForceQuit);
+    return;
+  }
+
   try {
     const tabs = Vento.tabs;
 
@@ -648,6 +670,84 @@
       check("hata sayfası metni çevrildi ('Hmm. We’re having trouble…')", text.includes("having trouble finding that site"), text.slice(0, 120));
       check("dil kaynağı eksikliği raporlanmadı (brand.ftl)", missing.length === 0, missing.join(" | "));
       check("uygulama dil kaynağı kayıtlı", L10nRegistry.getInstance().getSourceNames().some(n => n.includes("vento")));
+    }
+
+    // ===================== Oturum geri yükleme =====================
+    {
+      const S = Vento.session;
+      const llm = Services.env.get("VENTO_ESIN_ENDPOINT").replace(/\/v1$/, "");
+      const u = n => `${llm}/oturum/${n}`;
+      // Temiz başlangıç: seçili sekme dışındakileri kapat
+      for (const t of tabs.all) { if (t !== tabs.selected) { tabs.close(t); } }
+      const first = tabs.selected;
+      first.browser.fixupAndLoadURIString("data:text/html,<title>x</title>", { triggeringPrincipal: Vento.SYSTEM_PRINCIPAL });
+      await wait(() => first.url.startsWith("data:"));
+
+      // -- capture: yalnız gerçek sayfalar, seçili indeks saklanabilir sekmelere göre
+      const A = tabs.open(u("a"), { select: false });
+      const B = tabs.open(u("b"), { select: true });
+      const C = tabs.open(u("c"), { select: false });
+      await wait(() => [A, B, C].every(t => t.url === t.browser.currentURI?.spec && t.url.startsWith("http")), 15000);
+      const cap = S.capture();
+      check("capture: data: sekmesi dışarıda, 3 http sekmesi", cap.tabs.length === 3 && cap.tabs.every(t => t.url.startsWith(llm)), JSON.stringify(cap.tabs.map(t => t.url)));
+      check("capture: seçili indeks saklanabilir sekmelere göre (B → 1)", cap.selected === 1, String(cap.selected));
+
+      // -- diske yazma + okuma
+      tabs.select(C);
+      await S.flush();
+      const back = await S.read();
+      check("flush + read: aynı durum diske gitti", back?.tabs.length === 3 && back.selected === 2 && back.tabs[1].url === u("b"), JSON.stringify(back));
+
+      // -- bozuk dosya → yedek
+      await S.flush(); // ikinci yazma: ilk dosya .bak olur
+      check(".bak yedeği oluştu", await IOUtils.exists(S.path + ".bak"));
+      await IOUtils.writeUTF8(S.path, "{ bozuk json");
+      const fallback = await S.read();
+      check("ana dosya bozukken yedekten okundu", fallback?.tabs.length === 3, JSON.stringify(fallback));
+
+      // -- kurcalanmış dosya: tehlikeli şemalar süzülür
+      await IOUtils.writeJSON(S.path, { version: 1, selected: 9, tabs: [{ url: "javascript:alert(1)" }, { url: "chrome://vento/content/vento.xhtml" }, { url: u("ok"), title: "t" }, { url: 5 }] });
+      const tampered = await S.read();
+      check("javascript:/chrome:/tip hatalı girdiler süzüldü", tampered?.tabs.length === 1 && tampered.tabs[0].url === u("ok"), JSON.stringify(tampered));
+      check("geçersiz sürüm/boş durum → null", (await IOUtils.writeJSON(S.path, { version: 99, tabs: [] }), await (async () => { await IOUtils.remove(S.path + ".bak", { ignoreAbsent: true }); return (await S.read()) === null; })()));
+
+      // -- restore: seçili yüklenir, diğerleri bekler
+      const before = tabs.all.length;
+      const state = { selected: 1, tabs: [{ url: u("x"), title: "Sayfa X" }, { url: u("y"), title: "Sayfa Y" }, { url: u("z"), title: "Sayfa Z" }] };
+      check("restore: true döner", S.restore(state) === true);
+      const [X, Y, Z] = tabs.all.slice(before);
+      check("restore: 3 sekme eklendi, seçili olan Y", tabs.all.length === before + 3 && tabs.selected === Y);
+      check("restore: Y yüklendi, X ve Z bekliyor", !Y.pending && X.pending === u("x") && Z.pending === u("z"));
+      check("restore: bekleyen sekmelerde başlık ve adres şeritte", X.title === "Sayfa X" && X.url === u("x") && X.label === "Sayfa X");
+      check("restore: Y'nin sayfası yüklendi", await wait(() => Y.browser.currentURI?.spec === u("y"), 15000), Y.browser.currentURI?.spec);
+      check("restore: bekleyen X'in sayfası HENÜZ yüklenmedi", X.browser.currentURI?.spec !== u("x"), X.browser.currentURI?.spec);
+      tabs.select(Z);
+      check("restore: Z'ye geçince yüklendi", !Z.pending && await wait(() => Z.browser.currentURI?.spec === u("z"), 15000), Z.browser.currentURI?.spec);
+      // adres çubuğundan gezinme beklemeyi iptal eder (eski adres sonradan yüklenip ezmesin)
+      tabs.navigate(X, u("q"));
+      check("bekleyen sekmede başka adrese gidince bekleme iptal", X.pending === null);
+      for (const t of [X, Y, Z]) { tabs.close(t); }
+
+      // -- komut satırı adresi: ayrı sekme, o seçili
+      const n0 = tabs.all.length;
+      S.restore({ selected: 0, tabs: [{ url: u("m"), title: "M" }] }, u("extra"));
+      check("restore + -url: ek adres ayrı sekmede ve seçili, geri gelen sekme bekliyor", tabs.all.length === n0 + 2 && tabs.selected === tabs.all[n0 + 1] && tabs.all[n0].pending === u("m"));
+      check("restore + -url: ek adres yüklendi", await wait(() => tabs.selected.url === u("extra"), 15000), tabs.selected.url);
+      tabs.close(tabs.all[tabs.all.length - 1]);
+      tabs.close(tabs.all[tabs.all.length - 1]);
+      check("restore(null) ve boş durum: false", S.restore(null) === false && S.restore({ selected: 0, tabs: [] }) === false);
+
+      // -- Son durum: 2. aşamada (yeniden başlatma) doğrulanır. Başlıklar bilerek verilir (sunucu başlıksız).
+      for (const t of tabs.all) { if (t !== tabs.selected) { tabs.close(t); } }
+      const keep = tabs.selected;
+      const [a2, b2, c2] = [tabs.open(u("a"), { select: false }), tabs.open(u("b"), { select: false }), tabs.open(u("c"), { select: false })];
+      await wait(() => [a2, b2, c2].every(t => !t.loading && t.browser.currentURI?.spec === t.url && t.url.startsWith("http")), 15000);
+      a2.title = "Sayfa A"; c2.title = "Sayfa C";
+      tabs.close(keep); // boş/data sekmesi geri gelmesin
+      tabs.select(c2);
+      await S.flush();       // ara durum: seçili C
+      tabs.select(b2);       // seçili B — ARTIK yazılmayı beklemeden çıkıyoruz: kapanış engelleyicisi yazmalı
+      check("kapanış öncesi: 3 sekme, seçili B", tabs.all.length === 3 && tabs.selected === b2);
     }
   } catch (e) {
     check("öz-test istisna fırlatmadı", false, String(e) + "\n" + (e.stack || ""));
