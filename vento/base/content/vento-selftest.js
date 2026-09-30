@@ -673,6 +673,55 @@
       check("uygulama dil kaynağı kayıtlı", L10nRegistry.getInstance().getSourceNames().some(n => n.includes("vento")));
     }
 
+    // ===================== Sertifika hata sayfası (gerçek HTTPS, kendinden imzalı) =====================
+    {
+      const https = Services.env.get("VENTO_TEST_HTTPS");
+      const tab = tabs.open("about:blank"); // temiz sekme (önceki hata sayfası testinin durumu karışmasın)
+      const docURI = () => tab.browser.browsingContext?.currentWindowGlobal?.documentURI?.spec ?? "";
+      const load = u => tab.browser.fixupAndLoadURIString(u, { triggeringPrincipal: Vento.SYSTEM_PRINCIPAL });
+      // İçerik sürecinde bir işlev çalıştırıp sonucunu alır
+      const inPage = (body, ms = 8000) => new Promise(resolve => {
+        body = body.replace(/\bdocument\b/g, "content.document");
+        const id = "vento:sonuc:" + Math.random();
+        const mm = tab.browser.messageManager;
+        mm.addMessageListener(id, m => resolve(m.data), { once: true });
+        // async destekli; kaynak ASCII olmalı (data: betik Latin-1 okunuyor)
+        mm.loadFrameScript("data:,(" + encodeURIComponent(`function(){ Promise.resolve().then(() => (${body})()).then(r => sendAsyncMessage(${JSON.stringify(id)}, r), e => sendAsyncMessage(${JSON.stringify(id)}, "HATA " + e)); }`) + ")()", false);
+        setTimeout(() => resolve("ZAMAN AŞIMI"), ms);
+      });
+      check("gizlilik: sertifika hatasında Mozilla MITM sunucusuna istek atılmıyor", Services.prefs.getBoolPref("security.certerrors.mitm.priming.enabled") === false);
+      Services.prefs.setIntPref("security.dialog_enable_delay", 0); // "Riski kabul et" düğmesinin 1 sn'lik bekleme süresi (yalnız test)
+      const overrides = Cc["@mozilla.org/security/certoverride;1"].getService(Ci.nsICertOverrideService);
+
+      load(`${https}/`);
+      check("kendinden imzalı HTTPS: about:certerror açıldı", await wait(() => docURI().startsWith("about:certerror"), 15000), docURI().slice(0, 80));
+      check("sertifika hata sayfasının başlığı çözüldü", await wait(() => tab.title === "Warning: Potential Security Risk Ahead", 10000), `"${tab.title}"`);
+      const page = await inPage(`() => ({ text: document.body.innerText, adv: !!document.getElementById("advancedButton"), ret: !!document.getElementById("returnButton"), exc: !!document.getElementById("exceptionDialogButton") })`);
+      check("sayfa metni: 'Vento' adı geçiyor, Nightly/Firefox yok", /Vento/.test(page.text) && !/Nightly|Firefox/.test(page.text), String(page.text).slice(0, 160).replace(/\n/g, " | "));
+      check("düğmeler: Gelişmiş, Geri dön, İstisna", page.adv && page.ret && page.exc, JSON.stringify(page));
+
+      await inPage(`() => document.getElementById("advancedButton").click()`);
+      const adv = await inPage(`() => { const b = document.getElementById("exceptionDialogButton"); return { hidden: b.closest("[hidden]") ? "gizli" : "gorunur", disabled: b.disabled }; }`);
+      check("'Gelişmiş' → 'Riski kabul et' düğmesi görünür", adv.hidden === "gorunur", JSON.stringify(adv));
+
+      await wait(async () => (await inPage(`() => !document.getElementById("exceptionDialogButton").disabled`)) === true, 8000);
+      await inPage(`() => document.getElementById("exceptionDialogButton").click()`);
+      check("riski kabul edince sayfa gerçekten yüklendi", await wait(() => tab.title === "Güvenli sayfa", 15000), `"${tab.title}" ${docURI().slice(0, 50)}`);
+      check("adres çubuğu HTTPS adresini gösteriyor (hata adresi değil)", tab.url === `${https}/`, tab.url);
+      check("istisna saklandı (aynı oturumda yeniden sorulmaz)", await (async () => { load(`${https}/?ikinci`); return wait(() => tab.title === "Güvenli sayfa" && tab.url.endsWith("?ikinci"), 15000); })());
+      overrides.clearAllOverrides();
+
+      // "Geri dön": önceki sayfaya (temiz geçmiş: data: sayfası → sertifika hatası → geri)
+      load("data:text/html,<title>onceki</title>");
+      await wait(() => tab.title === "onceki" && !tab.loading, 10000);
+      load(`${https}/?geri`);
+      await wait(() => docURI().startsWith("about:certerror"), 15000);
+      await inPage(`() => document.getElementById("returnButton").click()`);
+      check("'Geri dön' önceki sayfaya götürdü", await wait(() => tab.title === "onceki" && !docURI().startsWith("about:certerror"), 10000), `${docURI().slice(0, 40)} "${tab.title}"`);
+      Services.prefs.clearUserPref("security.dialog_enable_delay");
+      tabs.close(tab);
+    }
+
     // ===================== Sekme simgeleri (favicon) =====================
     {
       const llm = Services.env.get("VENTO_ESIN_ENDPOINT").replace(/\/v1$/, "");

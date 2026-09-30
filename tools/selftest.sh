@@ -10,11 +10,16 @@ fi
 APP="$ROOT/engine/obj-vento/dist/Vento.app/Contents/MacOS/vento"
 TMP="$(mktemp -d)"
 # Sahte LLM (Esin testleri için)
-node "$ROOT/tools/fake-llm.mjs" "$TMP/llm-port" &
+# Kendinden imzalı sertifika (sertifika hatası sayfası testi)
+openssl req -x509 -newkey rsa:2048 -nodes -keyout "$TMP/tls-key.pem" -out "$TMP/tls-cert.pem" -days 2 \
+  -subj "/CN=127.0.0.1" -addext "subjectAltName=IP:127.0.0.1" >/dev/null 2>&1
+node "$ROOT/tools/fake-llm.mjs" "$TMP/llm-port" "$TMP/tls-port" "$TMP/tls-key.pem" "$TMP/tls-cert.pem" &
 LLM=$!
 trap 'kill $LLM 2>/dev/null' EXIT
 i=0; while [ ! -s "$TMP/llm-port" ] && [ $i -lt 50 ]; do sleep 0.1; i=$((i+1)); done
+i=0; while [ ! -s "$TMP/tls-port" ] && [ $i -lt 50 ]; do sleep 0.1; i=$((i+1)); done
 export VENTO_ESIN_ENDPOINT="http://127.0.0.1:$(cat "$TMP/llm-port")/v1"
+export VENTO_TEST_HTTPS="https://127.0.0.1:$(cat "$TMP/tls-port")"
 env -u CLAUDECODE VENTO_SELFTEST=1 VENTO_TRACE="$TMP/trace.txt" MOZ_CRASHREPORTER_DISABLE=1 \
   "$APP" --profile "$TMP/profile" --no-remote --headless >"$TMP/out.log" 2>&1 &
 PID=$!

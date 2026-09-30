@@ -1,6 +1,7 @@
 // Sahte OpenAI uyumlu LLM: Esin öz-testi için. Neyin gönderildiğini kaydeder, /stats ile verir.
 // Kullanım: node tools/fake-llm.mjs <port-dosyası>
 import http from "node:http";
+import https from "node:https";
 import fs from "node:fs";
 
 const stats = { requests: [], aborted: 0 };
@@ -111,3 +112,12 @@ const srv = http.createServer((req, res) => {
 srv.listen(0, "127.0.0.1", () => {
   fs.writeFileSync(process.argv[2], String(srv.address().port));
 });
+
+// HTTPS ucu (sertifika hatası testi): kendinden imzalı sertifika. Kullanım: node fake-llm.mjs <port> <tls-port> <key.pem> <cert.pem>
+if (process.argv[3] && process.argv[4] && process.argv[5]) {
+  const tls = https.createServer({ key: fs.readFileSync(process.argv[4]), cert: fs.readFileSync(process.argv[5]) }, (req, res) => {
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    res.end('<!doctype html><meta charset="utf-8"><title>Güvenli sayfa</title><p>tls-ok</p>');
+  });
+  tls.listen(0, "127.0.0.1", () => fs.writeFileSync(process.argv[3], String(tls.address().port)));
+}

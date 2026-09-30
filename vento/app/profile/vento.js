@@ -25,3 +25,12 @@ pref("browser.download.always_ask_before_handling_new_types", false);
 
 // Açılışta önceki oturumun sekmelerini geri getir
 pref("vento.session.restore", true);
+
+// Hata sayfaları (about:certerror / about:neterror): sayfa bu tercihleri varsayılansız okur; tanımsızsa
+// başlatma istisnayla yarıda kalır ve düğmelerin tıklama işleyicileri hiç bağlanmaz (Firefox'ta firefox.js tanımlar).
+pref("security.certerrors.permanentOverride", true);
+// Firefox'ta açık: sertifika hatasında Mozilla'nın MITM tespit sunucusuna istek atar. Vento atmaz.
+pref("security.certerrors.mitm.priming.enabled", false);
+// "Daha fazla bilgi" bağlantıları (Gecko'nun kendi yardım makaleleri — Mozilla'nın yardım sitesi)
+pref("app.support.baseURL", "https://support.mozilla.org/1/firefox/%VERSION%/%OS%/%LOCALE%/");
+
