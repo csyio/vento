@@ -103,7 +103,7 @@ ${page.body}
 </main>
 <footer class="foot"><div class="wrap">
   <p><strong>${u.footTag}</strong></p>
-  <div><p>${u.footLine}</p><p><a href="mailto:info@cansoykanyilmaz.com">info@cansoykanyilmaz.com</a></p></div>
+  <div><p>${u.footLine}</p><p><a href="mailto:info@cansoykanyilmaz.com">info@cansoykanyilmaz.com</a> · <a href="https://github.com/csyio/vento">${lang === "tr" ? "Kaynak kod (MPL-2.0)" : "Source code (MPL-2.0)"}</a></p></div>
 </div></footer>
 </body>
 </html>
