@@ -57,3 +57,10 @@ https://vento.cansoykanyilmaz.com/updates/browser/<BUILD_TARGET>/<CHANNEL>/updat
 - MAR imzalama anahtarı: `~/.vento-mar-keys` (NSS veritabanı, takma ad `vento-mar-1`). **Bu anahtarı yedekle**; kaybolursa yayımlanmış hiçbir sürüm güncellenemez.
 - Yapılması gereken (yazılmadı): tam MAR üretimi, `signmar` ile imza, `update.xml` üretimi, `tools/sign-mar.sh`. İlk sürümde sunucuda güncelleme yok; site bunu açıkça söylüyor.
 - Gizlilik: adreste yalnız yapı hedefi ve kanal bulunur; sürüm/kimlik gitmez (site gizlilik sayfasında yazılı).
+
+## 5. 0.1.1 planı (2026-10-01'de kararlaştırıldı)
+
+1. **Güncelleme sunucusu** (§4): MAR üretimi, `signmar`, `update.xml`, `tools/sign-mar.sh`; 0.1.0 → 0.1.1 uçtan uca denenir.
+2. **Passkey:** Neden: `MacOSWebAuthnService.mm` `com.apple.developer.web-browser.public-key-credential` yetkisi yoksa platform passkey API'sini kapatır; Vento'nun `browser.xml`'inde yok (Mozilla'nın yetkisi ekip kimliğine bağlı).
+   Yapılacak: Account Holder (sertifika sahibi) Apple'a yetki talebi gönderir → onaydan sonra `com.cansoykanyilmaz.vento` açık App ID + Developer ID provisioning profile → profil `Contents/embedded.provisionprofile` olarak gömülür, yetki `browser.xml`'e eklenir, yeniden imzala + notarize. Başarısızlık nedeni `WebAuthn` log'unda görünür.
+   Geçici: Safari/Chrome kullan; sitede "bilinen eksik" notu var.

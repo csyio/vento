@@ -303,6 +303,7 @@ export const pages = {
         <li>Parola yöneticisi, eklenti arayüzü, hesap/eşitleme yok.</li>
         <li>Otomatik güncelleme yerleşik ve kapatılabilir; ama bu ilk sürümde güncelleme sunucuda henüz yayımlanmadı. Yeni sürümler o zamana kadar bu siteden indirilir.</li>
         <li>Yalnızca macOS (Apple Silicon derlemesi).</li>
+        <li>Passkey (geçiş anahtarı) ile giriş henüz çalışmıyor; bu, Apple'dan özel bir tarayıcı yetkisi gerektiriyor ve başvuru sürecinde. Passkey isteyen sitelerde parola ya da doğrulama kodu kullan.</li>
       </ul>
     </div>
   </section>
@@ -593,6 +594,7 @@ export const pages = {
         <li>No password manager, extensions UI, accounts or sync.</li>
         <li>Automatic updating is built in and can be turned off, but no update has been published on the server for this first release yet. Until then, new versions are downloaded from this site.</li>
         <li>macOS only (Apple Silicon build).</li>
+        <li>Passkey sign-in does not work yet; it needs a special browser entitlement from Apple, which we are applying for. On sites that offer passkeys, use a password or verification code instead.</li>
       </ul>
     </div>
   </section>
