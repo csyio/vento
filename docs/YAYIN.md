@@ -19,7 +19,7 @@ Makefile.in değişince `engine/obj-vento/vento/installer/Makefile` bir sonraki 
 Paketi sına (DMG'den kopyalanmış uygulamada öz-test):
 
 ```sh
-VENTO_APP=/yol/Vento.app tools/selftest.sh --no-build     # 378/378 + 7/7 beklenir
+VENTO_APP=/yol/Vento.app tools/selftest.sh --no-build     # 408/408 + 7/7 beklenir (0.1.0, 2026-10-01)
 ```
 
 Paket kimliği: `com.cansoykanyilmaz.vento` (`mozconfig`: `--with-distribution-id`, `vento/branding/default/configure.sh`: `MOZ_MACBUNDLE_ID`).
