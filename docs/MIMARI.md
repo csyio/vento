@@ -79,5 +79,4 @@ Tam derleme ~45 dk (M-serisi, sıfırdan). Sonraki derlemeler artımlı.
 
 ## Tuzaklar (yaşandıkça eklenecek)
 
-- `mach` `CLAUDECODE` görünce çıktıyı kısar: `env -u CLAUDECODE ./mach ...`
 - `git clean` sembolik bağı siler → `tools/link.sh` yeniden çalıştır (`.git/info/exclude`'da olduğu için normalde silmez).

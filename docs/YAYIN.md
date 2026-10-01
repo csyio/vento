@@ -6,7 +6,7 @@ Durum işaretleri: **[doğrulandı]** bu makinede çalıştırıldı, **[denenme
 
 ```sh
 export MOZCONFIG=$PWD/mozconfig
-cd engine && env -u CLAUDECODE ./mach build            # tam derleme (saatler sürer)
+cd engine && ./mach build            # tam derleme (saatler sürer)
 cd .. && sh tools/build-locale.sh                      # Türkçe (tr) dist'e girer; pakete girmesi için şart
 cd engine/obj-vento/vento/installer && make make-package
 # çıktı: engine/obj-vento/dist/vento-<sürüm>.en-US.mac.dmg

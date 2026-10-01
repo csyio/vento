@@ -9,7 +9,7 @@ L10N="$ROOT/l10n-base/firefox-l10n"
 OBJ="$ROOT/engine/obj-vento"
 RES="$OBJ/dist/Vento.app/Contents/Resources"
 [ -d "$L10N/tr" ] || sh "$ROOT/tools/fetch-l10n.sh"
-if ! env -u CLAUDECODE make -C "$OBJ/vento/locales" chrome-tr L10NBASEDIR="$L10N" IS_LANGUAGE_REPACK=1 FINAL_TARGET="$RES" >"$OBJ/vento-locale.log" 2>&1; then
+if ! make -C "$OBJ/vento/locales" chrome-tr L10NBASEDIR="$L10N" IS_LANGUAGE_REPACK=1 FINAL_TARGET="$RES" >"$OBJ/vento-locale.log" 2>&1; then
   tail -n 20 "$OBJ/vento-locale.log"; echo "HATA: dil paketleme başarısız (tam günlük: $OBJ/vento-locale.log)" >&2; exit 1
 fi
 # Paketli diller (Gecko bunu res/multilocale.txt'ten okur); varsayılan en-US kalır, tr tercihle seçilir (vento.js)

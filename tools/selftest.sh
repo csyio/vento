@@ -5,7 +5,7 @@ set -e
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 export MOZCONFIG="$ROOT/mozconfig"
 if [ "$1" != "--no-build" ]; then
-  (cd "$ROOT/engine" && env -u CLAUDECODE ./mach build faster 2>&1 | tail -n 3)
+  (cd "$ROOT/engine" && ./mach build faster 2>&1 | tail -n 3)
   sh "$ROOT/tools/build-locale.sh"
 fi
 # disk.icns yalnız DMG paketlemede kullanılır (uygulama paketine girmez): kaynakta uygulama simgesiyle aynı olmalı
@@ -26,7 +26,7 @@ i=0; while [ ! -s "$TMP/llm-port" ] && [ $i -lt 50 ]; do sleep 0.1; i=$((i+1)); 
 i=0; while [ ! -s "$TMP/tls-port" ] && [ $i -lt 50 ]; do sleep 0.1; i=$((i+1)); done
 export VENTO_ESIN_ENDPOINT="http://127.0.0.1:$(cat "$TMP/llm-port")/v1"
 export VENTO_TEST_HTTPS="https://127.0.0.1:$(cat "$TMP/tls-port")"
-env -u CLAUDECODE VENTO_SELFTEST=1 VENTO_TRACE="$TMP/trace.txt" MOZ_CRASHREPORTER_DISABLE=1 \
+VENTO_SELFTEST=1 VENTO_TRACE="$TMP/trace.txt" MOZ_CRASHREPORTER_DISABLE=1 \
   "$APP" --profile "$TMP/profile" --no-remote --headless >"$TMP/out.log" 2>&1 &
 PID=$!
 i=0; while kill -0 $PID 2>/dev/null && [ $i -lt 90 ]; do sleep 1; i=$((i+1)); done
@@ -36,7 +36,7 @@ grep -q "ÖZET" "$TMP/trace.txt" 2>/dev/null && ! grep -q "FAIL" "$TMP/trace.txt
 
 # 2. aşama: AYNI profille yeniden aç → oturum geri gelmiş olmalı
 echo "--- 2. aşama: yeniden başlatma (oturum geri yükleme)"
-env -u CLAUDECODE VENTO_SELFTEST=1 VENTO_SELFTEST_PHASE2=1 VENTO_TRACE="$TMP/trace2.txt" MOZ_CRASHREPORTER_DISABLE=1 \
+VENTO_SELFTEST=1 VENTO_SELFTEST_PHASE2=1 VENTO_TRACE="$TMP/trace2.txt" MOZ_CRASHREPORTER_DISABLE=1 \
   "$APP" --profile "$TMP/profile" --no-remote --headless >"$TMP/out2.log" 2>&1 &
 PID=$!
 i=0; while kill -0 $PID 2>/dev/null && [ $i -lt 60 ]; do sleep 1; i=$((i+1)); done
