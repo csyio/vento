@@ -10,8 +10,10 @@
 <head>
   <meta charset="utf-8"/>
   <title>Vento</title>
+  <link rel="localization" href="vento/vento.ftl"/>
   <script src="chrome://global/content/customElements.js"/>
   <script src="chrome://global/content/globalOverlay.js"/>
+  <script src="chrome://vento/content/vento-l10n.js"/>
   <script src="chrome://vento/content/vento-tabs.js"/>
   <script src="chrome://vento/content/vento-motion.js"/>
   <script src="chrome://vento/content/vento-markdown.js"/>
@@ -24,6 +26,9 @@
   <script src="chrome://vento/content/vento-permissions.js"/>
   <script src="chrome://vento/content/vento-session.js"/>
   <script src="chrome://vento/content/vento-start.js"/>
+  <script src="chrome://vento/content/vento-bookmarks.js"/>
+  <script src="chrome://vento/content/vento-update.js"/>
+  <script src="chrome://vento/content/vento-welcome.js"/>
   <script src="chrome://vento/content/vento-shell.js"/>
 </head>
 <body>
@@ -33,6 +38,7 @@
     <xul:command id="cmd_newTab"/>
     <xul:command id="cmd_closeTab"/>
     <xul:command id="cmd_print"/>
+    <xul:command id="cmd_bookmark"/>
     <xul:command id="cmd_reopenTab" disabled="true"/>
     <xul:command id="cmd_focusBar"/>
     <xul:command id="cmd_reload"/>
@@ -58,6 +64,7 @@
     <xul:key id="key_newTab" key="t" modifiers="accel" command="cmd_newTab"/>
     <xul:key id="key_closeTab" key="w" modifiers="accel" command="cmd_closeTab"/>
     <xul:key id="key_print" key="p" modifiers="accel" command="cmd_print"/>
+    <xul:key id="key_bookmark" key="d" modifiers="accel" command="cmd_bookmark"/>
     <xul:key id="key_reopenTab" key="t" modifiers="accel,shift" command="cmd_reopenTab"/>
     <xul:key id="key_focusBar" key="l" modifiers="accel" command="cmd_focusBar"/>
     <xul:key id="key_focusBar2" key="k" modifiers="accel" command="cmd_focusBar"/>
@@ -90,48 +97,54 @@
     <xul:toolbox>
       <xul:toolbar type="menubar" id="toolbar-menubar">
         <xul:menubar id="main-menubar">
-          <xul:menu id="file-menu" label="Dosya">
+          <xul:menu id="file-menu" data-l10n-id="menu-file">
             <xul:menupopup id="menu_FilePopup">
-              <xul:menuitem id="menu_newTab" label="Yeni Sekme" command="cmd_newTab" key="key_newTab"/>
-              <xul:menuitem id="menu_closeTab" label="Sekmeyi Kapat" command="cmd_closeTab" key="key_closeTab"/>
+              <xul:menuitem id="menu_newTab" data-l10n-id="menu-new-tab" command="cmd_newTab" key="key_newTab"/>
+              <xul:menuitem id="menu_closeTab" data-l10n-id="menu-close-tab" command="cmd_closeTab" key="key_closeTab"/>
               <xul:menuseparator/>
-              <xul:menuitem id="menu_print" label="Yazdır…" command="cmd_print" key="key_print"/>
+              <xul:menuitem id="menu_print" data-l10n-id="menu-print" command="cmd_print" key="key_print"/>
               <xul:menuseparator/>
-              <xul:menuitem id="menu_FileQuitItem" label="Vento'dan Çık" command="cmd_quit" key="key_quit"/>
+              <xul:menuitem id="menu_FileQuitItem" data-l10n-id="menu-quit" command="cmd_quit" key="key_quit"/>
             </xul:menupopup>
           </xul:menu>
-          <xul:menu id="edit-menu" label="Düzen">
+          <xul:menu id="edit-menu" data-l10n-id="menu-edit">
             <xul:menupopup id="menu_EditPopup">
-              <xul:menuitem id="menu_undo" label="Geri Al" command="cmd_undo" key="key_undo"/>
-              <xul:menuitem id="menu_redo" label="Yinele" command="cmd_redo" key="key_redo"/>
+              <xul:menuitem id="menu_undo" data-l10n-id="menu-undo" command="cmd_undo" key="key_undo"/>
+              <xul:menuitem id="menu_redo" data-l10n-id="menu-redo" command="cmd_redo" key="key_redo"/>
               <xul:menuseparator/>
-              <xul:menuitem id="menu_cut" label="Kes" command="cmd_cut" key="key_cut"/>
-              <xul:menuitem id="menu_copy" label="Kopyala" command="cmd_copy" key="key_copy"/>
-              <xul:menuitem id="menu_paste" label="Yapıştır" command="cmd_paste" key="key_paste"/>
-              <xul:menuitem id="menu_selectAll" label="Tümünü Seç" command="cmd_selectAll" key="key_selectAll"/>
+              <xul:menuitem id="menu_cut" data-l10n-id="menu-cut" command="cmd_cut" key="key_cut"/>
+              <xul:menuitem id="menu_copy" data-l10n-id="menu-copy" command="cmd_copy" key="key_copy"/>
+              <xul:menuitem id="menu_paste" data-l10n-id="menu-paste" command="cmd_paste" key="key_paste"/>
+              <xul:menuitem id="menu_selectAll" data-l10n-id="menu-select-all" command="cmd_selectAll" key="key_selectAll"/>
               <xul:menuseparator/>
-              <xul:menuitem id="menu_find" label="Sayfada Ara…" command="cmd_find" key="key_find"/>
-              <xul:menuitem id="menu_findNext" label="Sonrakini Bul" command="cmd_findNext" key="key_findNext"/>
-              <xul:menuitem id="menu_findPrev" label="Öncekini Bul" command="cmd_findPrev" key="key_findPrev"/>
+              <xul:menuitem id="menu_find" data-l10n-id="menu-find" command="cmd_find" key="key_find"/>
+              <xul:menuitem id="menu_findNext" data-l10n-id="menu-find-next" command="cmd_findNext" key="key_findNext"/>
+              <xul:menuitem id="menu_findPrev" data-l10n-id="menu-find-prev" command="cmd_findPrev" key="key_findPrev"/>
             </xul:menupopup>
           </xul:menu>
-          <xul:menu id="view-menu" label="Görünüm">
+          <xul:menu id="view-menu" data-l10n-id="menu-view">
             <xul:menupopup id="menu_ViewPopup">
-              <xul:menuitem id="menu_focusBar" label="Akıllı Çubuğa Git" command="cmd_focusBar" key="key_focusBar"/>
-              <xul:menuitem id="menu_toggleEsin" label="Esin'i Aç/Kapat" command="cmd_toggleEsin" key="key_toggleEsin"/>
-              <xul:menuitem id="menu_reload" label="Sayfayı Yenile" command="cmd_reload" key="key_reload"/>
-              <xul:menuitem id="menu_stop" label="Yüklemeyi Durdur" command="cmd_stop" key="key_stop"/>
+              <xul:menuitem id="menu_focusBar" data-l10n-id="menu-focus-bar" command="cmd_focusBar" key="key_focusBar"/>
+              <xul:menuitem id="menu_toggleEsin" data-l10n-id="menu-toggle-esin" command="cmd_toggleEsin" key="key_toggleEsin"/>
+              <xul:menuitem id="menu_reload" data-l10n-id="menu-reload" command="cmd_reload" key="key_reload"/>
+              <xul:menuitem id="menu_stop" data-l10n-id="menu-stop" command="cmd_stop" key="key_stop"/>
             </xul:menupopup>
           </xul:menu>
-          <xul:menu id="history-menu" label="Geçmiş">
+          <xul:menu id="history-menu" data-l10n-id="menu-history">
             <xul:menupopup id="menu_HistoryPopup">
-              <xul:menuitem id="menu_back" label="Geri" command="cmd_back" key="key_back"/>
-              <xul:menuitem id="menu_forward" label="İleri" command="cmd_forward" key="key_forward"/>
+              <xul:menuitem id="menu_back" data-l10n-id="menu-back" command="cmd_back" key="key_back"/>
+              <xul:menuitem id="menu_forward" data-l10n-id="menu-forward" command="cmd_forward" key="key_forward"/>
               <xul:menuseparator/>
-              <xul:menuitem id="menu_reopenTab" label="Kapatılan Sekmeyi Yeniden Aç" command="cmd_reopenTab" key="key_reopenTab"/>
+              <xul:menuitem id="menu_reopenTab" data-l10n-id="menu-reopen-tab" command="cmd_reopenTab" key="key_reopenTab"/>
               <xul:menuseparator/>
-              <xul:menuitem id="menu_nextTab" label="Sonraki Sekme" command="cmd_nextTab" key="key_nextTab"/>
-              <xul:menuitem id="menu_prevTab" label="Önceki Sekme" command="cmd_prevTab" key="key_prevTab"/>
+              <xul:menuitem id="menu_nextTab" data-l10n-id="menu-next-tab" command="cmd_nextTab" key="key_nextTab"/>
+              <xul:menuitem id="menu_prevTab" data-l10n-id="menu-prev-tab" command="cmd_prevTab" key="key_prevTab"/>
+            </xul:menupopup>
+          </xul:menu>
+          <xul:menu id="bookmarks-menu" data-l10n-id="menu-bookmarks">
+            <xul:menupopup id="menu_BookmarksPopup">
+              <xul:menuitem id="menu_bookmarkThis" data-l10n-id="menu-bookmark-this" command="cmd_bookmark" key="key_bookmark"/>
+              <xul:menuseparator/>
             </xul:menupopup>
           </xul:menu>
         </xul:menubar>
@@ -144,43 +157,46 @@
     <!-- macOS trafik ışıkları bu kutunun içine yerleştirilir (boş kutu; boyutunu tema verir). -->
     <div class="titlebar-buttonbox"></div>
     <div id="tabs"></div>
-    <button id="newtab" title="Yeni sekme (⌘T)">
+    <button id="newtab" data-l10n-id="tip-new-tab">
       <svg:svg viewBox="0 0 16 16"><svg:path d="M8 3.5v9M3.5 8h9"/></svg:svg>
     </button>
   </div>
 
   <!-- Araç çubuğu: gezinme + akıllı çubuk -->
   <div id="toolbar">
-    <button id="nav-back" class="nav" title="Geri (⌘[)" disabled="true">
+    <button id="nav-back" class="nav" data-l10n-id="tip-back" disabled="true">
       <svg:svg viewBox="0 0 16 16"><svg:path d="M10 3.5 5.5 8l4.5 4.5"/></svg:svg>
     </button>
-    <button id="nav-forward" class="nav" title="İleri (⌘])" disabled="true">
+    <button id="nav-forward" class="nav" data-l10n-id="tip-forward" disabled="true">
       <svg:svg viewBox="0 0 16 16"><svg:path d="M6 3.5 10.5 8 6 12.5"/></svg:svg>
     </button>
-    <button id="nav-reload" class="nav" title="Yenile (⌘R)">
+    <button id="nav-reload" class="nav" data-l10n-id="tip-reload">
       <svg:svg viewBox="0 0 16 16"><svg:path d="M13 8a5 5 0 1 1-1.6-3.7M13 2.8v2.6h-2.6"/></svg:svg>
     </button>
     <div id="smartbar-slot">
       <div id="smartbar">
         <svg:svg id="smartbar-icon" viewBox="0 0 16 16"><svg:circle cx="7" cy="7" r="4.2"/><svg:path d="M10.2 10.2 13 13"/></svg:svg>
         <input id="smartbar-input" type="text" spellcheck="false" autocomplete="off"
-               placeholder="Adres yaz, ara ya da Esin'e sor"/>
+               data-l10n-id="smartbar-placeholder"/>
       </div>
       <div id="smartbar-suggest" hidden="true">
         <button class="suggest-row" data-kind="esin">
           <svg:svg viewBox="0 0 16 16"><svg:path d="M8 2.2l1.4 3.6 3.6 1.4-3.6 1.4L8 12.2 6.6 8.6 3 7.2l3.6-1.4z"/></svg:svg>
-          <span class="suggest-label">Esin'e sor</span><span class="suggest-text"></span>
+          <span class="suggest-label" data-l10n-id="suggest-ask-esin"></span><span class="suggest-text"></span>
         </button>
         <button class="suggest-row" data-kind="search">
           <svg:svg viewBox="0 0 16 16"><svg:circle cx="7" cy="7" r="4.2"/><svg:path d="M10.2 10.2 13 13"/></svg:svg>
-          <span class="suggest-label">Ara</span><span class="suggest-text"></span>
+          <span class="suggest-label" data-l10n-id="suggest-search"></span><span class="suggest-text"></span>
         </button>
       </div>
     </div>
-    <button id="nav-downloads" class="nav" title="İndirilenler" hidden="true">
+    <button id="nav-bookmark" class="nav" data-l10n-id="tip-bookmark" disabled="true">
+      <svg:svg viewBox="0 0 16 16"><svg:path d="M8 2.2l1.7 3.6 3.9.5-2.9 2.7.8 3.9L8 10.9l-3.5 2 .8-3.9L2.4 6.3l3.9-.5z"/></svg:svg>
+    </button>
+    <button id="nav-downloads" class="nav" data-l10n-id="tip-downloads" hidden="true">
       <svg:svg viewBox="0 0 16 16"><svg:path d="M8 3v7M5 7.5l3 3 3-3M3.5 13h9"/></svg:svg>
     </button>
-    <button id="nav-esin" class="nav" title="Esin (⌘E)">
+    <button id="nav-esin" class="nav" data-l10n-id="tip-esin">
       <span class="esin-glyph" aria-hidden="true"></span>
     </button>
   </div>
@@ -191,11 +207,11 @@
       <div id="gust"></div>
       <div id="findbar" hidden="true">
         <svg:svg id="find-icon" viewBox="0 0 16 16"><svg:circle cx="7" cy="7" r="4.2"/><svg:path d="M10.2 10.2 13 13"/></svg:svg>
-        <input id="find-input" type="text" spellcheck="false" autocomplete="off" placeholder="Sayfada ara"/>
+        <input id="find-input" type="text" spellcheck="false" autocomplete="off" data-l10n-id="find-placeholder"/>
         <span id="find-count"></span>
-        <button id="find-prev" class="find-btn" title="Önceki (⇧⌘G)"><svg:svg viewBox="0 0 16 16"><svg:path d="M4 10l4-4 4 4"/></svg:svg></button>
-        <button id="find-next" class="find-btn" title="Sonraki (⌘G)"><svg:svg viewBox="0 0 16 16"><svg:path d="M4 6l4 4 4-4"/></svg:svg></button>
-        <button id="find-close" class="find-btn" title="Kapat (esc)"><svg:svg viewBox="0 0 16 16"><svg:path d="M4 4l8 8M12 4l-8 8"/></svg:svg></button>
+        <button id="find-prev" class="find-btn" data-l10n-id="find-prev"><svg:svg viewBox="0 0 16 16"><svg:path d="M4 10l4-4 4 4"/></svg:svg></button>
+        <button id="find-next" class="find-btn" data-l10n-id="find-next"><svg:svg viewBox="0 0 16 16"><svg:path d="M4 6l4 4 4-4"/></svg:svg></button>
+        <button id="find-close" class="find-btn" data-l10n-id="find-close"><svg:svg viewBox="0 0 16 16"><svg:path d="M4 4l8 8M12 4l-8 8"/></svg:svg></button>
       </div>
       <div id="start">
         <div id="start-wall" aria-hidden="true"></div>
@@ -218,29 +234,54 @@
           </div>
         </div>
         <div id="start-word">Vento</div>
-        <div id="start-hint"><kbd>⌘L</kbd> ile yaz, <kbd>↵</kbd> ile git</div>
-        <button id="start-custom" title="Başlangıç ekranını özelleştir">
+        <div id="start-hint" data-l10n-id="start-hint"><kbd></kbd><kbd></kbd></div>
+        <div id="start-sites" hidden="true"></div>
+        <button id="start-custom" data-l10n-id="start-custom">
           <svg:svg viewBox="0 0 16 16"><svg:path d="M2.5 5h7M12.5 5h1M2.5 11h1M6.5 11h7"/><svg:circle cx="11" cy="5" r="1.6"/><svg:circle cx="5" cy="11" r="1.6"/></svg:svg>
-          <span>Özelleştir</span>
+          <span data-l10n-id="start-custom-label"></span>
         </button>
       </div>
       <div id="browsers"></div>
-      <div id="custom-panel" hidden="true" role="dialog" aria-label="Özelleştir">
-        <div class="cp-head">Özelleştir</div>
-        <div class="cp-label">Duvar kâğıdı</div>
+      <div id="custom-panel" hidden="true" role="dialog" aria-labelledby="cp-head">
+        <div class="cp-head" id="cp-head" data-l10n-id="cp-head"></div>
+        <div class="cp-label" data-l10n-id="cp-wallpaper"></div>
         <div id="cp-walls"></div>
-        <label class="cp-row"><span>Ebabil'i göster</span><input id="cp-ebabil" type="checkbox"/></label>
+        <label class="cp-row"><span data-l10n-id="cp-ebabil"></span><input id="cp-ebabil" type="checkbox"/></label>
+        <label class="cp-row"><span data-l10n-id="cp-search"></span>
+          <select id="cp-search">
+            <option value="duckduckgo">DuckDuckGo</option>
+            <option value="google">Google</option>
+          </select>
+        </label>
+        <p id="cp-search-note" data-l10n-id="cp-search-note" hidden="true"></p>
+        <label class="cp-row"><span data-l10n-id="cp-sites"></span><input id="cp-sites" type="checkbox"/></label>
+        <label class="cp-row"><span data-l10n-id="cp-esin"></span><input id="cp-esin" type="checkbox"/></label>
+        <label class="cp-row"><span data-l10n-id="cp-model"></span>
+          <select id="cp-model">
+            <option value="" data-l10n-id="cp-model-default"></option>
+            <option value="qwen/qwen3.6-35b-a3b">Qwen 3.6 (35B)</option>
+            <option value="qwen/qwen3.6-flash">Qwen 3.6 Flash</option>
+          </select>
+        </label>
+        <p id="cp-model-note" data-l10n-id="cp-model-note" hidden="true"></p>
+        <label class="cp-row"><span data-l10n-id="cp-update-auto"></span><input id="cp-update-auto" type="checkbox"/></label>
+        <div class="cp-row cp-update"><button id="cp-update-check" data-l10n-id="cp-update-check"></button><span id="cp-update-status" role="status"></span></div>
+      </div>
+      <div id="update-bar" hidden="true" role="status">
+        <span id="ub-text"></span>
+        <button id="ub-primary"></button>
+        <button id="ub-later" data-l10n-id="ub-later"></button>
       </div>
       <div id="perm-layer" hidden="true"></div>
       <div id="dialog-layer" hidden="true"></div>
     </div>
 
     <div id="downloads-panel" hidden="true">
-      <div id="dl-head"><span>İndirilenler</span><button id="dl-clear">Temizle</button></div>
+      <div id="dl-head"><span data-l10n-id="dl-title"></span><button id="dl-clear" data-l10n-id="dl-clear"></button></div>
       <div id="dl-rows"></div>
       <div id="dl-empty">
         <img class="empty-ebabil" src="chrome://vento/content/art/pose-empty.webp" alt="" aria-hidden="true"/>
-        <div>Henüz indirme yok</div>
+        <div data-l10n-id="dl-empty"></div>
       </div>
     </div>
 
@@ -250,46 +291,112 @@
           <img class="esin-logo" src="chrome://vento/content/esin/esin-color.png" alt="" aria-hidden="true"/>
           Esin
         </span>
-        <button id="esin-clear" class="esin-icon" title="Yeni sohbet">
+        <button id="esin-clear" class="esin-icon" data-l10n-id="esin-new-chat">
           <svg:svg viewBox="0 0 16 16"><svg:path d="M3 8a5 5 0 1 1 1.6 3.7M3 13.2v-2.6h2.6"/></svg:svg>
         </button>
-        <button id="esin-close" class="esin-icon" title="Kapat (esc)">
+        <button id="esin-close" class="esin-icon" data-l10n-id="esin-close">
           <svg:svg viewBox="0 0 16 16"><svg:path d="M4 4l8 8M12 4l-8 8"/></svg:svg>
         </button>
       </header>
 
       <div id="esin-thread">
         <div id="esin-consent" hidden="true">
-          <strong>Esin nasıl çalışır</strong>
-          <p>Sorduğun soru ve bağlama eklediğin sayfaların metni, yanıt üretmek için LLMTR üzerinden
-             GreenPT'ye (Fransa) gönderilir. Girdilerin model eğitiminde kullanılmaz. Sayfa metni
-             yalnızca sen bir soru gönderdiğinde ve o sekme bağlamdayken gönderilir; neyin gittiğini her
-             mesajın altında görürsün.</p>
-          <button id="esin-consent-ok">Anladım</button>
+          <strong data-l10n-id="esin-consent-title"></strong>
+          <p data-l10n-id="esin-consent-body"></p>
+          <button id="esin-consent-ok" data-l10n-id="esin-consent-ok"></button>
         </div>
         <div id="esin-empty">
           <img class="empty-ebabil" src="chrome://vento/content/art/pose-empty.webp" alt="" aria-hidden="true"/>
-          <div class="empty-title">Bu sayfayı sor</div>
-          <button data-q="Bu sayfayı kısaca özetle.">Özetle</button>
-          <button data-q="Bu sayfanın ana noktalarını madde madde çıkar.">Ana noktalar</button>
-          <button data-q="Bunu basit bir dille, sanki ilk kez duyuyormuşum gibi anlat.">Basitçe anlat</button>
+          <div class="empty-title" data-l10n-id="esin-empty-title"></div>
+          <button data-q-id="esin-q-summarize" data-l10n-id="esin-q-summarize-label"></button>
+          <button data-q-id="esin-q-keypoints" data-l10n-id="esin-q-keypoints-label"></button>
+          <button data-q-id="esin-q-simple" data-l10n-id="esin-q-simple-label"></button>
+          <div id="esin-thanks">
+            <!-- LLMTR resmi logosu: DEĞİŞTİRİLMEZ; markanın kendi kart rengi ve çevresinde ≥ %50 logo yüksekliği boşluk (site/src/parts.mjs ile aynı) -->
+            <div id="esin-llmtr" role="link" tabindex="0" data-l10n-id="esin-llmtr-open">
+              <picture>
+                <source media="(prefers-color-scheme: dark)" srcset="chrome://vento/content/esin/llmtr-on-dark.svg"/>
+                <img src="chrome://vento/content/esin/llmtr-on-light.svg" alt="LLMTR" width="112" height="28.5"/>
+              </picture>
+            </div>
+            <p data-l10n-id="esin-thanks"></p>
+          </div>
         </div>
       </div>
 
       <div id="esin-context">
         <div id="esin-chips"></div>
-        <button id="esin-add" title="Başka bir sekmeyi bağlama ekle">+ Sekme</button>
+        <button id="esin-add" data-l10n-id="esin-add-tab"></button>
         <div id="esin-menu" hidden="true"></div>
       </div>
 
       <form id="esin-form">
-        <textarea id="esin-input" rows="1" spellcheck="true" placeholder="Esin'e sor…"></textarea>
-        <button id="esin-send" type="submit" title="Gönder (↵)">
+        <textarea id="esin-input" rows="1" spellcheck="true" data-l10n-id="esin-input-placeholder"></textarea>
+        <button id="esin-send" type="submit">
           <svg:svg class="ic-send" viewBox="0 0 16 16"><svg:path d="M8 13V3.5M4 7l4-4 4 4"/></svg:svg>
           <svg:svg class="ic-stop" viewBox="0 0 16 16"><svg:rect x="4.5" y="4.5" width="7" height="7" rx="1.5"/></svg:svg>
         </button>
       </form>
+      <div id="esin-quota" role="status" hidden="true"></div>
     </aside>
+  </div>
+
+
+  <!-- İlk açılış (karşılama): tam pencere katman; adımlar vento-welcome.js'te -->
+  <div id="welcome" hidden="true" role="dialog" aria-modal="true" aria-labelledby="w-title-lang">
+    <button id="w-skip" data-l10n-id="w-skip"></button>
+    <div id="w-card">
+      <div id="w-ebabil" aria-hidden="true"><img id="w-eb-img" src="chrome://vento/content/ebabil/still.webp" alt=""/></div>
+
+      <section class="w-step" data-step="lang">
+        <h1 class="w-h" id="w-title-lang">Hoş geldin · Welcome</h1>
+        <p class="w-p">Dilini seç · Choose your language</p>
+        <div class="w-choices">
+          <button class="w-choice" data-lang="tr" aria-pressed="false">Türkçe</button>
+          <button class="w-choice" data-lang="en-US" aria-pressed="false">English</button>
+        </div>
+      </section>
+
+      <section class="w-step" data-step="hello" hidden="true">
+        <h1 class="w-h" data-l10n-id="w-hello-title"></h1>
+        <p class="w-p" data-l10n-id="w-hello-body"></p>
+        <ul class="w-tips">
+          <li data-l10n-id="w-tip-bar"><kbd></kbd></li>
+          <li data-l10n-id="w-tip-find"><kbd></kbd></li>
+          <li data-l10n-id="w-tip-tabs"><kbd></kbd><kbd></kbd></li>
+          <li data-l10n-id="w-tip-esin"><kbd></kbd></li>
+        </ul>
+      </section>
+
+      <section class="w-step" data-step="esin" hidden="true">
+        <h1 class="w-h" data-l10n-id="w-esin-title"></h1>
+        <p class="w-p" data-l10n-id="w-esin-body"></p>
+        <div class="w-choices">
+          <button class="w-choice" data-esin="on" aria-pressed="true" data-l10n-id="w-esin-on"></button>
+          <button class="w-choice" data-esin="off" aria-pressed="false" data-l10n-id="w-esin-off"></button>
+        </div>
+        <p class="w-note" data-l10n-id="w-esin-note"></p>
+      </section>
+
+      <section class="w-step" data-step="update" hidden="true">
+        <h1 class="w-h" data-l10n-id="w-update-title"></h1>
+        <p class="w-p" data-l10n-id="w-update-body"></p>
+        <div class="w-choices">
+          <button class="w-choice" data-update="on" aria-pressed="true" data-l10n-id="w-update-on"></button>
+          <button class="w-choice" data-update="off" aria-pressed="false" data-l10n-id="w-update-off"></button>
+        </div>
+        <p class="w-note" data-l10n-id="w-update-off-note" id="w-update-off-note" hidden="true"></p>
+      </section>
+
+      <section class="w-step" data-step="done" hidden="true">
+        <h1 class="w-h" data-l10n-id="w-done-title"></h1>
+        <p class="w-p" data-l10n-id="w-done-body"></p>
+      </section>
+    </div>
+    <div id="w-foot">
+      <div id="w-dots" aria-hidden="true"></div>
+      <button id="w-next" data-l10n-id="w-next"></button>
+    </div>
   </div>
 
 </body>

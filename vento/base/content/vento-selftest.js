@@ -1320,6 +1320,313 @@
       await wait(() => tab.icon === "" && !tab.loading);
     }
 
+    // ===================== Yer imleri + sık siteler =====================
+    {
+      const B = Vento.bookmarks;
+      const $ = id => document.getElementById(id);
+      const bmUrl = "https://example.com/vento-yerimi-testi";
+      await B.remove(bmUrl);
+      check("yer imi: başta yok", !(await B.isBookmarked(bmUrl)));
+      check("yer imi: web olmayan adres eklenmez", (await B.add("javascript:alert(1)")) === null && (await B.add("chrome://vento/content/vento.xhtml")) === null);
+      let changed = 0;
+      const onChange = () => changed++;
+      B.addEventListener("change", onChange);
+      await B.add(bmUrl, "Yer imi testi");
+      check("yer imi: eklendi ve 'change' yayınlandı", (await B.isBookmarked(bmUrl)) && changed >= 1, String(changed));
+      const listed = (await B.list(50)).find(b => b.url === bmUrl);
+      check("yer imi: listede, başlığıyla", listed?.title === "Yer imi testi", JSON.stringify(listed));
+      check("yer imi: 'Diğer yer imleri' klasöründe", (await B.find(bmUrl))?.parentGuid === Places.bookmarks.unfiledGuid);
+
+      // ⌘D komutu ve yıldız düğmesi (geçerli sekme: example.com)
+      const cur = tabs.open("https://example.com/", { select: true });
+      await wait(() => cur.title === "Example Domain");
+      check("yıldız: web sayfasında etkin", await wait(() => !$("nav-bookmark").disabled), cur.url);
+      check("yıldız: yer imi değilken işaretsiz", !$("nav-bookmark").hasAttribute("active"));
+      check("toggle: ekledi (true)", (await B.toggle(cur)) === true && (await B.isBookmarked(cur.url)));
+      check("yıldız: yer imi olunca dolu", await wait(() => $("nav-bookmark").hasAttribute("active"), 5000));
+      check("toggle: kaldırdı (false)", (await B.toggle(cur)) === false && !(await B.isBookmarked(cur.url)));
+      check("yıldız: kaldırınca boş", await wait(() => !$("nav-bookmark").hasAttribute("active"), 5000));
+      tabs.close(cur);
+
+      // menü: açılırken kurulur
+      const popup = $("menu_BookmarksPopup");
+      popup.dispatchEvent(new Event("popupshowing"));
+      check("Yer İmleri menüsü: yer imi satırı kuruldu", await wait(() => [...popup.querySelectorAll(".bm-item")].some(m => m.getAttribute("tooltiptext") === bmUrl), 5000));
+
+      // başlangıç ekranı karoları
+      const tops = await B.topSites(8);
+      check("topSites: yer imi karo olarak geldi (bookmark=true)", tops.some(s => s.url === bmUrl && s.bookmark === true), JSON.stringify(tops.map(s => s.host)));
+      check("topSites: sunucu başına tek karo", new Set(tops.map(s => s.host)).size === tops.length);
+      check("topSites: en çok 8", tops.length <= 8);
+      // ×: yer imi karosu → silinir
+      await B.remove(bmUrl);
+      check("yer imi silinince listeden çıktı", !(await B.list(50)).some(b => b.url === bmUrl));
+
+      // sık site gizleme (sunucu adına göre)
+      const hiddenBefore = Services.prefs.getStringPref(B.constructor.PREF_HIDDEN, "[]");
+      B.hideHost("gizli-site.example");
+      check("hideHost: tercihe yazıldı", JSON.parse(Services.prefs.getStringPref(B.constructor.PREF_HIDDEN, "[]")).includes("gizli-site.example"));
+      Services.prefs.setStringPref(B.constructor.PREF_HIDDEN, hiddenBefore);
+      B.removeEventListener("change", onChange);
+    }
+
+    // ===================== Güncelleme =====================
+    {
+      const U = Vento.update;
+      const $ = id => document.getElementById(id);
+      const { AppUpdater: AU } = ChromeUtils.importESModule("resource://gre/modules/AppUpdater.sys.mjs");
+      const prefLast = U.constructor.PREF_LAST;
+      const hadLast = Services.prefs.prefHasUserValue(prefLast);
+      const oldLast = Services.prefs.getStringPref(prefLast, "");
+
+      // sürüm notları adresi: dile göre, sürüm parametreli
+      check("sürüm notları: Türkçede /surum-notlari/?v=", U.releaseNotesURL("1.2.0") === "https://vento.cansoykanyilmaz.com/surum-notlari/?v=1.2.0", U.releaseNotesURL("1.2.0"));
+      // güncelleme sonrası ilk açılış mantığı
+      const r1 = U.afterUpdate({ last: "", current: "1.0.0", open: false });
+      check("afterUpdate: ilk kurulumda (kayıt yok) açmaz", r1 === null);
+      check("afterUpdate: sürümü kaydetti", Services.prefs.getStringPref(prefLast) === "1.0.0");
+      check("afterUpdate: aynı sürümde açmaz", U.afterUpdate({ last: "1.0.0", current: "1.0.0", open: false }) === null);
+      check("afterUpdate: eski sürüme dönüşte açmaz", U.afterUpdate({ last: "1.1.0", current: "1.0.0", open: false }) === null);
+      check("afterUpdate: sürüm yükselince sürüm notlarını verir", U.afterUpdate({ last: "1.0.0", current: "1.1.0", open: false }) === U.releaseNotesURL("1.1.0"));
+      check("afterUpdate: '1.9' → '1.10' doğru sıralanır (metin değil sürüm karşılaştırması)", U.afterUpdate({ last: "1.9.0", current: "1.10.0", open: false }) === U.releaseNotesURL("1.10.0"));
+      const nTabs = tabs.all.length;
+      const opened = U.afterUpdate({ last: "0.9.0", current: "1.0.0" });
+      check("afterUpdate: open=true sürüm notlarını yeni sekmede açtı", tabs.all.length === nTabs + 1 && opened === U.releaseNotesURL("1.0.0") && await wait(() => tabs.selected.url.includes("surum-notlari"), 10000), tabs.selected.url);
+      tabs.close(tabs.selected);
+      if (hadLast) { Services.prefs.setStringPref(prefLast, oldLast); } else { Services.prefs.clearUserPref(prefLast); }
+
+      // sahte güncelleyici: durumlar metne ve çubuğa yansır
+      const statuses = [];
+      const onStatus = e => statuses.push(e.detail.id);
+      U.addEventListener("status", onStatus);
+      const fake = () => {
+        let cb;
+        return { addListener(f) { cb = f; }, stop() {}, check() { this.emit = cb; return Promise.resolve(); }, allowed: false, allowUpdateDownload() { this.allowed = true; } };
+      };
+      let f = fake();
+      await U.check(f);
+      f.emit(AU.STATUS.CHECKING);
+      check("güncelleme: denetleniyor durumu", U.status.id === "checking" && U.status.text.length > 0 && U.status.text !== "up-checking", JSON.stringify(U.status));
+      f.emit(AU.STATUS.NO_UPDATES_FOUND);
+      check("güncelleme: güncel durumu sürümü söyler", U.status.id === "current" && U.status.text.includes(Services.appinfo.version), JSON.stringify(U.status));
+      f.emit(AU.STATUS.DOWNLOADING, 50, 200);
+      check("güncelleme: indirme yüzdesi (%25)", U.status.id === "downloading" && /25/.test(U.status.text), JSON.stringify(U.status));
+      f.emit(AU.STATUS.DOWNLOAD_FAILED);
+      check("güncelleme: hata durumu", U.status.id === "failed");
+      f.emit(AU.STATUS.NO_UPDATER);
+      check("güncelleme: güncelleyici yok → 'kullanılamıyor'", U.status.id === "unavailable");
+      check("hata/güncel durumlarında çubuk açılmadı", $("update-bar").hidden);
+
+      // otomatik kapalı: "İndir ve kur" çubuğu → izin verilir
+      f.emit(AU.STATUS.DOWNLOAD_AND_INSTALL);
+      check("güncelleme bulundu: çubuk açıldı, 'indir' düğmesi", await wait(() => !$("update-bar").hidden && $("ub-primary").dataset.kind === "available"), $("ub-primary").dataset.kind);
+      $("ub-primary").click();
+      check("'indir' izin verdi (allowUpdateDownload) ve çubuk kapandı", f.allowed === true && await wait(() => $("update-bar").hidden, 5000));
+      // otomatik açık: hazır → "yeniden başlat" çubuğu; "sonra" kapatır
+      f.emit(AU.STATUS.READY_FOR_RESTART);
+      check("güncelleme hazır: çubuk 'yeniden başlat' düğmesiyle", await wait(() => !$("update-bar").hidden && $("ub-primary").dataset.kind === "ready"), $("ub-primary").dataset.kind);
+      check("çubuk metni çözüldü (ham kimlik değil)", $("ub-text").textContent.length > 5 && !/^ub-/.test($("ub-text").textContent), $("ub-text").textContent);
+      $("ub-later").click();
+      check("'sonra' çubuğu kapattı", await wait(() => $("update-bar").hidden, 5000));
+      check("durum olayları sırayla yayınlandı", statuses.join() === "checking,current,downloading,failed,unavailable,found,ready", statuses.join());
+      U.removeEventListener("status", onStatus);
+
+      // Özelleştir panelinden elle denetim düğmesi ve durum metni
+      check("Özelleştir: 'Güncellemeleri denetle' düğmesi var", !!$("cp-update-check") && !!$("cp-update-status"));
+    }
+
+    // ===================== Arayüz dili (Fluent, canlı değişim) =====================
+    {
+      const L = Vento.l10n;
+      const reqBefore = Services.prefs.prefHasUserValue("intl.locale.requested") ? Services.prefs.getStringPref("intl.locale.requested") : null;
+      check("l10n: öznitelik metni (.title) çözüldü", L.attr("tip-tab-close") !== "tip-tab-close" && L.attr("tip-tab-close").length > 3, L.attr("tip-tab-close"));
+      check("l10n: Türkçe çözüldü", L.locale === "tr" && L.t("up-checking") !== "up-checking", L.t("up-checking"));
+      const tr = L.t("w-start");
+      check("l10n: değişkenli metin", L.t("up-current", { version: "9.9.9" }).includes("9.9.9"), L.t("up-current", { version: "9.9.9" }));
+      check("l10n: olmayan kimlik → kimliğin kendisi ve 'missing'e yazıldı", L.t("yok-boyle-bir-kimlik") === "yok-boyle-bir-kimlik" && L.missing.includes("yok-boyle-bir-kimlik"));
+      let changes = 0;
+      const onChange = () => changes++;
+      L.addEventListener("change", onChange);
+      L.setLocale("en-US");
+      check("l10n: İngilizceye geçti (olay + dil)", await wait(() => L.locale === "en-US" && changes >= 1, 10000), `${L.locale} olay=${changes}`);
+      const en = L.t("w-start");
+      check("l10n: İngilizce metin Türkçeden farklı", en !== tr && en !== "w-start", `${tr} ↔ ${en}`);
+      check("l10n: statik metin (data-l10n-id) canlı yenilendi", await wait(() => document.getElementById("w-next").textContent === L.t("w-next"), 10000), document.getElementById("w-next").textContent);
+      check("l10n: sürüm notları İngilizce adresi", Vento.update.releaseNotesURL("2.0.0").startsWith("https://vento.cansoykanyilmaz.com/en/release-notes/"), Vento.update.releaseNotesURL("2.0.0"));
+      L.setLocale(reqBefore ?? "tr");
+      if (reqBefore === null) { Services.prefs.clearUserPref("intl.locale.requested"); }
+      check("l10n: Türkçeye geri döndü", await wait(() => L.locale === "tr", 10000), L.locale);
+      L.removeEventListener("change", onChange);
+      // eksik kimlik yalnız bu testin uydurduğu kimlik olmalı (kodda ham kimlik görünmemeli)
+      check("l10n: testler boyunca yalnız uydurma kimlik eksik çıktı", L.missing.every(id => id === "yok-boyle-bir-kimlik"), L.missing.join());
+    }
+
+    // ===================== İlk açılış (karşılama) =====================
+    {
+      const W = Vento.welcome;
+      const $ = id => document.getElementById(id);
+      const P = Services.prefs;
+      const keep = ["vento.welcome.completed", "vento.esin.enabled", "vento.esin.consented", "app.update.auto", "intl.locale.requested"]
+        .map(k => [k, P.prefHasUserValue(k) ? (P.getPrefType(k) === P.PREF_BOOL ? P.getBoolPref(k) : P.getStringPref(k)) : undefined]);
+      P.clearUserPref("vento.esin.consented");
+      P.setBoolPref("vento.esin.enabled", true);
+      P.setBoolPref("app.update.auto", true);
+      const visible = () => !$("welcome").hidden;
+      const stepShown = () => [...document.querySelectorAll("#w-card .w-step")].filter(s => !s.hidden).map(s => s.dataset.step);
+
+      W.show();
+      check("karşılama: açıldı, ilk adım dil", await wait(visible, 5000) && W.isOpen && W.step === "lang" && stepShown().join() === "lang", stepShown().join());
+      check("karşılama: dil düğmeleri (tr, en-US) ve biri seçili", document.querySelectorAll('[data-lang]').length === 2 && document.querySelectorAll('[data-lang][aria-pressed="true"]').length === 1);
+      // dil seçimi anında uygulanır
+      document.querySelector('[data-lang="en-US"]').click();
+      check("karşılama: dil seçimi canlı uygulandı (en-US)", await wait(() => Vento.l10n.locale === "en-US", 10000), Vento.l10n.locale);
+      document.querySelector('[data-lang="tr"]').click();
+      check("karşılama: Türkçeye döndü", await wait(() => Vento.l10n.locale === "tr", 10000));
+      // ileri: lang → hello → esin
+      W.next();
+      check("karşılama: 2. adım tanışma", W.step === "hello" && stepShown().join() === "hello", W.step);
+      W.next();
+      check("karşılama: 3. adım Esin", W.step === "esin", W.step);
+      document.querySelector('[data-esin="off"]').click();
+      check("Esin kapat: tercih kapandı, onay verilmedi sayılır", P.getBoolPref("vento.esin.enabled") === false && P.getBoolPref("vento.esin.consented", false) === false);
+      check("Esin kapalıyken uyuyan Ebabil", $("w-eb-img").src.includes("pose-idle"), $("w-eb-img").src);
+      document.querySelector('[data-esin="on"]').click();
+      check("Esin aç: tercih açıldı ve onay bu ekranda alınmış sayıldı", P.getBoolPref("vento.esin.enabled") === true && P.getBoolPref("vento.esin.consented") === true);
+      check("Esin açıkken uçan Ebabil", $("w-eb-img").src.includes("ebabil/still"), $("w-eb-img").src);
+      W.next();
+      check("karşılama: 4. adım güncelleme", W.step === "update" && $("w-update-off-note").hidden);
+      document.querySelector('[data-update="off"]').click();
+      check("Güncelleme kapat: app.update.auto kapandı ve uyarı notu göründü", P.getBoolPref("app.update.auto") === false && !$("w-update-off-note").hidden);
+      document.querySelector('[data-update="on"]').click();
+      check("Güncelleme aç: geri açıldı, not gizlendi", P.getBoolPref("app.update.auto") === true && $("w-update-off-note").hidden);
+      W.next();
+      check("karşılama: son adım, 'Atla' gizli, düğme 'Başla'", W.step === "done" && $("w-skip").hidden && $("w-next").getAttribute("data-l10n-id") === "w-start");
+      check("noktalar: 5 adım, sonuncusu işaretli", $("w-dots").children.length === 5 && $("w-dots").children[4].hasAttribute("on"));
+      W.next();
+      check("karşılama: bitirince kapandı ve tamamlandı sayıldı", await wait(() => !visible() && !W.isOpen, 5000) && W.completed === true);
+
+      // Esc akışı kapatır ve tamamlanmış sayar; yanlış kalan seçimler geri alınmaz
+      P.setBoolPref("vento.welcome.completed", false);
+      W.show();
+      check("karşılama: yeniden açıldı", await wait(visible, 5000) && W.step === "lang");
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      check("Esc: karşılamayı kapattı ve tamamlandı saydı", await wait(() => !visible(), 5000) && W.completed === true);
+      W.show();
+      W.show(); // açıkken tekrar çağrı ikinci kopya üretmez
+      check("show() açıkken tekrar çağrılınca adım sıfırlanmadı/çift açılmadı", W.isOpen && $("w-dots").children.length === 5);
+      $("w-skip").click();
+      check("'Atla' düğmesi kapattı", await wait(() => !visible() && !W.isOpen, 5000));
+
+      // tercihleri eski hâline getir
+      for (const [k, v] of keep) {
+        if (v === undefined) { P.clearUserPref(k); } else if (typeof v === "boolean") { P.setBoolPref(k, v); } else { P.setStringPref(k, v); }
+      }
+      check("karşılama testi sonrası dil Türkçe", await wait(() => Vento.l10n.locale === "tr", 10000), Vento.l10n.locale);
+    }
+
+    // ===================== Esin: LLMTR logosu ve teşekkür =====================
+    {
+      const $ = id => document.getElementById(id);
+      const keepConsent = Services.prefs.getBoolPref("vento.esin.consented", false);
+      Services.prefs.setBoolPref("vento.esin.consented", true);
+      Vento.esin.open();
+      Vento.esin.clearChat();
+      const card = $("esin-llmtr");
+      const img = card.querySelector("img");
+      check("LLMTR: boş durumda logo kartı görünür", await wait(() => card.getBoundingClientRect().width > 100 && !$("esin-empty").hidden), `${JSON.stringify(card.getBoundingClientRect())} panelHidden=${$("esin").hidden} panelDisplay=${getComputedStyle($("esin")).display} emptyHidden=${$("esin-empty").hidden} emptyDisplay=${getComputedStyle($("esin-empty")).display} enabled=${Vento.esin.enabled} panelW=${$("esin").getBoundingClientRect().width}`);
+      check("LLMTR: resmi logo yüklendi (SVG, oran korunmuş)", await wait(() => img.complete && img.naturalWidth > 0), `${img.naturalWidth}x${img.naturalHeight} ${img.currentSrc}`);
+      const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      check("LLMTR: zemine uygun sürüm (koyu/açık)", img.currentSrc.endsWith(dark ? "llmtr-on-dark.svg" : "llmtr-on-light.svg"), img.currentSrc);
+      const r = img.getBoundingClientRect();
+      check("LLMTR: logo oranı bozulmadı (141.435:36)", Math.abs(r.width / r.height - 141.435 / 36) < 0.05, `${r.width}x${r.height}`);
+      const cr = card.getBoundingClientRect();
+      check("LLMTR: çevresinde ≥ %50 logo yüksekliği boşluk", (r.left - cr.left) >= r.height * 0.5 && (r.top - cr.top) >= r.height * 0.5, `${r.left - cr.left}px / ${r.top - cr.top}px, yükseklik ${r.height}`);
+      const bg = getComputedStyle(card).backgroundColor;
+      check("LLMTR: kart rengi markanın belirteci (#F8FAFC / #111113)", bg === (dark ? "rgb(17, 17, 19)" : "rgb(248, 250, 252)"), bg);
+      const thanks = document.querySelector("#esin-thanks p");
+      // statik metinler dil değişiminden sonra eşzamansız yenilenir: beklenir
+      check("LLMTR: teşekkür metni çözüldü ve görünür", await wait(() => thanks.textContent.includes("LLMTR") && thanks.textContent.includes("teşekkür") && thanks.getBoundingClientRect().height > 10, 10000), thanks.textContent);
+      check("LLMTR: erişilebilir ad ve ipucu", card.getAttribute("role") === "link" && /LLMTR/.test(card.getAttribute("aria-label") ?? "") && !!card.title, `${card.getAttribute("aria-label")} / ${card.title}`);
+      // tıklama → llmtr.com yeni sekmede
+      const n = tabs.all.length;
+      card.click();
+      check("LLMTR: tıklayınca llmtr.com yeni sekmede açıldı", tabs.all.length === n + 1 && await wait(() => tabs.selected.url.includes("llmtr.com"), 15000), tabs.selected.url);
+      tabs.close(tabs.selected);
+      card.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      check("LLMTR: Enter ile de açılır", tabs.all.length === n + 1 && await wait(() => tabs.selected.url.includes("llmtr.com"), 15000), tabs.selected.url);
+      tabs.close(tabs.selected);
+      Vento.esin.close();
+      Services.prefs.setBoolPref("vento.esin.consented", keepConsent);
+    }
+
+    // ===================== Esin günlük kota (vekilin başlıkları ve 429 kodları) =====================
+    {
+      const $ = id => document.getElementById(id);
+      const llm = Services.env.get("VENTO_ESIN_ENDPOINT").replace(/\/v1$/, "");
+      const keepConsent = Services.prefs.getBoolPref("vento.esin.consented", false);
+      Services.prefs.setBoolPref("vento.esin.consented", true);
+      Vento.esin.open();
+      Vento.esin.clearChat();
+      const idle = () => !Vento.esin.state.busy;
+      const lastBot = () => [...$("esin-thread").querySelectorAll(".msg-assistant")].at(-1);
+      const left = () => Number(/(\d+) \/ (\d+)/.exec($("esin-quota").textContent)?.[1]);
+
+      Vento.esin.send("Kota birinci soru");
+      check("kota: cevap geldi", await wait(() => idle() && lastBot()?.textContent.includes("Kota birinci soru")), lastBot()?.textContent);
+      check("kota: 'Bugün kalan: N / 30' görünür (vekil başlığından)", !$("esin-quota").hidden && /Bugün kalan: \d+ \/ 30/.test($("esin-quota").textContent), $("esin-quota").textContent);
+      const l1 = left();
+      Vento.esin.send("Kota ikinci soru");
+      check("kota: ikinci soruda kalan hak 1 azaldı", await wait(() => idle() && lastBot()?.textContent.includes("Kota ikinci soru") && left() === l1 - 1, 10000), `${l1} → ${left()}`);
+      check("kota: az kalmamışken vurgulanmaz", !$("esin-quota").hasAttribute("low") || left() <= 3);
+
+      // kullanıcı kotası doldu: anlaşılır mesaj, yenilenme zamanı, TEKRAR DENE yok, sağlayıcıya ikinci istek gitmez
+      Vento.esin.send("KOTA-DOLU");
+      check("kota dolu: hata balonu göründü", await wait(() => idle() && !!lastBot()?.classList.contains("msg-error")), lastBot()?.textContent);
+      const msg = lastBot()?.textContent ?? "";
+      check("kota dolu: mesaj kotayı (30 soru) ve yenilenmeyi söyler", /30 soru/.test(msg) && /Yenilenme: /.test(msg), msg);
+      check("kota dolu: 'Tekrar dene' düğmesi yok (anlamsız)", !lastBot()?.querySelector(".msg-retry"));
+      check("kota dolu: panel '0 / 30' ve vurgulu", left() === 0 && $("esin-quota").hasAttribute("low"), $("esin-quota").textContent);
+      // toplam kapasite doldu
+      Vento.esin.send("GLOBAL-DOLU");
+      check("toplam kapasite dolu: ayrı mesaj, tekrar dene yok", await wait(() => idle() && /bugünlük kapasitesini/.test(lastBot()?.textContent ?? "")) && !lastBot()?.querySelector(".msg-retry"), lastBot()?.textContent);
+
+      Vento.esin.clearChat();
+      Vento.esin.close();
+      Services.prefs.setBoolPref("vento.esin.consented", keepConsent);
+    }
+
+    // ===================== Kullanıcı aracısı (siteler tanısın) =====================
+    {
+      const ua = Cc["@mozilla.org/network/protocol;1?name=http"].getService(Ci.nsIHttpProtocolHandler).userAgent;
+      check("UA: 'Firefox/x.y' uyumluluk belirteci var (Google gibi siteler modern sayfa sunsun)", /Gecko\/\d+ Firefox\/\d+\.\d+ Vento\/\S+$/.test(ua), ua);
+      check("UA: Vento adı dürüstçe duruyor, Nightly/Mozilla ürün adı sızmıyor", /Vento\//.test(ua) && !/Nightly|Zen/.test(ua), ua);
+    }
+
+    // ===================== Arama motoru (DuckDuckGo varsayılan, Google seçilebilir) =====================
+    {
+      const $ = id => document.getElementById(id);
+      const P = Services.prefs;
+      const had = P.prefHasUserValue("vento.search.engine");
+      const old = P.getStringPref("vento.search.engine", "duckduckgo");
+      const q = "rüzgar nedir", enc = "r%C3%BCzgar%20nedir";
+      P.clearUserPref("vento.search.engine");
+      check("arama: varsayılan DuckDuckGo", Vento.resolveInput(q) === `https://duckduckgo.com/?q=${enc}` && Vento.searchURL(q) === `https://duckduckgo.com/?q=${enc}`);
+      check("arama: panelde DuckDuckGo seçili, Google notu gizli", $("cp-search").value === "duckduckgo" && $("cp-search-note").hidden);
+      P.setStringPref("vento.search.engine", "google");
+      check("arama: Google seçilince metin Google'da aranır", Vento.resolveInput(q) === `https://www.google.com/search?q=${enc}`, Vento.resolveInput(q));
+      check("arama: sağ tık 'Ara' adresi de Google (adres gibi metin bile aranır)", Vento.searchURL("example.com") === "https://www.google.com/search?q=example.com", Vento.searchURL("example.com"));
+      check("arama: Google'da da çubuk önerisi 'arama' sayılır, adres sayılmaz", Vento.isSearchText(q) && !Vento.isSearchText("example.com"));
+      check("arama: adresler etkilenmedi", Vento.resolveInput("example.com/x") === "https://example.com/x" && !Vento.resolveInput("javascript:alert(1)").startsWith("javascript:"));
+      check("arama: panel tercihle eşitlendi, Google gizlilik notu göründü", await wait(() => $("cp-search").value === "google" && !$("cp-search-note").hidden, 5000), `${$("cp-search").value} notGizli=${!$("cp-search-note").hidden}`);
+      // panelden değiştirme tercihi yazar
+      $("cp-search").value = "duckduckgo";
+      $("cp-search").dispatchEvent(new Event("change", { bubbles: true }));
+      check("arama: panelden DuckDuckGo'ya dönünce tercih yazıldı ve not gizlendi", P.getStringPref("vento.search.engine") === "duckduckgo" && await wait(() => $("cp-search-note").hidden, 5000));
+      P.setStringPref("vento.search.engine", "yok-boyle-motor");
+      check("arama: bilinmeyen değer DuckDuckGo'ya düşer", Vento.resolveInput(q) === `https://duckduckgo.com/?q=${enc}`);
+      if (had) { P.setStringPref("vento.search.engine", old); } else { P.clearUserPref("vento.search.engine"); }
+    }
+
     // ===================== Oturum geri yükleme =====================
     {
       const S = Vento.session;

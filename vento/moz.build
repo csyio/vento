@@ -17,6 +17,8 @@ EXTRA_COMPONENTS += [
     "l10n-registry.manifest",
 ]
 
+CONFIGURE_SUBST_FILES += ["installer/Makefile"]
+
 DIST_SUBDIR = "browser"
 export("DIST_SUBDIR")
 

@@ -8,6 +8,7 @@
 import http from "node:http";
 import fs from "node:fs";
 import { once } from "node:events";
+import crypto from "node:crypto";
 
 /** Yalnızca kotaya dahil modeller. Liste dışı istek sessizce varsayılana düşer. */
 export const MODELS = ["greenpt/gpt-oss-120b-eu", "qwen/qwen3.6-35b-a3b", "qwen/qwen3.6-flash"];
@@ -23,7 +24,7 @@ export const LIMITS = {
 
 const ROLES = new Set(["system", "user", "assistant"]);
 
-const err = message => ({ error: { message } });
+const err = (message, extra = {}) => ({ error: { message, ...extra } });
 
 function json(res, status, body) {
   const data = JSON.stringify(body);
@@ -83,7 +84,9 @@ export function createProxy(cfg = {}) {
   const {
     apiKey = "",
     baseUrl = "https://llmtr.com/v1",
-    dailyLimit = 2000, // UTC günü başına istek; 0 = kapalı
+    dailyLimit = 2000, // TÜM kullanıcılar için günlük toplam istek (bütçe koruması); 0 = kapalı
+    clientDaily = 30, // kullanıcı (IP) başına günlük istek kotası; 0 = kapalı
+    dayOffsetHours = 3, // "gün" bu UTC farkına göre döner (3 = Türkiye saati, gün 00:00'da yenilenir)
     counterPath = "", // boşsa bellekte sayılır
     perMinute = 20, // IP başına dakikada
     trustProxyHops = 1, // X-Forwarded-For sonundan kaçıncı adres istemci
@@ -121,9 +124,17 @@ export function createProxy(cfg = {}) {
     return xff[xff.length - trustProxyHops] ?? req.socket.remoteAddress ?? "?";
   }
 
-  // ---- Günlük tavan (dosya sayacı, süreçler arası kilit) ------------------------------------
-  let memCount = { date: "", count: 0 };
-  const today = () => new Date().toISOString().slice(0, 10);
+  // ---- Günlük kota: toplam tavan + kullanıcı (IP) başına kota ----------------------------------
+  // Dosya: { date, count, salt, clients: { <tuzlu özet>: sayı } }. Ham IP diske YAZILMAZ; özet günle birlikte silinir
+  // (tuz kalıcıdır ki yeniden başlatma kotayı sıfırlamasın). Süreçler arası kilit: bkz. withLock.
+  const MAX_CLIENTS = 100_000;
+  const localNow = () => new Date(Date.now() + dayOffsetHours * 3_600_000);
+  const today = () => localNow().toISOString().slice(0, 10);
+  const resetAt = () => {
+    const n = localNow();
+    return new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate() + 1) - dayOffsetHours * 3_600_000).toISOString();
+  };
+  let mem = null;
 
   function withLock(fn) {
     const lock = `${counterPath}.lock`;
@@ -153,37 +164,63 @@ export function createProxy(cfg = {}) {
     throw new Error("sayaç kilidi alınamadı");
   }
 
-  function readCount() {
-    if (!counterPath) {
-      return memCount.date === today() ? memCount : { date: today(), count: 0 };
+  function load() {
+    let s = mem;
+    if (counterPath) {
+      try {
+        s = JSON.parse(fs.readFileSync(counterPath, "utf8"));
+      } catch {
+        s = null;
+      }
     }
-    try {
-      const s = JSON.parse(fs.readFileSync(counterPath, "utf8"));
-      return s.date === today() ? s : { date: today(), count: 0 };
-    } catch {
-      return { date: today(), count: 0 };
+    const salt = s?.salt || crypto.randomBytes(16).toString("hex");
+    if (!s || s.date !== today()) {
+      return { date: today(), count: 0, salt, clients: {} };
+    }
+    return { date: s.date, count: s.count ?? 0, salt, clients: s.clients ?? {} };
+  }
+
+  function save(s) {
+    if (counterPath) {
+      fs.writeFileSync(counterPath, JSON.stringify(s));
+    } else {
+      mem = s;
     }
   }
 
-  /** true → istek sayıldı; false → günlük tavan doldu. */
-  function bumpDaily() {
-    if (!dailyLimit) {
-      return true;
-    }
-    const step = () => {
-      const s = readCount();
-      if (s.count >= dailyLimit) {
-        return false;
+  const transact = fn => (counterPath ? withLock(() => fn()) : fn());
+  const clientId = (s, ip) => crypto.createHash("sha256").update(`${s.salt}|${ip}`).digest("hex").slice(0, 16);
+
+  /** İstek kabul edilirse { ok:true, limit, remaining }, reddedilirse { ok:false, code:"client"|"global" }. */
+  function admit(ip) {
+    return transact(() => {
+      const s = load();
+      const id = clientId(s, ip);
+      const used = s.clients[id] ?? 0;
+      if (clientDaily && (used >= clientDaily || (!(id in s.clients) && Object.keys(s.clients).length >= MAX_CLIENTS))) {
+        return { ok: false, code: "client", limit: clientDaily };
+      }
+      if (dailyLimit && s.count >= dailyLimit) {
+        return { ok: false, code: "global" };
       }
       s.count += 1;
-      if (counterPath) {
-        fs.writeFileSync(counterPath, JSON.stringify(s));
-      } else {
-        memCount = s;
+      s.clients[id] = used + 1;
+      save(s);
+      return { ok: true, limit: clientDaily, remaining: clientDaily ? clientDaily - used - 1 : null };
+    });
+  }
+
+  /** Sağlayıcıya hiç ulaşılamadıysa hakkı geri verir (kullanıcının suçu değil). */
+  function refund(ip) {
+    transact(() => {
+      const s = load();
+      const id = clientId(s, ip);
+      if (s.clients[id] > 0) {
+        s.clients[id] -= 1;
+        s.count = Math.max(0, s.count - 1);
+        save(s);
       }
-      return true;
-    };
-    return counterPath ? withLock(step) : step();
+    });
   }
 
   // ---- Uç noktalar ------------------------------------------------------------------------------
@@ -199,9 +236,10 @@ export function createProxy(cfg = {}) {
       json(res, status, err("Sunucu yapılandırılmamış"));
       return done();
     }
-    if (!take(clientIp(req))) {
+    const ip = clientIp(req);
+    if (!take(ip)) {
       status = 429;
-      json(res, status, err("Çok fazla istek, biraz bekle"));
+      json(res, status, err("Çok fazla istek, biraz bekle", { code: "rate" }));
       return done();
     }
 
@@ -226,9 +264,11 @@ export function createProxy(cfg = {}) {
       json(res, status, err("İstek çok büyük"));
       return done();
     }
-    if (!bumpDaily()) {
+    const quota = admit(ip);
+    if (!quota.ok) {
       status = 429;
-      json(res, status, err("Günlük sınır doldu, yarın tekrar dene"));
+      const message = quota.code === "client" ? "Günlük Esin hakkın doldu" : "Esin bugünlük doldu, yarın tekrar dene";
+      json(res, status, err(message, { code: quota.code === "client" ? "client_quota" : "global_quota", limit: quota.limit ?? null, resetAt: resetAt() }));
       return done();
     }
 
@@ -254,6 +294,7 @@ export function createProxy(cfg = {}) {
     } catch {
       status = ac.signal.aborted ? 499 : 502;
       if (!ac.signal.aborted) {
+        refund(ip);
         json(res, status, err("Sağlayıcıya ulaşılamadı"));
       }
       return done();
@@ -262,6 +303,7 @@ export function createProxy(cfg = {}) {
     if (!up.ok) {
       // Sağlayıcının ham hatasını (anahtar/adres ipuçları) istemciye sızdırma.
       status = up.status === 429 ? 429 : 502;
+      refund(ip);
       await up.body?.cancel().catch(() => {});
       json(res, status, err(status === 429 ? "Sağlayıcı yoğun, biraz bekle" : "Sağlayıcı hatası"));
       log(JSON.stringify({ t: new Date().toISOString(), upstream: up.status }));
@@ -273,6 +315,7 @@ export function createProxy(cfg = {}) {
       "Content-Type": up.headers.get("content-type") ?? "text/event-stream",
       "Cache-Control": "no-cache",
       "X-Accel-Buffering": "no",
+      ...(quota.limit ? { "X-Esin-Limit": String(quota.limit), "X-Esin-Remaining": String(quota.remaining), "X-Esin-Reset": resetAt() } : {}),
     });
     try {
       for await (const chunk of up.body) {
@@ -292,12 +335,12 @@ export function createProxy(cfg = {}) {
     try {
       const path = new URL(req.url, "http://x").pathname;
       if (req.method === "GET" && path === "/health") {
-        const s = readCount();
+        const s = transact(load);
         return json(res, 200, {
           ok: true,
           configured: !!apiKey,
           models: MODELS,
-          today: { count: s.count, limit: dailyLimit },
+          today: { count: s.count, limit: dailyLimit, clientLimit: clientDaily, clients: Object.keys(s.clients).length, resetAt: resetAt() },
         });
       }
       if (req.method === "POST" && path === "/v1/chat/completions") {

@@ -35,14 +35,14 @@ Vento.dialogs = (() => {
     const t = args.promptType;
     const label = (i, fallback) => args[`button${i}Label`] || fallback;
     if (isType(t, "alert", "alertCheck")) {
-      return [{ index: 0, label: label(0, "Tamam") }];
+      return [{ index: 0, label: label(0, Vento.l10n.t("dlg-ok")) }];
     }
     if (t === "confirmEx") {
       return [0, 1, 2, 3].filter(i => args[`button${i}Label`]).map(i => ({ index: i, label: args[`button${i}Label`] }));
     }
     return [
-      { index: 0, label: label(0, "Tamam") },
-      { index: 1, label: label(1, "İptal") },
+      { index: 0, label: label(0, Vento.l10n.t("dlg-ok")) },
+      { index: 1, label: label(1, Vento.l10n.t("dlg-cancel")) },
     ];
   }
 
@@ -70,7 +70,7 @@ Vento.dialogs = (() => {
     if (origin) {
       const o = document.createElement("div");
       o.className = "dlg-origin";
-      o.textContent = args.inPermitUnload ? origin : `${origin} diyor ki`;
+      o.textContent = args.inPermitUnload ? origin : Vento.l10n.t("dlg-says", { origin });
       card.append(o);
     }
 
@@ -82,7 +82,7 @@ Vento.dialogs = (() => {
     if (args.isInsecureAuth) {
       const w = document.createElement("div");
       w.className = "dlg-warn";
-      w.textContent = "Bu bağlantı güvenli değil: girdiğin bilgiler şifrelenmeden gönderilir.";
+      w.textContent = Vento.l10n.t("dlg-insecure");
       card.append(w);
     }
 
@@ -90,10 +90,10 @@ Vento.dialogs = (() => {
     if (t === "prompt") {
       inputs.value = field("dlg-value", "text", args.value);
     } else if (t === "promptUserAndPass") {
-      inputs.user = field("dlg-user", "text", args.user, "Kullanıcı adı");
-      inputs.pass = field("dlg-pass", "password", args.pass, "Parola");
+      inputs.user = field("dlg-user", "text", args.user, Vento.l10n.t("dlg-username"));
+      inputs.pass = field("dlg-pass", "password", args.pass, Vento.l10n.t("dlg-password"));
     } else if (t === "promptPassword") {
-      inputs.pass = field("dlg-pass", "password", args.pass, "Parola");
+      inputs.pass = field("dlg-pass", "password", args.pass, Vento.l10n.t("dlg-password"));
     }
     card.append(...Object.values(inputs));
 

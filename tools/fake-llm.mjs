@@ -116,7 +116,14 @@ const srv = http.createServer((req, res) => {
       hasAuth: !!req.headers.authorization,
     });
 
-    res.writeHead(200, { "Content-Type": "text/event-stream" });
+    // Kota (vekilin davranışı): KOTA-DOLU → 429 client_quota, GLOBAL-DOLU → 429 global_quota; diğerlerinde kalan hak başlığı
+    if (question.includes("KOTA-DOLU") || question.includes("GLOBAL-DOLU")) {
+      res.writeHead(429, { "Content-Type": "application/json" });
+      const client = question.includes("KOTA-DOLU");
+      return res.end(JSON.stringify({ error: { message: "kota", code: client ? "client_quota" : "global_quota", limit: client ? 30 : null, resetAt: new Date(Date.now() + 3 * 3600_000).toISOString() } }));
+    }
+    stats.quotaLeft = (stats.quotaLeft ?? 30) - 1;
+    res.writeHead(200, { "Content-Type": "text/event-stream", "X-Esin-Limit": "30", "X-Esin-Remaining": String(stats.quotaLeft) });
     const send = t => res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: t } }] })}\n\n`);
 
     if (question.includes("YAVAS")) {

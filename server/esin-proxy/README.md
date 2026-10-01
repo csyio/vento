@@ -14,7 +14,19 @@ Sıfır bağımlılık (Node 18+). Mantık `app.mjs`, başlatıcı `server.mjs`,
   (gizli sistem istemi ~2.5k jeton/istek, kotayı yer).
 - Gövdeyi olduğu gibi geçirmez; yalnızca bilinen alanları yeniden kurar. `max_tokens` ≤ 1500;
   toplam mesaj uzunluğu ≤ 150k karakter; ≤ 40 mesaj.
-- IP başına dakikada 20 istek; UTC günü başına 2000 istek (dosya sayacı, süreçler arası kilit).
+- **Kota (üç katman):**
+  1. IP başına dakikada 20 istek (`ESIN_PER_MINUTE`) → `429 code:"rate"`.
+  2. **Kullanıcı (IP) başına günlük kota, varsayılan 30 istek** (`ESIN_CLIENT_DAILY`, 0 = kapalı) → `429 code:"client_quota"`,
+     gövdede `limit` ve `resetAt`. Başarılı yanıtlarda `X-Esin-Limit` / `X-Esin-Remaining` / `X-Esin-Reset` başlıkları gelir (Vento panelde "Bugün kalan: N / 30" gösterir).
+  3. Tüm kullanıcılar için günlük toplam tavan, varsayılan 2000 (`ESIN_DAILY_LIMIT`) → `429 code:"global_quota"`. Bütçe koruması; tek kişi değil herkes için.
+  - **Gün Türkiye saatine göre döner** (`ESIN_DAY_OFFSET_HOURS`, varsayılan 3): kota 00:00'da yenilenir.
+  - Geçersiz/bozuk istekler hak yemez; sağlayıcıya ulaşılamazsa (502/429) hak **geri verilir**.
+  - Sayaç dosyası (`esin-daily.json`): kullanıcılar **ham IP ile değil, tuzlu SHA-256 özetinin ilk 16 karakteriyle** tutulur; özetler ertesi gün silinir.
+    Tuz dosyada kalıcıdır; yeniden başlatma kotayı sıfırlamaz. 100.000'den fazla farklı kullanıcı aynı gün gelirse yenileri reddedilir.
+  - **Bütçe hesabı (sayıları buna göre ayarla):** LLMTR test bütçesi ~3M jeton/ay ≈ 100k jeton/gün. Sayfa bağlamlı bir soru tipik 3–6k jeton tutar
+    (en kötü durumda ~35k). Yani 100k jeton/gün ≈ **günde 20–30 soru TOPLAM**. Varsayılanlar (kullanıcı başına 30, toplam 2000) bu bütçeye göre
+    değil, kötüye kullanımı sınırlamak için; bütçeyi korumak istiyorsan `ESIN_DAILY_LIMIT`'i düşür (ör. 25–150) ve `ESIN_CLIENT_DAILY`'i
+    (ör. 10–20) birlikte ayarla. Kullanıcı sayısı artınca LLMTR ile bütçeyi konuşmak gerekir.
 - İstemci bağlantıyı kapatınca ("durdur") upstream de iptal edilir; yoksa jeton yanmaya devam eder.
 - Sağlayıcının ham hatasını istemciye sızdırmaz (anahtar/adres ipuçları).
 - **İstem ve yanıt içeriği loglanmaz.** Yalnızca zaman, model, durum, mesaj sayısı, süre.
@@ -32,7 +44,7 @@ seçersen `vento/app/profile/vento.js` içindeki `vento.esin.endpoint` tercihini
    *Application Startup File*: `server.mjs`.
 4. **Custom environment variables:** `LLMTR_API_KEY` = LLMTR panelinden aldığın anahtar.
    **Anahtarı kimseyle/hiçbir sohbette paylaşma; yalnızca buraya yaz.**
-   İsteğe bağlı: `ESIN_DAILY_LIMIT`, `ESIN_PER_MINUTE`, `TRUST_PROXY_HOPS`.
+   İsteğe bağlı: `ESIN_CLIENT_DAILY`, `ESIN_DAILY_LIMIT`, `ESIN_PER_MINUTE`, `ESIN_DAY_OFFSET_HOURS`, `TRUST_PROXY_HOPS`.
 5. *Enable Node.js* → *Restart App*.
 6. Doğrula:
    ```sh

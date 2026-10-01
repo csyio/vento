@@ -1,0 +1,81 @@
+diff --git a/toolkit/mozapps/update/updater/moz.build b/toolkit/mozapps/update/updater/moz.build
+index 7e362df573..8a105f7122 100644
+--- a/toolkit/mozapps/update/updater/moz.build
++++ b/toolkit/mozapps/update/updater/moz.build
+@@ -80,6 +80,10 @@ elif CONFIG["MOZ_UPDATE_CHANNEL"] in (
+ ):
+     primary_cert.inputs += ["nightly_aurora_level3_primary.der"]
+     secondary_cert.inputs += ["nightly_aurora_level3_secondary.der"]
++elif CONFIG["MOZ_UPDATE_CHANNEL"] == "vento":
++    # Vento: kendi MAR imza sertifikalarımız (anahtarlar ~/.vento-mar-keys, imzalama tools/sign-mar.sh; docs/YAYIN.md)
++    primary_cert.inputs += ["vento1.der"]
++    secondary_cert.inputs += ["vento2.der"]
+ else:
+     primary_cert.inputs += ["dep1.der"]
+     secondary_cert.inputs += ["dep2.der"]
+diff --git a/toolkit/mozapps/update/updater/vento1.der b/toolkit/mozapps/update/updater/vento1.der
+new file mode 100644
+index 0000000000000000000000000000000000000000..a52cffd0534684236f7e8d22bfb9eadaf3388d8a
+GIT binary patch
+literal 1251
+zcmXqLV!3b7#B_WCGZP~d6Dz~%l$ojqylk9WZ60mkc^MhGSs4rr4fzas*qB3ExP)25
+zQu9jk4do4FL40OmF)&{tv>+w1Bvm0eGd(XeFI~aVKu(<3$jrdf(7@2bz}VP0N}Sgi
+znM;n5O-xG24r63xU~XdKX8<~$i>Zl;kzrSWY3a(H=WlKLb$^r6+_q)APe?^}oMK^I
+z!vEvN4&m%;Ue*Tt5-v?&^kdVzk5BU?!@f@2R(p2)_nrAwv%iOhfBc=}p|@m#^0`YJ
+zXZ@{Pr0}eE|Hq9dFGjX93Gc~OF<aO^%kk}^b4Lu+S?1jQGtn|UcELQ2>pQCcRL>LG
+zqd9l}gNZLzt}Sm_T=a4c(+aOEKQnLc;h$bAGws->r`q-P4W;hu8f4wl%=FnVimmV9
+zh^WoD@+bC=LI3w@(^Ji#B_^mHG%L#%(oHau{9w=UCTHee*Swhb44#&U=FH}~yt+{E
+z&9NnA?($oI@$6gD*thV=|5-=Bh^n5v7xFe!{mFBA-uC2~@pqbk^*pYgDQz#Sx=n0-
+zig|IBvDyj+qgQ2zdw=bp`Sbq0YVIjDkB$g=3;3_uTXHtl>*tZqoDb37`^`MpK3}Y$
+z$+0%<D@R88p~c<DxfP$aUo|l~?xhx~%yM(KWLNmVCvLBItxaP1A(m0j_jMMlt>!yN
+z8~Z@9*1}^PR$e{c3!^s1t;$LM5EZpk@@kjJ?v*bDSti}IvSi)SwtF(uBR%V^ov&?$
+z4mm6G-I$akvE9pO<2keE_j?z8I&(dn<;&d5%!m72|JJ8hu<GSIrhWZT)pj9uSM5qB
+zk8}osC*Pb`FEjsPdbv#HqlL#hgNmems*(MV76#r*|H3JC=CZYr%Yq%X%>|#Cm>C%u
+zky8jT=>k&-BZIs5!W+hlD}+C9c$oUs)_UvnxLy4@s>jzoo$N2FdVWbmjPa~rfiq?_
+zyluMtXl@w8`;582O?9T8KA!MbGPZ3i_ttxx;^m)-C+g<A`TMG;UH!6hi<+mSbM1?e
+z`c1po{&g>#{r=RB$*V6KO<8%TR4Cv3^@Ol1ufGM})BSMdh4hIkhP7AbnIydX>}kGZ
+z;>OFT_a0O1%ReGBA!4KID(BT(J|qiW53zUX)b)yT`Mkt8_Sc;1gAdDhB<J=A{8RbZ
+zzH3f56E~l=#r`{C1+lyz=bqieac%i*nQiWMsj>lA;**N!zcdxmxyM<YJJYUW(eekY
+zt{myv#eZzh@){-2$1m4>Yg{t3<iL)&1Fy0TkDtGP$ty|2<Z*4BtnjHD1(Wv02bdPF
+zQr6lgbhD7T<-6(n+aKmE4w<)9@#xe8Q#TvVR$49jra)OTSG|6bx7<U<sUfVXe=j|{
+z%q1eS<^g*IkHszTMQh96tAF;=RbDAl9Z^>Mw6kx*mrXsPE6@5FB;1&je*KAF+T6Me
+zEB^aw3s^bN-1T{>!JktvE^mt4qvgNtpx`Un@ACT^!ke<S;)Ra~ZJyX8xs~aT$9(>V
+zo?S&(Sw!EbAM_RbINPgqJJ%X_7KOHq*nXjPbHZj#6w7D5-+l4J<Zp5{Uw2g9{dJe=
+l(a!o4p{j4EiU}6B{Rm8PoZ`ID?6~F23vYG_8W=V@0{}bEJPZH;
+
+literal 0
+HcmV?d00001
+
+diff --git a/toolkit/mozapps/update/updater/vento2.der b/toolkit/mozapps/update/updater/vento2.der
+new file mode 100644
+index 0000000000000000000000000000000000000000..fb6e6f57334d5cce1acde07e958c8d344f7c843d
+GIT binary patch
+literal 1251
+zcmXqLV!3b7#B_WCGZP~d6Dz~%l$q)Vylk9WZ60mkc^MhGSs4rr4fzas*qB3ExP)25
+zQu9jk4do4FL40OmF)&{tv>+w1Bvm0eGd(XeFI~aNKu(<3$jrdf(7@2bz}VO<N}Sgi
+znM;n5O-xG24r63xU~XdKX8<~$i>Zl;k>PaUMS+|nvN8d^=Z*%8OSDVPJ!cfFWxk}e
+zu}FILpSR|g*Z#>)jhTL>h-JdF!^b(o%<lwWVQbI#Nng7)Wiw0BJ`KAt^^fMPYW@@C
+zIj<$GSmN}>Y5JiD2ifjyxVZoEA#FaN8C!prW-Gb}ExFBNQ@zze;P0Er|0~L;2rOFl
+zW%`ZTQl<{Q>eH5NEPTP8Y%Y8#_Q@(~24A;tFWbKyo?Rrc_>6|=y_D~}K6G@icGp^>
+zufcsQ&GN+OX9X4Sw{BUst@*5Cm*=-@2Rm2!<o#V@de!pm6rQ)yPjX*!t=W)$=|H#2
+zW$vWPU(QcGc}jv(HG999XU|(~qBK#^(8{y2!K=on$6wd^HRr0Oh5<hu=DZ1+bUgfP
+z@XeYFT*Bv6)iWypuRDE$>k-c$ou;N!OrkqGG^G02ma(gTpYr73->TljD%+0a3Lm~~
+zZz-9teD{v!B(oU%$Kv1n4(yGN{x{i`S=TvqmBJ#qRFnN*tX3VKXwS|5UOjo{wk@s<
+zYYie;UWIUbTg%mO=-t+u+&bmn6uFk$+e97PSQ|tgUv9dgbt>QJ+B7Z&zw0rKtB<X;
+zKhSV-imh%8({kU;bMlpOvU~S)One^k;lk`4XE}op=m}4|8Z}eqUe2box7Hf^q`r5m
+znf6R%6=U0l7dOuqe*WzDDB1k%y+j6?ll6To=cRRpsV`j~r}6X69NT9;lXo*QGcqtD
+zrx0M$1*Q;2hE0bB*SPI@a^tvS#qsT_f5qx9E!&aWYA)HL_U(h3(N|!~x0XDkx_W_L
+z#Dc60)0M^vlW!~(P5kEg@{o>>wWg`K)!aGm%U&(8W4f8aX<hg(cJY+CW?G54w~GHw
+zb3XX_SL;>I+w3Bbof=r*FWGi#(wt9oc6N9z;r+H(@BiWVw_a2%sVwzUZ#m^C^D*f6
+z`M)X+7fbKW{gA@^X>I;7hOb*CEWhU(+HHR&Ci3g!SswitmA9sL{txoGKA-1;Z!On^
+zS8h%gZX2Q|x}``xyqCs2`NjqrM@uX7#qX<GpR;nky);Gh&7Xj6Cr{jRIM=5m-!OfB
+zZNaol+p-K7+>3tk#h#gQL-})~7i;)$?~dS`8N~i{pKr@A=dRQz-F7F`s-Cs3s5o6?
+zq@r;{Dl3Uu!Zd8lr0S^P>rbzHF41^z_~T!K%CQe0dbO9G`_jaba<$Ad-I5{x`|25I
+ze0HdQEy?h8&iZS0Zkg_tZ-#kIJndU!w@4gm{Li13Ah7P6)cWVO3wQXM?rcA7b;Vt7
+zo8E%=!JYEITvytZ8N9jv=f3rpb!L0R!y`WKUi|-Uvztcz{tMH?r>D#^><YG<Fq0!)
+zzrXY(w^7cqT=r(c>r+qWAAD2zIOgLAm#MctZ*#b(=ii$mZy5fj<L;O8D_W+-qAh1*
+iFX~vXlRNzQa1poTG=FX3sgXC0U+NrXjWHAo(E$KaBri(<
+
+literal 0
+HcmV?d00001
+

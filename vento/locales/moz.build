@@ -1,2 +1,8 @@
 # Vento'nun kendi arayüz metinleri kodda Türkçe olarak gömülü; burada yalnız motorun (toolkit/dom/netwerk/security)
 # Türkçe dil dosyalarını paketleme kuralları var. Bkz. Makefile.in ve tools/fetch-l10n.sh.
+
+# Vento'nun kendi arayüz metinleri (Fluent). Her dil Resources/browser/localization/<dil>/vento/vento.ftl olarak yüklenir
+# (l10n kaynağı "5-vento", bkz. l10n-registry.manifest). Kimlik kümeleri iki dilde AYNI olmalı (öz-test doğrular).
+FINAL_TARGET_FILES.localization["en-US"].vento += ["en-US/vento.ftl"]
+FINAL_TARGET_FILES.localization["tr"].vento += ["tr/vento.ftl"]
+

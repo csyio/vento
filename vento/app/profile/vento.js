@@ -3,7 +3,7 @@
 // Ana pencereyi components/startup/VentoStartup açar (DefaultCLH değil) — toolkit.defaultChromeURI
 // bilerek set DEĞİL, yoksa iki pencere açılır. browser.xhtml YOK.
 pref("toolkit.telemetry.enabled", false);
-pref("app.update.enabled", false);
+pref("app.update.enabled", true);
 
 // Geliştirme: chrome dump() çıktısı stdout'a.
 pref("browser.dom.window.dump.enabled", true);
@@ -45,4 +45,22 @@ pref("intl.locale.requested", "tr");
 // Başlangıç ekranı kişiselleştirme: duvar kâğıdı ("" = yok, sade varsayılan) ve Ebabil'in görünürlüğü
 pref("vento.start.wallpaper", "");
 pref("vento.start.ebabil", true);
+
+// ---- İlk açılış, Esin, güncelleme (vento-welcome.js / vento-update.js / vento-bookmarks.js) ----
+pref("vento.welcome.completed", false);   // ilk açılış akışı bir kez gösterilir
+pref("vento.esin.model", "");            // "" = vekilin varsayılanı (greenpt/gpt-oss-120b-eu)
+pref("vento.esin.enabled", true);         // kapalıyken Esin düğmesi/önerisi/paneli yok, hiçbir şey gönderilmez
+// Kullanıcı aracısına "Firefox/x.y" belirteci eklenir (…Gecko/20100101 Firefox/x.y Vento/s): aksi hâlde Google gibi siteler
+// tanımadıkları tarayıcıya sadeleştirilmiş eski sayfa sunar. "Vento/s" belirteci dürüstlük için kalır.
+pref("general.useragent.compatMode.firefox", true);
+pref("vento.search.engine", "duckduckgo"); // duckduckgo | google (vento-tabs.js SEARCH_ENGINES)
+pref("vento.start.sites", true);          // başlangıç ekranında sık siteler + yer imleri
+pref("vento.start.hidden", "[]");         // gizlenen sık site sunucu adları (JSON dizisi)
+pref("vento.lastRunVersion", "");         // güncelleme sonrası sürüm notlarını açmak için son çalışan sürüm
+pref("app.update.auto", true);            // kapalıysa yeni sürüm çıkınca haber verilir, kullanıcı "İndir ve kur" der
+pref("app.update.interval", 21600);       // 6 saatte bir denetle (sn)
+pref("app.update.staging.enabled", true);
+// "Daha fazla bilgi" ve elle indirme bağlantıları ürün sitesine gider (tek adres)
+pref("app.update.url.details", "https://vento.cansoykanyilmaz.com/surum-notlari/");
+pref("app.update.url.manual", "https://vento.cansoykanyilmaz.com/");
 

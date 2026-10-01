@@ -151,7 +151,10 @@
     Vento.ui.init();
     Vento.esin.init();
     Vento.find.init();
+    Vento.bookmarks.init();
+    Vento.update.init();
     Vento.start.init();
+    Vento.welcome.init();
     Vento.dialogs.init();
     Vento.permissions.init();
     Vento.downloads.init().catch(e => Vento.trace(`indirmeler başlatılamadı: ${e}`));
@@ -190,6 +193,13 @@
       }
     }
     Vento.session.start();
+    if (!Services.env.exists("VENTO_SELFTEST")) {
+      // Güncelleme sonrası ilk açılış → sitedeki sürüm notları açılır; ilk kurulumda karşılama akışı gösterilir
+      Vento.update.afterUpdate();
+      if (!Vento.welcome.completed) {
+        Vento.welcome.show();
+      }
+    }
     Vento.trace(`kabuk hazır (oturum geri yüklendi=${restored})`);
 
     if (Services.env.exists("VENTO_SELFTEST")) {

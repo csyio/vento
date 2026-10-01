@@ -27,23 +27,23 @@ Vento.downloads = (() => {
       n /= 1024;
       i++;
     }
-    return `${n.toLocaleString("tr-TR", { maximumFractionDigits: i ? 1 : 0 })} ${units[i]}`;
+    return `${Vento.l10n.number(n, { maximumFractionDigits: i ? 1 : 0 })} ${units[i]}`;
   }
 
   /** Durum metni + sınıf: active | done | error | canceled | paused */
   function status(d) {
     if (d.error) {
-      return { kind: "error", text: "Başarısız" };
+      return { kind: "error", text: Vento.l10n.t("dl-failed") };
     }
     if (d.canceled) {
-      return { kind: "canceled", text: "İptal edildi" };
+      return { kind: "canceled", text: Vento.l10n.t("dl-canceled") };
     }
     if (d.succeeded) {
-      return { kind: "done", text: `${formatBytes(d.totalBytes || d.currentBytes)} · Tamamlandı` };
+      return { kind: "done", text: Vento.l10n.t("dl-done", { size: formatBytes(d.totalBytes || d.currentBytes) }) };
     }
     const cur = formatBytes(d.currentBytes);
     const total = d.hasProgress ? ` / ${formatBytes(d.totalBytes)}` : "";
-    return { kind: d.stopped ? "paused" : "active", text: d.stopped ? "Duraklatıldı" : `${cur}${total}` };
+    return { kind: d.stopped ? "paused" : "active", text: d.stopped ? Vento.l10n.t("dl-paused") : `${cur}${total}` };
   }
 
   function svgButton(className, title, pathData, onClick) {
@@ -87,10 +87,10 @@ Vento.downloads = (() => {
     const actions = document.createElement("div");
     actions.className = "dl-actions";
     actions.append(
-      svgButton("dl-cancel", "İptal", "M4 4l8 8M12 4l-8 8", () => d.cancel()),
-      svgButton("dl-retry", "Yeniden dene", "M13 8a5 5 0 1 1-1.6-3.7M13 2.8v2.6h-2.6", () => d.start()),
-      svgButton("dl-reveal", "Finder'da göster", "M2.5 5.5h4l1.2 1.5h5.8v5.5h-11z", () => reveal(d)),
-      svgButton("dl-remove", "Listeden kaldır", "M3.5 5h9M6.5 5V3.5h3V5M5 5l.6 8h4.8l.6-8", () => remove(d))
+      svgButton("dl-cancel", Vento.l10n.t("dl-cancel"), "M4 4l8 8M12 4l-8 8", () => d.cancel()),
+      svgButton("dl-retry", Vento.l10n.t("dl-retry"), "M13 8a5 5 0 1 1-1.6-3.7M13 2.8v2.6h-2.6", () => d.start()),
+      svgButton("dl-reveal", Vento.l10n.t("dl-reveal"), "M2.5 5.5h4l1.2 1.5h5.8v5.5h-11z", () => reveal(d)),
+      svgButton("dl-remove", Vento.l10n.t("dl-remove"), "M3.5 5h9M6.5 5V3.5h3V5M5 5l.6 8h4.8l.6-8", () => remove(d))
     );
 
     row.append(mark, info, actions);

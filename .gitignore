@@ -2,3 +2,7 @@
 .DS_Store
 /build*.log
 /l10n-base/
+/site/dist/
+/site/*.zip
+/package*.log
+*.dmg

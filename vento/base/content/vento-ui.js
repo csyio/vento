@@ -66,7 +66,7 @@ Vento.ui = (() => {
     title.className = "tab-title";
     const close = document.createElement("button");
     close.className = "tab-close";
-    close.title = "Sekmeyi kapat (⌘W)";
+    close.title = Vento.l10n.attr("tip-tab-close");
     close.appendChild(svgIcon("M4 4l8 8M12 4l-8 8"));
     el.append(mark, title, close);
 
@@ -97,6 +97,7 @@ Vento.ui = (() => {
     el.toggleAttribute("selected", tab === Vento.tabs.selected);
     el.toggleAttribute("loading", tab.loading);
     setMark(el.querySelector(".tab-mark"), tab);
+    el.querySelector(".tab-close").title = Vento.l10n.attr("tip-tab-close");
     el.querySelector(".tab-title").textContent = tab.label;
     el.title = tab.label;
   }
@@ -207,7 +208,11 @@ Vento.ui = (() => {
     els.rows.forEach((r, k) => r.toggleAttribute("selected", k === suggestIndex));
   }
 
+  // Esin kapalıysa "Esin'e sor" satırı hiç yoktur (varsayılan seçim "Ara" olur)
+  const liveRows = () => [...els.suggest.querySelectorAll(".suggest-row")].filter(r => Vento.esin.enabled || r.dataset.kind !== "esin");
+
   function updateSuggest() {
+    els.rows = liveRows();
     const text = els.input.value.trim();
     const show = document.activeElement === els.input && !!text && Vento.isSearchText(text);
     if (!show) {
@@ -317,10 +322,10 @@ Vento.ui = (() => {
       refreshBar();
     });
     els.input.addEventListener("input", updateSuggest);
-    els.rows.forEach((row, i) => {
+    els.rows.forEach(row => {
       // mousedown'da odağı çubukta tut, yoksa blur önce öneriyi gizler ve tıklama kaybolur
       row.addEventListener("mousedown", e => e.preventDefault());
-      row.addEventListener("mouseenter", () => selectSuggest(i));
+      row.addEventListener("mouseenter", () => selectSuggest(Math.max(0, els.rows.indexOf(row))));
       row.addEventListener("click", () => runSuggest(row.dataset.kind));
     });
     els.input.addEventListener("keydown", e => {

@@ -22,6 +22,7 @@ Vento.contextMenu = (() => {
 
   /** Bağlam verisinden menü tarifi: [{label, run, disabled?, sub?} | SEP]. */
   function build(data) {
+    const L = (id, args) => Vento.l10n.t(id, args);
     const t = Vento.tabs;
     const tab = t.selected;
     const out = [];
@@ -34,54 +35,53 @@ Vento.contextMenu = (() => {
     const goCmd = c => () => goDoCommand(c);
 
     if (data.linkUrl) {
-      add("Bağlantıyı Yeni Sekmede Aç", () => t.open(data.linkUrl, { select: false, afterCurrent: true }));
-      add("Bağlantı Adresini Kopyala", () => copy(data.linkUrl));
-      add("Bağlantıdaki Dosyayı İndir", () => Vento.downloads.saveURL(data.linkUrl, { referrer: data.pageUrl }));
+      add(L("ctx-open-link-new-tab"), () => t.open(data.linkUrl, { select: false, afterCurrent: true }));
+      add(L("ctx-copy-link"), () => copy(data.linkUrl));
+      add(L("ctx-download-link"), () => Vento.downloads.saveURL(data.linkUrl, { referrer: data.pageUrl }));
       sep();
     }
 
     if (data.imageUrl) {
-      add("Resmi Yeni Sekmede Aç", () => t.open(data.imageUrl, { afterCurrent: true }));
-      add("Resim Adresini Kopyala", () => copy(data.imageUrl));
-      add("Resmi İndirilenler'e Kaydet", () => Vento.downloads.saveURL(data.imageUrl, { referrer: data.pageUrl }));
+      add(L("ctx-open-image-new-tab"), () => t.open(data.imageUrl, { afterCurrent: true }));
+      add(L("ctx-copy-image-url"), () => copy(data.imageUrl));
+      add(L("ctx-save-image"), () => Vento.downloads.saveURL(data.imageUrl, { referrer: data.pageUrl }));
       sep();
     }
 
     if (data.mediaUrl) {
-      const kind = data.mediaKind === "video" ? "Videoyu" : "Sesi";
-      add(`${kind} Yeni Sekmede Aç`, () => t.open(data.mediaUrl, { afterCurrent: true }));
-      add(`${data.mediaKind === "video" ? "Video" : "Ses"} Adresini Kopyala`, () => copy(data.mediaUrl));
-      add(`${kind} İndir`, () => Vento.downloads.saveURL(data.mediaUrl, { referrer: data.pageUrl }));
+      const video = data.mediaKind === "video";
+      const acc = L(video ? "ctx-kind-video-acc" : "ctx-kind-audio-acc");
+      const nom = L(video ? "ctx-kind-video" : "ctx-kind-audio");
+      add(L("ctx-open-media-new-tab", { kind: acc }), () => t.open(data.mediaUrl, { afterCurrent: true }));
+      add(L("ctx-copy-media-url", { kind: nom }), () => copy(data.mediaUrl));
+      add(L("ctx-download-media", { kind: acc }), () => Vento.downloads.saveURL(data.mediaUrl, { referrer: data.pageUrl }));
       sep();
     }
 
     if (data.editable) {
-      add("Geri Al", goCmd("cmd_undo"));
-      add("Yinele", goCmd("cmd_redo"));
+      add(L("ctx-undo"), goCmd("cmd_undo"));
+      add(L("ctx-redo"), goCmd("cmd_redo"));
       sep();
-      add("Kes", goCmd("cmd_cut"), { disabled: !data.selection });
-      add("Kopyala", goCmd("cmd_copy"), { disabled: !data.selection });
-      add("Yapıştır", goCmd("cmd_paste"));
-      add("Tümünü Seç", goCmd("cmd_selectAll"));
+      add(L("ctx-cut"), goCmd("cmd_cut"), { disabled: !data.selection });
+      add(L("ctx-copy"), goCmd("cmd_copy"), { disabled: !data.selection });
+      add(L("ctx-paste"), goCmd("cmd_paste"));
+      add(L("ctx-select-all"), goCmd("cmd_selectAll"));
       sep();
     } else if (data.selection) {
-      add("Kopyala", () => copy(data.selection));
+      add(L("ctx-copy"), () => copy(data.selection));
     }
 
     if (data.selection) {
       const q = data.selection;
-      add(`“${shorten(q)}” için Ara`, () => {
-        const url = Vento.resolveInput(q);
+      add(L("ctx-search-for", { text: shorten(q) }), () => {
         // Seçili metin adres gibi görünse bile arama yap (kullanıcı "ara" dedi)
-        t.open(url?.startsWith("https://duckduckgo.com/") ? url : `https://duckduckgo.com/?q=${encodeURIComponent(q)}`, {
-          afterCurrent: true,
-        });
+        t.open(Vento.searchURL(q), { afterCurrent: true });
       });
-      add("Esin", null, {
+      add(L("ctx-esin"), null, {
         sub: [
-          { label: "Açıkla", run: () => Vento.esin.ask(`Şu metni açıkla:\n\n“${q}”`) },
-          { label: "Özetle", run: () => Vento.esin.ask(`Şu metni kısaca özetle:\n\n“${q}”`) },
-          { label: "Türkçeye Çevir", run: () => Vento.esin.ask(`Şu metni Türkçeye çevir:\n\n“${q}”`) },
+          { label: L("ctx-explain"), run: () => Vento.esin.ask(`${L("ctx-q-explain")}\n\n“${q}”`) },
+          { label: L("ctx-summarize"), run: () => Vento.esin.ask(`${L("ctx-q-summarize")}\n\n“${q}”`) },
+          { label: L("ctx-translate"), run: () => Vento.esin.ask(`${L("ctx-q-translate")}\n\n“${q}”`) },
         ],
       });
       sep();
@@ -89,14 +89,14 @@ Vento.contextMenu = (() => {
 
     // Sayfa menüsü: yalnızca özel bir hedef yokken (bağlantı/resim/yazı alanı/seçim değil)
     if (!data.linkUrl && !data.imageUrl && !data.mediaUrl && !data.editable && !data.selection) {
-      add("Geri", () => t.back(), { disabled: !tab?.canGoBack });
-      add("İleri", () => t.forward(), { disabled: !tab?.canGoForward });
-      add("Yenile", () => t.reload());
+      add(L("ctx-back"), () => t.back(), { disabled: !tab?.canGoBack });
+      add(L("ctx-forward"), () => t.forward(), { disabled: !tab?.canGoForward });
+      add(L("ctx-reload"), () => t.reload());
       sep();
-      add("Sayfa Adresini Kopyala", () => copy(data.pageUrl));
-      add("Yazdır…", () => Vento.print());
-      add("Sayfayı Esin ile Özetle", () => Vento.esin.ask("Bu sayfayı kısaca özetle."));
-      add("Sayfa Kaynağını Göster", () => t.open(`view-source:${data.pageUrl}`, { afterCurrent: true }));
+      add(L("ctx-copy-page-url"), () => copy(data.pageUrl));
+      add(L("ctx-print"), () => Vento.print());
+      add(L("ctx-summarize-page"), () => Vento.esin.ask(L("ctx-q-summarize-page")));
+      add(L("ctx-view-source"), () => t.open(`view-source:${data.pageUrl}`, { afterCurrent: true }));
     }
 
     while (out.at(-1) === SEP) {

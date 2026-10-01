@@ -14,31 +14,32 @@ Vento.permissions = (() => {
 
   const PM = Services.perms;
 
-  /** İzin türü → cümle parçası ("… şunu yapmak istiyor: <parça>") */
+  /** İzin türü → Fluent kimliği ("… şunu yapmak istiyor: <parça>") */
   const WHAT = {
-    geolocation: "konumunu görmek",
-    "desktop-notification": "sana bildirim göndermek",
-    "persistent-storage": "verileri kalıcı olarak saklamak",
-    "storage-access": "siteler arası çerezlerine erişmek",
-    midi: "MIDI cihazlarını kullanmak",
-    "midi-sysex": "MIDI cihazlarını (gelişmiş) kullanmak",
-    xr: "sanal gerçeklik cihazlarını kullanmak",
-    camera: "kameranı kullanmak",
-    microphone: "mikrofonunu kullanmak",
-    "autoplay-media": "ses ve video otomatik oynatmak",
+    geolocation: "perm-geolocation",
+    "desktop-notification": "perm-notification",
+    "persistent-storage": "perm-persistent-storage",
+    "storage-access": "perm-storage-access",
+    midi: "perm-midi",
+    "midi-sysex": "perm-midi-sysex",
+    xr: "perm-xr",
+    camera: "perm-camera",
+    microphone: "perm-microphone",
+    "autoplay-media": "perm-autoplay",
   };
 
   function describe(kinds) {
+    const L = (id, args) => Vento.l10n.t(id, args);
     const media = kinds.filter(k => k === "camera" || k === "microphone");
     const others = kinds.filter(k => !media.includes(k));
     const parts = [];
     if (media.length === 2) {
-      parts.push("kameranı ve mikrofonunu kullanmak");
+      parts.push(L("perm-camera-microphone"));
     } else if (media.length === 1) {
-      parts.push(WHAT[media[0]]);
+      parts.push(L(WHAT[media[0]]));
     }
-    parts.push(...others.map(k => WHAT[k] ?? `izin istiyor (${k})`));
-    return parts.join(" ve ");
+    parts.push(...others.map(k => (WHAT[k] ? L(WHAT[k]) : L("perm-unknown", { kind: k }))));
+    return parts.join(L("perm-join"));
   }
 
   const originOf = principal => {
@@ -215,7 +216,7 @@ Vento.permissions = (() => {
     origin.textContent = originOf(entry.principal);
     const text = document.createElement("div");
     text.className = "perm-text";
-    text.textContent = `şunu yapmak istiyor: ${describe(entry.kinds)}`;
+    text.textContent = Vento.l10n.t("perm-wants", { what: describe(entry.kinds) });
     card.append(origin, text);
 
     const selects = {};
@@ -236,17 +237,17 @@ Vento.permissions = (() => {
     rememberLabel.className = "perm-remember";
     const remember = document.createElement("input");
     remember.type = "checkbox";
-    rememberLabel.append(remember, "Bu site için hatırla");
+    rememberLabel.append(remember, Vento.l10n.t("perm-remember"));
     card.append(rememberLabel);
 
     const buttons = document.createElement("div");
     buttons.className = "perm-buttons";
     const block = document.createElement("button");
     block.className = "perm-btn perm-block";
-    block.textContent = "Engelle";
+    block.textContent = Vento.l10n.t("perm-block");
     const allow = document.createElement("button");
     allow.className = "perm-btn perm-allow";
-    allow.textContent = "İzin Ver";
+    allow.textContent = Vento.l10n.t("perm-allow");
     allow.setAttribute("primary", "");
     buttons.append(block, allow);
     card.append(buttons);

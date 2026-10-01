@@ -20,7 +20,7 @@ Vento.find = (() => {
         const notFound = data.result === FIND_NOTFOUND;
         els.input.toggleAttribute("notfound", notFound);
         if (notFound) {
-          setCount("Bulunamadı");
+          setCount(Vento.l10n.t("find-not-found"));
         }
       },
       onMatchesCountResult(result) {

@@ -1,2 +1,2 @@
 MOZ_APP_DISPLAYNAME=Vento
-MOZ_MACBUNDLE_ID=com.cansoykanyilmaz.vento
+MOZ_MACBUNDLE_ID=vento

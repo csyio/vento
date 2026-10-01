@@ -11,7 +11,9 @@ fi
 # disk.icns yalnız DMG paketlemede kullanılır (uygulama paketine girmez): kaynakta uygulama simgesiyle aynı olmalı
 cmp -s "$ROOT/vento/branding/default/disk.icns" "$ROOT/vento/branding/default/firefox.icns" \
   || { echo "HATA: vento/branding/default/disk.icns uygulama simgesiyle (firefox.icns) aynı değil (tools/make-doc-icon.py)"; exit 1; }
-APP="$ROOT/engine/obj-vento/dist/Vento.app/Contents/MacOS/vento"
+# VENTO_APP: paketlenmiş (DMG'den kopyalanmış) Vento.app yolu verilirse onu sınar
+APP="${VENTO_APP:+$VENTO_APP/Contents/MacOS/vento}"
+APP="${APP:-$ROOT/engine/obj-vento/dist/Vento.app/Contents/MacOS/vento}"
 TMP="$(mktemp -d)"
 # Sahte LLM (Esin testleri için)
 # Kendinden imzalı sertifika (sertifika hatası sayfası testi)

@@ -195,3 +195,96 @@ test("anahtar yoksa 503; /health yapılandırma durumunu söyler; bilinmeyen yol
   assert.equal(h.configured, false);
   assert.equal((await fetch(`${s.base}/x`)).status, 404);
 });
+
+// ---- Kullanıcı (IP) başına günlük kota --------------------------------------------------------------
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
+const ipOf = ip => ({ "X-Forwarded-For": ip });
+
+test("kullanıcı kotası: dolunca 429 client_quota, başkası etkilenmez; kalan hak başlıkta", async t => {
+  const s = await setup({ clientDaily: 3, perMinute: 1000 });
+  t.after(s.close);
+  const remaining = [];
+  for (let i = 0; i < 3; i++) {
+    const r = await s.post(ask(), ipOf("203.0.113.1"));
+    assert.equal(r.status, 200);
+    assert.equal(r.headers.get("x-esin-limit"), "3");
+    remaining.push(r.headers.get("x-esin-remaining"));
+    await r.text();
+  }
+  assert.deepEqual(remaining, ["2", "1", "0"]);
+  const over = await s.post(ask(), ipOf("203.0.113.1"));
+  assert.equal(over.status, 429);
+  const body = await over.json();
+  assert.equal(body.error.code, "client_quota");
+  assert.equal(body.error.limit, 3);
+  assert.ok(Date.parse(body.error.resetAt) > Date.now(), "yenilenme zamanı gelecekte");
+  assert.equal(s.up.seen.requests.length, 3, "kota dolunca sağlayıcıya istek gitmedi");
+  const other = await s.post(ask(), ipOf("203.0.113.2"));
+  assert.equal(other.status, 200, "başka kullanıcı etkilenmez");
+  await other.text();
+});
+
+test("kota: geçersiz istek hak yemez; sağlayıcı hatasında hak geri verilir", async t => {
+  const s = await setup({ clientDaily: 2, perMinute: 1000 });
+  t.after(s.close);
+  for (let i = 0; i < 5; i++) {
+    assert.equal((await s.post("{bozuk", ipOf("203.0.113.3"))).status, 400);
+  }
+  s.up.setMode("error401");
+  for (let i = 0; i < 4; i++) {
+    const r = await s.post(ask(), ipOf("203.0.113.3"));
+    assert.equal(r.status, 502, "sağlayıcı hatası kullanıcının hakkını yemez");
+    await r.text();
+  }
+  s.up.setMode("stream");
+  const ok1 = await s.post(ask(), ipOf("203.0.113.3"));
+  assert.equal(ok1.headers.get("x-esin-remaining"), "1");
+  await ok1.text();
+});
+
+test("kota: toplam tavan ayrı kodla (global_quota); dosyaya ham IP yazılmaz; yeniden başlatma sıfırlamaz", async t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "esin-q-"));
+  const file = path.join(dir, "c.json");
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  let s = await setup({ clientDaily: 2, dailyLimit: 3, perMinute: 1000, counterPath: file });
+  for (const ip of ["198.51.100.7", "198.51.100.7", "198.51.100.8"]) {
+    const r = await s.post(ask(), ipOf(ip));
+    assert.equal(r.status, 200);
+    await r.text();
+  }
+  const g = await s.post(ask(), ipOf("198.51.100.9"));
+  assert.equal(g.status, 429);
+  assert.equal((await g.json()).error.code, "global_quota");
+  s.close();
+
+  const raw = fs.readFileSync(file, "utf8");
+  assert.ok(!raw.includes("198.51.100"), "ham IP diskte yok");
+  assert.equal(Object.keys(JSON.parse(raw).clients).length, 2);
+
+  // süreç yeniden başlar (yeni createProxy, aynı dosya): .7 hâlâ dolu
+  s = await setup({ clientDaily: 2, dailyLimit: 100, perMinute: 1000, counterPath: file });
+  t.after(s.close);
+  const again = await s.post(ask(), ipOf("198.51.100.7"));
+  assert.equal(again.status, 429);
+  assert.equal((await again.json()).error.code, "client_quota");
+});
+
+test("kota: gün sınırı Türkiye saatine göre; eski günün sayacı sıfırlanır", async t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "esin-q-"));
+  const file = path.join(dir, "c.json");
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  fs.writeFileSync(file, JSON.stringify({ date: "2000-01-01", count: 99, salt: "x", clients: { abc: 99 } }));
+  const s = await setup({ clientDaily: 1, dailyLimit: 5, perMinute: 1000, counterPath: file });
+  t.after(s.close);
+  const r = await s.post(ask(), ipOf("192.0.2.5"));
+  assert.equal(r.status, 200, "dünün sayacı bugünü etkilemez");
+  await r.text();
+  const h = await (await fetch(`${s.base}/health`)).json();
+  assert.equal(h.today.count, 1);
+  assert.equal(h.today.clientLimit, 1);
+  // bir sonraki yenilenme yerel gece yarısı: TR saatiyle 00:00 = UTC 21:00
+  assert.match(h.today.resetAt, /T21:00:00\.000Z$/);
+});

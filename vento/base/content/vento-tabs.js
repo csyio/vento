@@ -9,7 +9,12 @@
 var Vento = (window.Vento = window.Vento || {});
 
 const SYSTEM_PRINCIPAL = Services.scriptSecurityManager.getSystemPrincipal();
-const SEARCH_URL = "https://duckduckgo.com/?q=";
+// Arama motorları (Özelleştir ▸ Arama motoru; tercih: vento.search.engine). Yeni motor eklemek için yalnız buraya satır ekle.
+const SEARCH_ENGINES = {
+  duckduckgo: "https://duckduckgo.com/?q=",
+  google: "https://www.google.com/search?q=",
+};
+const searchBase = () => SEARCH_ENGINES[Services.prefs.getStringPref("vento.search.engine", "duckduckgo")] ?? SEARCH_ENGINES.duckduckgo;
 
 /** VENTO_TRACE=<dosya> verilirse her adımı oraya yazar (stdout'a güvenilmez). */
 Vento.trace = (() => {
@@ -41,11 +46,15 @@ Vento.resolveInput = function resolveInput(raw) {
     const local = /^(localhost|\d{1,3}(?:\.\d{1,3}){3}|\[)/i.test(text);
     return `${local ? "http" : "https"}://${text}`;
   }
-  return SEARCH_URL + encodeURIComponent(text);
+  return searchBase() + encodeURIComponent(text);
 };
 
+/** Metni geçerli arama motorunda arayan adres (adres gibi görünse de arar). */
+Vento.searchURL = text => searchBase() + encodeURIComponent(text);
+Vento.SEARCH_ENGINES = SEARCH_ENGINES;
+
 /** Girdi bir adres değil, arama/soru metni mi? (çubuktaki "Ara / Esin'e sor" önerisi için) */
-Vento.isSearchText = text => Vento.resolveInput(text)?.startsWith(SEARCH_URL) ?? false;
+Vento.isSearchText = text => Vento.resolveInput(text)?.startsWith(searchBase()) ?? false;
 
 /** Çubukta gösterilecek kısa biçim: alan adı + yol. */
 Vento.formatDisplay = function formatDisplay(url) {
@@ -101,7 +110,7 @@ class VentoTab {
   }
 
   get label() {
-    return this.title || this.host || "Yeni sekme";
+    return this.title || this.host || Vento.l10n.t("tab-new");
   }
 }
 
