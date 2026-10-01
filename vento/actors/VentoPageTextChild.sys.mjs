@@ -1,10 +1,10 @@
-// Sayfa metni çıkarma aktörü (içerik süreci tarafı).
+// Page text extraction actor (content process side).
 //
-// Firefox'un PageExtractor'ı ile AYNI modülleri kullanır (Reader modu ile gürültü temizleme +
-// DOMExtractor) ama waitForPageReady()'yi atlar: o, requestIdleCallback + çift requestAnimationFrame
-// bekler; arka plandaki sekmelerde çizim durduğu için bu 2–7 sn sürer. Çoklu sekme bağlamında
-// (arka plan sekmeleri) kabul edilemez. Sayfa zaten yüklenmiş ("Esin'e sor" anında) olduğundan
-// beklemeye gerek yok.
+// Uses the SAME modules as Firefox's PageExtractor (Reader mode for noise removal +
+// DOMExtractor) but skips waitForPageReady(): that waits for requestIdleCallback + a double
+// requestAnimationFrame, and since painting stops in background tabs it takes 2-7 s. That's
+// unacceptable with multiple tabs (background tabs). The page is already loaded (at the moment of
+// "Ask Esin"), so there's no need to wait.
 
 import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
 
@@ -35,7 +35,7 @@ export class VentoPageTextChild extends JSWindowActorChild {
         }
       }
     } catch (e) {
-      // Reader modu başarısızsa ham sayfadan devam et
+      // If Reader mode fails, fall back to the raw page
       document = window.document;
       rootNode = document.body;
     }

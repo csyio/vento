@@ -1,7 +1,7 @@
 "use strict";
 
-// Vento arayüzü: sekme şeridi, gezinme, akıllı çubuk, sahne durumu.
-// Yalnızca Vento.tabs modelinin olaylarını dinler; motora doğrudan dokunmaz.
+// Vento UI: tab strip, navigation, smart bar, stage state.
+// Only listens to Vento.tabs model events; never touches the engine directly.
 
 Vento.ui = (() => {
   const SVG = "http://www.w3.org/2000/svg";
@@ -23,8 +23,8 @@ Vento.ui = (() => {
     return m ? m[0] : "V";
   }
 
-  // Simge varsa <img>, yoksa (ya da yüklenemezse) harf işareti. Simge değişmedikçe öğe yeniden kurulmaz (titremesin).
-  // Boş sekmenin (yeni sekme) simgesi: Ebabil'in başı (sitenin kendi simgesi yok)
+  // <img> if there is an icon, otherwise (or if it fails to load) a letter mark. The element isn't rebuilt unless the icon changes (no flicker).
+  // Icon of a blank tab (new tab): Ebabil's head (the site has no icon of its own)
   const BLANK_ICON = "chrome://vento/content/art/pose-icon.webp";
 
   function setMark(mark, tab) {
@@ -102,9 +102,9 @@ Vento.ui = (() => {
     el.title = tab.label;
   }
 
-  // ---- Sekme hareketi --------------------------------------------------------------------------
-  // Açılırken yerinde genişleyip belirir; kapanırken kopyası (hayalet) daralıp solar. Açılışta (booting) hareket yok.
-  // Genişlik animasyonu yerleşimi etkiler ama yalnız 30 px'lik sekme şeridinde; sayfa yeniden boyutlanmaz.
+  // ---- Tab motion --------------------------------------------------------------------------
+  // On open it expands in place and fades in; on close its copy (ghost) shrinks and fades. No motion on startup (booting).
+  // The width animation affects layout but only in the 30 px tab strip; the page isn't resized.
   const TAB_IN_MS = 200;
   const TAB_OUT_MS = 170;
   const ghosts = []; // {el, index, started}
@@ -145,7 +145,7 @@ Vento.ui = (() => {
     const frames = Vento.motion.reduced ? [{ opacity: 1 }, { opacity: 0 }] : [{}, COLLAPSED];
     const a = g.el.animate(frames, { duration: Vento.motion.reduced ? 90 : TAB_OUT_MS, easing: "cubic-bezier(0.4, 0, 1, 1)", fill: "forwards" });
     a.finished.then(done, done);
-    setTimeout(done, TAB_OUT_MS + 200); // güvence: hayalet asla kalıcı takılmaz
+    setTimeout(done, TAB_OUT_MS + 200); // safety net: a ghost never gets stuck for good
   }
 
   function renderTabs() {
@@ -174,7 +174,7 @@ Vento.ui = (() => {
     ghosts.filter(g => !g.started).forEach(startGhost);
   }
 
-  /** Çubuğun değeri: odakta tam adres, değilse kısa biçim. */
+  /** The bar's value: full URL when focused, short form otherwise. */
   function refreshBar() {
     const tab = Vento.tabs.selected;
     if (!tab || document.activeElement === els.input) {
@@ -196,7 +196,7 @@ Vento.ui = (() => {
     refreshBar();
   }
 
-  // ---- Öneriler: adres olmayan metin için "Esin'e sor / Ara" -----------------------------
+  // ---- Suggestions: "Ask Esin / Search" for text that is not a URL -----------------------------
   let suggestIndex = 0;
 
   function suggestVisible() {
@@ -208,7 +208,7 @@ Vento.ui = (() => {
     els.rows.forEach((r, k) => r.toggleAttribute("selected", k === suggestIndex));
   }
 
-  // Esin kapalıysa "Esin'e sor" satırı hiç yoktur (varsayılan seçim "Ara" olur)
+  // If Esin is off, the "Ask Esin" row is absent (the default choice becomes "Search")
   const liveRows = () => [...els.suggest.querySelectorAll(".suggest-row")].filter(r => Vento.esin.enabled || r.dataset.kind !== "esin");
 
   function updateSuggest() {
@@ -216,9 +216,9 @@ Vento.ui = (() => {
     const text = els.input.value.trim();
     const show = document.activeElement === els.input && !!text && Vento.isSearchText(text);
     if (!show) {
-      hideSuggest(); // seçimi de sıfırlar: sonraki açılışta varsayılan yine "Esin'e sor"
+      hideSuggest(); // also resets the selection: next open defaults to "Ask Esin" again
     } else {
-      // Liste yeniden (ya da çıkarken tekrar) göründüğünde seçim sıfırlanır: varsayılan yine "Esin'e sor"
+      // The selection resets when the list shows again (or again while exiting): the default is "Ask Esin" again
       if (!Vento.motion.isShown(els.suggest)) {
         els.rows.forEach(r => r.removeAttribute("selected"));
       }
@@ -227,13 +227,13 @@ Vento.ui = (() => {
     if (show) {
       els.rows.forEach(r => (r.querySelector(".suggest-text").textContent = text));
       if (!els.rows.some(r => r.hasAttribute("selected"))) {
-        selectSuggest(0); // varsayılan: Esin
+        selectSuggest(0); // default: Esin
       }
     }
   }
 
   function hideSuggest() {
-    // Seçim, çıkış animasyonu BİTİNCE sıfırlanır (solarken vurgu kaybolup titremesin); bu arada yeniden açıldıysa dokunulmaz.
+    // The selection is reset when the exit animation ENDS (so the highlight doesn't vanish and flicker while fading); untouched if it reopened meanwhile.
     Vento.motion.hide(els.suggest, "drop").then(() => {
       if (els.suggest.hidden) {
         els.rows.forEach(r => r.removeAttribute("selected"));
@@ -257,7 +257,7 @@ Vento.ui = (() => {
     }
   }
 
-  /** Odakta çubuk tam adresi gösterir. Değeri odak olayına bırakmayız: pencere etkin değilken tetiklenmez. */
+  /** When focused the bar shows the full URL. We don't leave the value to the focus event: it doesn't fire while the window is inactive. */
   function showFullUrl() {
     const tab = Vento.tabs.selected;
     els.input.value = tab && !tab.blank ? tab.url : "";
@@ -274,7 +274,7 @@ Vento.ui = (() => {
   }
 
   function init() {
-    // Açılışta (oturum geri yükleme dahil) sekme animasyonu yok; kısa süre sonra açılır.
+    // No tab animation on startup (including session restore); it turns on shortly after.
     document.documentElement.setAttribute("booting", "");
     setTimeout(() => document.documentElement.removeAttribute("booting"), 900);
     Object.assign(els, {
@@ -323,7 +323,7 @@ Vento.ui = (() => {
     });
     els.input.addEventListener("input", updateSuggest);
     els.rows.forEach(row => {
-      // mousedown'da odağı çubukta tut, yoksa blur önce öneriyi gizler ve tıklama kaybolur
+      // keep focus on the bar on mousedown, otherwise blur hides the suggestion first and the click is lost
       row.addEventListener("mousedown", e => e.preventDefault());
       row.addEventListener("mouseenter", () => selectSuggest(Math.max(0, els.rows.indexOf(row))));
       row.addEventListener("click", () => runSuggest(row.dataset.kind));

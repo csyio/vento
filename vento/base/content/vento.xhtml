@@ -33,7 +33,7 @@
 </head>
 <body>
 
-  <!-- Komutlar ve kısayollar: macOS yerel menüsü bunlardan kurulur. -->
+  <!-- Commands and shortcuts: the macOS native menu is built from these. -->
   <xul:commandset id="vento-commands">
     <xul:command id="cmd_newTab"/>
     <xul:command id="cmd_closeTab"/>
@@ -87,12 +87,12 @@
     <xul:key id="key_quit" key="q" modifiers="accel" command="cmd_quit"/>
   </xul:keyset>
 
-  <!-- Sayfa sağ tık menüsü: içeriği vento-menu.js dinamik kurar. -->
+  <!-- Page context menu: vento-menu.js builds its contents dynamically. -->
   <xul:popupset>
     <xul:menupopup id="page-context-menu"/>
   </xul:popupset>
 
-  <!-- Yerel menü kaynağı (ekranda görünmez). -->
+  <!-- Native menu source (not visible on screen). -->
   <div id="vento-menus">
     <xul:toolbox>
       <xul:toolbar type="menubar" id="toolbar-menubar">
@@ -152,9 +152,9 @@
     </xul:toolbox>
   </div>
 
-  <!-- Sekme şeridi -->
+  <!-- Tab strip -->
   <div id="tabstrip">
-    <!-- macOS trafik ışıkları bu kutunun içine yerleştirilir (boş kutu; boyutunu tema verir). -->
+    <!-- The macOS traffic lights are placed inside this box (empty box; the theme sets its size). -->
     <div class="titlebar-buttonbox"></div>
     <div id="tabs"></div>
     <button id="newtab" data-l10n-id="tip-new-tab">
@@ -162,7 +162,7 @@
     </button>
   </div>
 
-  <!-- Araç çubuğu: gezinme + akıllı çubuk -->
+  <!-- Toolbar: navigation + smart bar -->
   <div id="toolbar">
     <button id="nav-back" class="nav" data-l10n-id="tip-back" disabled="true">
       <svg:svg viewBox="0 0 16 16"><svg:path d="M10 3.5 5.5 8l4.5 4.5"/></svg:svg>
@@ -201,7 +201,7 @@
     </button>
   </div>
 
-  <!-- Çalışma alanı: sayfa kartı + Esin paneli -->
+  <!-- Workspace: page card + Esin panel -->
   <div id="workspace">
     <div id="stage">
       <div id="gust"></div>
@@ -215,7 +215,7 @@
       </div>
       <div id="start">
         <div id="start-wall" aria-hidden="true"></div>
-        <!-- Ebabil (maskot): dört katman toplamsal karışımla üst üste; kanat/kuyruk ayrı döner (tools/make-ebabil.py) -->
+        <!-- Ebabil (mascot): four layers stacked with additive blending; wings/tail rotate separately (tools/make-ebabil.py) -->
         <div id="ebabil" aria-hidden="true">
           <div id="ebabil-glow"></div>
           <svg id="ebabil-wind" viewBox="0 0 320 240" preserveAspectRatio="none">
@@ -312,7 +312,7 @@
           <button data-q-id="esin-q-keypoints" data-l10n-id="esin-q-keypoints-label"></button>
           <button data-q-id="esin-q-simple" data-l10n-id="esin-q-simple-label"></button>
           <div id="esin-thanks">
-            <!-- LLMTR resmi logosu: DEĞİŞTİRİLMEZ; markanın kendi kart rengi ve çevresinde ≥ %50 logo yüksekliği boşluk (site/src/parts.mjs ile aynı) -->
+            <!-- LLMTR official logo: DO NOT MODIFY; the brand's own card color and padding of at least 50% of the logo height around it (same as site/src/parts.mjs) -->
             <div id="esin-llmtr" role="link" tabindex="0" data-l10n-id="esin-llmtr-open">
               <picture>
                 <source media="(prefers-color-scheme: dark)" srcset="chrome://vento/content/esin/llmtr-on-dark.svg"/>
@@ -342,7 +342,7 @@
   </div>
 
 
-  <!-- İlk açılış (karşılama): tam pencere katman; adımlar vento-welcome.js'te -->
+  <!-- First launch (welcome): full-window layer; the steps are in vento-welcome.js -->
   <div id="welcome" hidden="true" role="dialog" aria-modal="true" aria-labelledby="w-title-lang">
     <button id="w-skip" data-l10n-id="w-skip"></button>
     <div id="w-card">

@@ -1,6 +1,7 @@
-// Kamera/mikrofon (getUserMedia) — süreç düzeyi. İçerik sürecinde "getUserMedia:request" bildirimini dinler
-// ve isteği ilgili pencerenin VentoMedia aktörüne verir. Firefox'ta bunu browser/'ın BrowserProcessChild'ı yapar;
-// bizde kimse dinlemediği için site kamera isteyince cevap sonsuza kadar askıda kalıyordu.
+// Camera/microphone (getUserMedia), process level. Listens for the "getUserMedia:request" notification in the
+// content process and hands the request to the VentoMedia actor of the right window. In Firefox, browser/'s
+// BrowserProcessChild does this; nobody was listening here, so when a site asked for the camera the
+// request hung forever.
 
 export class VentoMediaProcessChild extends JSProcessActorChild {
   observe(subject, topic) {
@@ -12,7 +13,7 @@ export class VentoMediaProcessChild extends JSProcessActorChild {
       const win = Services.wm.getOuterWindowWithId(subject.windowID);
       actor = win?.windowGlobalChild?.getActor("VentoMedia");
     } catch (e) {
-      // pencere gitmiş olabilir
+      // the window may be gone
     }
     if (actor) {
       actor.gum(subject);

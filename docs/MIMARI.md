@@ -1,82 +1,82 @@
-# Vento — mimari kararlar (2026-09-30)
+# Vento architecture decisions (2026-09-30)
 
-Eski tarayıcı (`~/Desktop/csy-browser`) Firefox'un `browser.xhtml` / `gBrowser` katmanına giydirilmişti.
-Bu yüzden Firefox'un iç davranışları Vento'nun davranışı oldu. Yeni proje bunu tekrarlamaz.
+The old browser (`~/Desktop/csy-browser`) was a skin over Firefox's `browser.xhtml` / `gBrowser` layer.
+That meant Firefox's internal behavior became Vento's behavior. The new project does not repeat this.
 
-## Karar
+## Decision
 
-**Gecko motoru + tamamen kendi kabuk.** Thunderbird (`comm/mail`) modeli: `browser/` derlenmez,
-motor ağacının yanında kendi uygulama dizinimiz (`vento/`) vardır ve `toolkit/` üzerine kurulur.
+**Gecko engine, fully custom shell.** We follow the Thunderbird (`comm/mail`) model. `browser/` is not built.
+Our own application directory (`vento/`) sits next to the engine tree and builds on `toolkit/`.
 
 ```
-engine/          Firefox 153.2.0esr, pristine git ağacı — dokunulmaz, git'e girmez
-vento/           bizim uygulama dizinimiz (engine/vento -> ../vento sembolik bağ)
+engine/          Firefox 153.2.0esr, pristine git tree: never edited, not committed
+vento/           our application directory (engine/vento is a symlink to ../vento)
   moz.configure, confvars.sh, app.mozbuild, moz.build
-  app/           ikili (nsVentoApp.cpp), tercihler (profile/vento.js), macOS paketi
-  base/          pencere/kabuk XHTML + JS (chrome://vento/content/)
-  branding/      ad, ikonlar
+  app/           binary (nsVentoApp.cpp), prefs (profile/vento.js), macOS bundle
+  base/          window/shell XHTML + JS (chrome://vento/content/)
+  branding/      name, icons
 mozconfig        --enable-project=vento, obj-vento
-tools/link.sh    engine/vento bağını kurar
+tools/link.sh    creates the engine/vento link
 ```
 
-## Kurallar
+## Rules
 
-1. Firefox dosyalarına **minimum yama**: yalnızca derleme uyumu için, `patches/NNNN-*.patch` olarak
-   izlenir, `tools/apply-patches.sh` uygular. Arayüz/davranış yaması **asla**. Her şey `vento/` altında.
-2. `browser/` dizinine, `browser.xhtml`'e ve `gBrowser`'a bağımlılık **sıfır**.
-3. Motor ile arayüz arasında tek ince katman (sekme/oturum modeli bizim).
-4. Surfer yok. Düz `mach`. Firefox sürümü sabit, yükseltme bilinçli.
-5. İlk günden otomatik test.
-6. Dikey dilim: önce ince uçtan uca çekirdek, sonra özellik.
+1. Patch Firefox files as little as possible, and only for build compatibility. Patches are tracked as
+   `patches/NNNN-*.patch` and applied by `tools/apply-patches.sh`. Never patch UI or behavior. All of that lives under `vento/`.
+2. Zero dependency on the `browser/` directory, `browser.xhtml` and `gBrowser`.
+3. One thin layer between the engine and the UI (the tab/session model is ours).
+4. No Surfer. Plain `mach`. The Firefox version is pinned and upgrades are deliberate.
+5. Automated tests from day one.
+6. Vertical slice: a thin end-to-end core first, features after.
 
-## Pencere nasıl açılıyor
+## How the window opens
 
-`toolkit/components/DefaultCLH.sys.mjs` → `toolkit.defaultChromeURI` tercihi
-(`vento/app/profile/vento.js`) → `chrome://vento/content/vento.xhtml`. Firefox tarayıcı kodu yok.
+`toolkit/components/DefaultCLH.sys.mjs` reads the `toolkit.defaultChromeURI` pref
+(`vento/app/profile/vento.js`), which points to `chrome://vento/content/vento.xhtml`. There is no Firefox browser code in the path.
 
-## Toolkit'te hazır olanlar (browser/ dışında)
+## What toolkit already provides (outside browser/)
 
-places, downloads, sessionstore (C++ çekirdeği), extensions, prompts, search, contextualidentity,
-find, printing, **pageextractor, ml, translations** (Esin için sayfa metni/yapısı ve yerel model).
+places, downloads, sessionstore (C++ core), extensions, prompts, search, contextualidentity,
+find, printing, and **pageextractor, ml, translations** (page text/structure and a local model for Esin).
 
-## İlk sürüm kapsamı
+## First release scope
 
-Yatay çoklu sekme, adres çubuğu, **Esin** (sayfayı okuyup özetleme/soru cevaplama +
-çoklu sekme bağlamı), oturum geri yükleme, indirme, izinler.
-Sonraya: sayfada işlem yapma (form/tıklama), workspaces, split view, glance, konteynerler.
-Arayüz düzeni bilerek açık: "her şey bize özel" — dikey sekme yok, Firefox/Zen/Arc kalıbı yok.
+Horizontal multi-tab, address bar, **Esin** (reads the page to summarize and answer questions, with
+multi-tab context), session restore, downloads, permissions.
+Later: acting on the page (forms/clicks), workspaces, split view, glance, containers.
+The UI layout is deliberately open: everything is ours. No vertical tabs, and no Firefox/Zen/Arc pattern.
 
-## Sıra
+## Order of work
 
-1. ~~Spike~~ ✅ **tamam (2026-09-30):** `VentoStartup` pencereyi açtı, uzak içerik (`webIsolated`) example.com'u yükledi.
-2. Bir sekme + adres çubuğu, 3. yatay çoklu sekme, 4. Esin paneli (LLMTR), 5. oturum/indirme/izin.
+1. ~~Spike~~ ✅ **done (2026-09-30):** `VentoStartup` opened the window and remote content (`webIsolated`) loaded example.com.
+2. One tab and an address bar. 3. Horizontal multi-tab. 4. Esin panel (LLMTR). 5. Session/downloads/permissions.
 
-## Spike bulguları (2026-09-30)
+## Spike findings (2026-09-30)
 
-Toolkit'in `browser/`'a sert bağımlılığı **yok** — ama her Gecko uygulamasının sağlaması gereken iki şey çıktı:
+Toolkit has **no** hard dependency on `browser/`. Two things came up that every Gecko app has to provide:
 
-- `nsIShellService.h`: `widget/cocoa/nsMenuBarX.mm` koşulsuz include eder. Çözüm: kendi
-  `vento/components/shell/nsIShellService.idl` (yama gerekmedi; Thunderbird da böyle).
-- `services/settings/dumps/gen_last_modified.py`: derleme uygulaması adı sabit izin listesinde
-  (`browser`, `mobile/*`, `comm/*`). Çözüm: `patches/0001` (3 satır, `"vento"` eklendi).
+- `nsIShellService.h`: `widget/cocoa/nsMenuBarX.mm` includes it unconditionally. Fix: our own
+  `vento/components/shell/nsIShellService.idl` (no patch needed; Thunderbird does the same).
+- `services/settings/dumps/gen_last_modified.py`: the build app name is on a hardcoded allow list
+  (`browser`, `mobile/*`, `comm/*`). Fix: `patches/0001` (3 lines, adds `"vento"`).
 
-- Kimlik: `--with-app-basename=Vento` verilmezse `Name=Firefox` olur → gerçek Firefox profil klasörü → sessiz "profil eksik" diyaloğu. Bkz. vault `Knowledge/Vento Gecko Uygulaması Tuzakları.md`.
+- Identity: without `--with-app-basename=Vento` the app gets `Name=Firefox`. That points it at the real Firefox profile folder, and you get a silent "profile missing" dialog. See the maintainer's note `Knowledge/Vento Gecko Uygulaması Tuzakları.md` (kept outside this repo).
 
-Tam derleme ~45 dk (M-serisi, sıfırdan). Sonraki derlemeler artımlı.
+A full build from scratch takes about 45 minutes (M-series). Later builds are incremental.
 
-## Esin (asistan) mimarisi
+## Esin (assistant) architecture
 
-- **Panel:** `vento-esin.js` (istemci + panel), `vento-markdown.js` (güvenli çizici: model çıktısı asla HTML
-  olarak yorumlanmaz). Sağlayıcıdan bağımsız: OpenAI uyumlu `/chat/completions` + akış.
-- **Uç nokta:** tercih `vento.esin.endpoint` (varsayılan `https://esin.cansoykanyilmaz.com/v1`, Vento vekili);
-  geliştirme: `VENTO_ESIN_ENDPOINT` ortam değişkeni. **Anahtar tarayıcıda yok**, yalnızca `server/esin-proxy`.
-- **Sayfa metni:** `vento/actors/VentoPageText*` (Reader modu + DOMExtractor, `waitForPageReady` yok → arka plan
-  sekmeleri de ~70 ms). Yalnızca kullanıcı soru gönderince ve sekme bağlamdayken okunur/gönderilir;
-  mesajın altında "host · N karakter" görünür. İlk kullanımda onay kartı (`vento.esin.consented`).
-- **Akıllı çubuk:** adres olmayan metinde altta "Esin'e sor / Ara" (varsayılan Esin, ↑↓, Enter).
-- **Bağlam:** çipler; açık sayfa varsayılan (sekme değişince izler), "+ Sekme" ile en çok 5 sekme (çoklu bağlam).
-- **Test:** `tools/selftest.sh` + `tools/fake-llm.mjs` (66 kontrol); vekil: `server/esin-proxy` `node --test` (11).
+- **Panel:** `vento-esin.js` (client + panel) and `vento-markdown.js` (a safe renderer: model output is never
+  interpreted as HTML). Provider-independent: OpenAI-compatible `/chat/completions` with streaming.
+- **Endpoint:** pref `vento.esin.endpoint` (default `https://esin.cansoykanyilmaz.com/v1`, the Vento proxy).
+  For development, set the `VENTO_ESIN_ENDPOINT` environment variable. **The browser holds no key.** The key lives only in `server/esin-proxy`.
+- **Page text:** `vento/actors/VentoPageText*` (Reader mode + DOMExtractor, no `waitForPageReady`, so background
+  tabs take about 70 ms too). Text is read and sent only when the user submits a question and the tab is in the context.
+  The message shows "host · N characters" underneath. The first use shows a consent card (`vento.esin.consented`).
+- **Smart bar:** when the input is not an address, the bottom shows "Esin'e sor / Ara" ("Ask Esin / Search"). Esin is the default. Arrow keys and Enter work.
+- **Context:** chips. The open page is the default and follows tab switches. "+ Sekme" ("+ Tab") adds up to 5 tabs (multi-tab context).
+- **Tests:** `tools/selftest.sh` + `tools/fake-llm.mjs` (66 checks). Proxy: `node --test` in `server/esin-proxy` (11 tests).
 
-## Tuzaklar (yaşandıkça eklenecek)
+## Pitfalls (added as we hit them)
 
-- `git clean` sembolik bağı siler → `tools/link.sh` yeniden çalıştır (`.git/info/exclude`'da olduğu için normalde silmez).
+- `git clean` deletes the symlink. Run `tools/link.sh` again. It is listed in `.git/info/exclude`, so normally it survives.

@@ -1,24 +1,24 @@
-// Esin vekil sunucusu — LLMTR anahtarını sunucuda tutar; tarayıcı anahtarı hiç görmez.
+// Esin proxy server. Keeps the LLMTR key on the server; the browser never sees it.
 //
-// Ne yapar: POST /v1/chat/completions → LLMTR'ye iletir, Authorization başlığını burada ekler.
-// Ne yapmaz: içerik loglamaz, istemcinin gönderdiği başlıkları/alanları olduğu gibi geçirmez.
+// Does: forwards POST /v1/chat/completions to LLMTR and adds the Authorization header here.
+// Does not: log content, or pass the client's headers/fields through as-is.
 //
-// Sıfır bağımlılık (Node 18+). Test edilebilsin diye başlatma server.mjs'te, mantık burada.
+// No dependencies (Node 18+). Startup lives in server.mjs and the logic here, so it can be tested.
 
 import http from "node:http";
 import fs from "node:fs";
 import { once } from "node:events";
 import crypto from "node:crypto";
 
-/** Yalnızca kotaya dahil modeller. Liste dışı istek sessizce varsayılana düşer. */
+/** Only models covered by the quota. A model outside the list silently falls back to the default. */
 export const MODELS = ["greenpt/gpt-oss-120b-eu", "qwen/qwen3.6-35b-a3b", "qwen/qwen3.6-flash"];
 export const DEFAULT_MODEL = MODELS[0];
 
-// Tek bir isteğin kotayı yiyememesi için sınırlar.
+// Limits so that a single request can't eat the quota.
 export const LIMITS = {
-  maxTokens: 1500, // yanıt tavanı
-  maxBodyBytes: 512 * 1024, // istek gövdesi
-  maxTotalChars: 150_000, // tüm mesajların toplam uzunluğu (~35k jeton)
+  maxTokens: 1500, // response cap
+  maxBodyBytes: 512 * 1024, // request body
+  maxTotalChars: 150_000, // total length of all messages (~35k tokens)
   maxMessages: 40,
 };
 
@@ -39,7 +39,7 @@ function readBody(req, maxBytes) {
     req.on("data", c => {
       size += c.length;
       if (size > maxBytes) {
-        reject(Object.assign(new Error("gövde çok büyük"), { code: "TOO_BIG" }));
+        reject(Object.assign(new Error("body too large"), { code: "TOO_BIG" }));
         req.destroy();
         return;
       }
@@ -50,7 +50,7 @@ function readBody(req, maxBytes) {
   });
 }
 
-/** Yalnızca bilinen alanları yeniden kurar. Geçersizse null. */
+/** Rebuilds the messages from known fields only. Returns null if invalid. */
 export function sanitizeMessages(input) {
   if (!Array.isArray(input) || input.length < 1 || input.length > LIMITS.maxMessages) {
     return null;
@@ -84,16 +84,16 @@ export function createProxy(cfg = {}) {
   const {
     apiKey = "",
     baseUrl = "https://llmtr.com/v1",
-    dailyLimit = 2000, // TÜM kullanıcılar için günlük toplam istek (bütçe koruması); 0 = kapalı
-    clientDaily = 30, // kullanıcı (IP) başına günlük istek kotası; 0 = kapalı
-    dayOffsetHours = 3, // "gün" bu UTC farkına göre döner (3 = Türkiye saati, gün 00:00'da yenilenir)
-    counterPath = "", // boşsa bellekte sayılır
-    perMinute = 20, // IP başına dakikada
-    trustProxyHops = 1, // X-Forwarded-For sonundan kaçıncı adres istemci
+    dailyLimit = 2000, // total requests per day for ALL users (budget guard); 0 = off
+    clientDaily = 30, // daily request quota per user (IP); 0 = off
+    dayOffsetHours = 3, // the "day" rolls over at this UTC offset (3 = Turkey time, resets at 00:00)
+    counterPath = "", // if empty, counts in memory
+    perMinute = 20, // per IP per minute
+    trustProxyHops = 1, // which address from the end of X-Forwarded-For is the client
     log = line => console.log(line),
   } = cfg;
 
-  // ---- IP başına jeton kovası (bellekte) --------------------------------------------------
+  // ---- Per-IP token bucket (in memory) ----------------------------------------------------
   const buckets = new Map();
   function take(ip) {
     const now = Date.now();
@@ -120,13 +120,13 @@ export function createProxy(cfg = {}) {
       .split(",")
       .map(s => s.trim())
       .filter(Boolean);
-    // nginx gelen listenin SONUNA ekler; ilk adres istemci tarafından uydurulabilir.
+    // nginx appends to the END of the incoming list; the first address can be forged by the client.
     return xff[xff.length - trustProxyHops] ?? req.socket.remoteAddress ?? "?";
   }
 
-  // ---- Günlük kota: toplam tavan + kullanıcı (IP) başına kota ----------------------------------
-  // Dosya: { date, count, salt, clients: { <tuzlu özet>: sayı } }. Ham IP diske YAZILMAZ; özet günle birlikte silinir
-  // (tuz kalıcıdır ki yeniden başlatma kotayı sıfırlamasın). Süreçler arası kilit: bkz. withLock.
+  // ---- Daily quota: overall cap + per-user (IP) quota ------------------------------------------
+  // File: { date, count, salt, clients: { <salted hash>: count } }. Raw IPs are NEVER written to disk; the hashes are dropped
+  // with the day (the salt persists so a restart doesn't reset the quota). Cross-process lock: see withLock.
   const MAX_CLIENTS = 100_000;
   const localNow = () => new Date(Date.now() + dayOffsetHours * 3_600_000);
   const today = () => localNow().toISOString().slice(0, 10);
@@ -147,10 +147,10 @@ export function createProxy(cfg = {}) {
         }
         try {
           if (Date.now() - fs.statSync(lock).mtimeMs > 5000) {
-            fs.rmdirSync(lock); // takılı kalmış kilit
+            fs.rmdirSync(lock); // stale lock
           }
         } catch {
-          // başka süreç kaldırdı
+          // another process removed it
         }
         Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
         continue;
@@ -161,7 +161,7 @@ export function createProxy(cfg = {}) {
         fs.rmdirSync(lock);
       }
     }
-    throw new Error("sayaç kilidi alınamadı");
+    throw new Error("could not acquire counter lock");
   }
 
   function load() {
@@ -191,7 +191,7 @@ export function createProxy(cfg = {}) {
   const transact = fn => (counterPath ? withLock(() => fn()) : fn());
   const clientId = (s, ip) => crypto.createHash("sha256").update(`${s.salt}|${ip}`).digest("hex").slice(0, 16);
 
-  /** İstek kabul edilirse { ok:true, limit, remaining }, reddedilirse { ok:false, code:"client"|"global" }. */
+  /** Returns { ok:true, limit, remaining } if the request is admitted, { ok:false, code:"client"|"global" } if rejected. */
   function admit(ip) {
     return transact(() => {
       const s = load();
@@ -210,7 +210,7 @@ export function createProxy(cfg = {}) {
     });
   }
 
-  /** Sağlayıcıya hiç ulaşılamadıysa hakkı geri verir (kullanıcının suçu değil). */
+  /** Gives the quota back if the provider was never reached (not the user's fault). */
   function refund(ip) {
     transact(() => {
       const s = load();
@@ -223,7 +223,7 @@ export function createProxy(cfg = {}) {
     });
   }
 
-  // ---- Uç noktalar ------------------------------------------------------------------------------
+  // ---- Endpoints --------------------------------------------------------------------------------
   async function chat(req, res) {
     const started = Date.now();
     let status = 0;
@@ -275,7 +275,7 @@ export function createProxy(cfg = {}) {
     const payload = buildPayload(body, messages);
     model = payload.model;
 
-    // İstemci bağlantıyı kapatırsa ("durdur") upstream'i de iptal et; yoksa jeton yanmaya devam eder.
+    // If the client closes the connection ("stop"), abort the upstream request too; otherwise tokens keep burning.
     const ac = new AbortController();
     res.on("close", () => {
       if (!res.writableEnded) {
@@ -301,7 +301,7 @@ export function createProxy(cfg = {}) {
     }
 
     if (!up.ok) {
-      // Sağlayıcının ham hatasını (anahtar/adres ipuçları) istemciye sızdırma.
+      // Don't leak the provider's raw error (key/address hints) to the client.
       status = up.status === 429 ? 429 : 502;
       refund(ip);
       await up.body?.cancel().catch(() => {});
@@ -324,7 +324,7 @@ export function createProxy(cfg = {}) {
         }
       }
     } catch {
-      // iptal ya da upstream koptu; aşağıda kapanır
+      // aborted, or the upstream dropped; closed below
     } finally {
       res.end();
     }

@@ -1,15 +1,15 @@
-// Başlatıcı (Plesk "Application Startup File"). Mantık app.mjs'te; burası yalnızca ortamı okur.
+// Launcher (Plesk "Application Startup File"). The logic is in app.mjs; this file only reads the environment.
 //
-// Ortam değişkenleri:
-//   LLMTR_API_KEY     (zorunlu — yoksa /v1 istekleri 503 döner, /health "configured:false")
-//   LLMTR_BASE_URL    varsayılan https://llmtr.com/v1
-//   ESIN_DAILY_LIMIT  tüm kullanıcılar için günlük toplam istek, varsayılan 2000 (0 = kapalı)
-//   ESIN_CLIENT_DAILY kullanıcı (IP) başına günlük istek kotası, varsayılan 30 (0 = kapalı)
-//   ESIN_DAY_OFFSET_HOURS  günün döndüğü UTC farkı, varsayılan 3 (Türkiye saati: kota 00:00'da yenilenir)
-//   ESIN_PER_MINUTE   IP başına dakikada istek, varsayılan 20
-//   ESIN_COUNTER_PATH sayaç dosyası, varsayılan bu klasörde esin-daily.json
-//   TRUST_PROXY_HOPS  X-Forwarded-For sonundan kaçıncı adres istemci, varsayılan 1
-//   PORT              Plesk/Passenger kendisi verir; yerelde varsayılan 3111
+// Environment variables:
+//   LLMTR_API_KEY     (required; without it /v1 requests return 503 and /health reports "configured:false")
+//   LLMTR_BASE_URL    default https://llmtr.com/v1
+//   ESIN_DAILY_LIMIT  total requests per day across all users, default 2000 (0 = off)
+//   ESIN_CLIENT_DAILY daily request quota per user (IP), default 30 (0 = off)
+//   ESIN_DAY_OFFSET_HOURS  UTC offset at which the day rolls over, default 3 (Turkey time: the quota resets at 00:00)
+//   ESIN_PER_MINUTE   requests per minute per IP, default 20
+//   ESIN_COUNTER_PATH counter file, default esin-daily.json in this folder
+//   TRUST_PROXY_HOPS  which address from the end of X-Forwarded-For is the client, default 1
+//   PORT              set by Plesk/Passenger; defaults to 3111 locally
 
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -31,5 +31,5 @@ const server = createProxy({
 });
 
 server.listen(num(env.PORT, 3111), () => {
-  console.log(`esin-proxy hazır (anahtar ${env.LLMTR_API_KEY ? "var" : "YOK"})`);
+  console.log(`esin-proxy ready (key ${env.LLMTR_API_KEY ? "set" : "MISSING"})`);
 });

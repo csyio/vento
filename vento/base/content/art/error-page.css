@@ -1,4 +1,4 @@
-/* Vento hata sayfası (about:neterror) süsü: VentoErrorPageChild bu dosyayı ve Ebabil görselini sayfaya ekler. */
+/* Vento error page (about:neterror) decoration: VentoErrorPageChild adds this file and the Ebabil image to the page. */
 .vento-ebabil {
   display: block;
   width: 150px;
@@ -8,7 +8,7 @@
   user-select: none;
   animation: vento-eb-float 4.8s ease-in-out infinite;
 }
-/* Uyuyan Ebabil (çevrimdışı): yavaş nefes alır */
+/* Sleeping Ebabil (offline): breathes slowly */
 [data-vento-pose="idle"] .vento-ebabil {
   width: 170px;
   transform-origin: 50% 92%;

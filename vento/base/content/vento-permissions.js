@@ -1,20 +1,20 @@
 "use strict";
 
-// Site izinleri: konum, bildirim, kamera, mikrofon… Sayfa izin isteyince sayfa kartının sol üstünde bir kart çıkar.
-// Modal DEĞİL (sayfa çalışmaya devam eder). Kart SEKMEYE bağlıdır: arka plan sekmesinin isteği o sekme seçilene
-// kadar görünmez; sekme kapanır ya da başka siteye gidilirse istek reddedilir. İstek asla askıda bırakılmaz.
-// "Hatırla" varsayılan KAPALI (gizlilik öncelikli); işaretlenirse karar izin yöneticisinde kalıcı saklanır.
+// Site permissions: location, notifications, camera, microphone... When a page asks for a permission, a card appears at the top left of the page card.
+// NOT modal (the page keeps running). The card is bound to the TAB: a background tab's request stays hidden until that tab
+// is selected; if the tab closes or navigates to another site, the request is denied. A request is never left hanging.
+// "Remember" is OFF by default (privacy first); if checked, the decision is stored persistently in the permission manager.
 
 Vento.permissions = (() => {
   const $ = id => document.getElementById(id);
   const els = {};
-  /** browser → { current: entry|null, queue: entry[] } */
+  /** browser -> { current: entry|null, queue: entry[] } */
   const perBrowser = new Map();
   const state = { shown: null, autoAnswered: [] };
 
   const PM = Services.perms;
 
-  /** İzin türü → Fluent kimliği ("… şunu yapmak istiyor: <parça>") */
+  /** Permission type -> Fluent id ("... wants to: <part>") */
   const WHAT = {
     geolocation: "perm-geolocation",
     "desktop-notification": "perm-notification",
@@ -50,9 +50,9 @@ Vento.permissions = (() => {
     }
   };
 
-  // ---- Kayıtlı kararlar ---------------------------------------------------------------------------
+  // ---- Stored decisions ---------------------------------------------------------------------------
 
-  /** "allow" | "deny" | null (sormalı) */
+  /** "allow" | "deny" | null (should ask) */
   function saved(principal, kinds) {
     const results = kinds.map(k => PM.testExactPermissionFromPrincipal(principal, k));
     if (results.some(r => r === PM.DENY_ACTION)) {
@@ -64,13 +64,13 @@ Vento.permissions = (() => {
     return null;
   }
 
-  /** "Bu seferlik" verilebilen türler: hatırla işaretli değilse HİÇ saklanmaz (site bir dahaki sefere yine sorar). */
+  /** Types that can be granted "just this once": if remember is unchecked they are NEVER stored (the site asks again next time). */
   const ONE_TIME_KINDS = new Set(["camera", "microphone", "geolocation"]);
 
   /**
-   * Kararı izin yöneticisine yazar. Hatırla işaretliyse kalıcı. Değilse: durum tutan türler (bildirim vb.)
-   * oturum boyunca saklanır — yoksa sayfa Notification.permission'ı "denied" göremez ("default" görür ve
-   * her açılışta yeniden sorar); bir kerelik türler (kamera, mikrofon, konum) saklanmaz.
+   * Writes the decision to the permission manager. Persistent if remember is checked. Otherwise: stateful types (notifications etc.)
+   * are kept for the session, or the page can't see Notification.permission as "denied" (it sees "default" and
+   * asks again on every load); one-shot types (camera, microphone, location) are not stored.
    */
   function store(principal, kinds, allow, permanent) {
     const action = allow ? PM.ALLOW_ACTION : PM.DENY_ACTION;
@@ -83,9 +83,9 @@ Vento.permissions = (() => {
     }
   }
 
-  // ---- İstek girişleri ----------------------------------------------------------------------------
+  // ---- Request entry points ----------------------------------------------------------------------
 
-  /** nsIContentPermissionRequest (konum, bildirim, …) — VentoPermissionPrompt'tan gelir. */
+  /** nsIContentPermissionRequest (location, notifications, ...), comes from VentoPermissionPrompt. */
   function request(req) {
     const browser = req.element;
     const principal = req.principal;
@@ -106,7 +106,7 @@ Vento.permissions = (() => {
     });
   }
 
-  /** Kamera/mikrofon (VentoMediaParent'tan). */
+  /** Camera/microphone (from VentoMediaParent). */
   function requestMedia({ browser, principal, data, actor, respond }) {
     const kinds = [];
     if (data.videoInputDevices.length) {
@@ -133,7 +133,7 @@ Vento.permissions = (() => {
     });
   }
 
-  // ---- Kuyruk ---------------------------------------------------------------------------------------
+  // ---- Queue ---------------------------------------------------------------------------------------
 
   function enqueue(entry) {
     let slot = perBrowser.get(entry.browser);
@@ -163,16 +163,16 @@ Vento.permissions = (() => {
     if (slot && !slot.current && !slot.queue.length) {
       perBrowser.delete(entry.browser);
     }
-    // Görünen kartı sync() kaldırır (kapsayıcı solarken yerinde kalsın); görünmeyen kart hemen gider.
+    // sync() removes the visible card (so it stays in place while the container fades); a hidden card goes immediately.
     if (entry !== state.shown) {
       entry.ui?.card.remove();
     }
     try {
       entry.answer(allow, devices);
     } catch (e) {
-      // Sekme/sayfa gidince istek zaten geçersizdir (cancel() hata verir): beklenen, sessiz geç
+      // When the tab/page is gone the request is already invalid (cancel() throws): expected, skip quietly
       if (!aborted) {
-        Vento.trace(`izin cevabı iletilemedi: ${e}`);
+        Vento.trace(`could not deliver permission answer: ${e}`);
       }
     }
     sync();
@@ -188,7 +188,7 @@ Vento.permissions = (() => {
     }
   }
 
-  // ---- Kart -----------------------------------------------------------------------------------------
+  // ---- Card -----------------------------------------------------------------------------------------
 
   function selectFor(label, devices) {
     const wrap = document.createElement("label");
@@ -282,7 +282,7 @@ Vento.permissions = (() => {
     const old = state.shown?.ui?.card;
     state.shown = entry;
     if (!entry) {
-      // Çıkış: kart, kapsayıcı solarken yerinde kalır; bitince kaldırılır
+      // Exit: the card stays in place while the container fades; removed when it finishes
       state.leaving = old ?? null;
       Vento.motion.hide(els.layer, "drop").then(() => {
         if (!state.shown && state.leaving === old) {
@@ -306,7 +306,7 @@ Vento.permissions = (() => {
     els.layer = $("perm-layer");
     Vento.tabs.addEventListener("tabselect", sync);
     Vento.tabs.addEventListener("tabclose", e => abortWhere(x => x.browser === e.detail.tab.browser));
-    // Başka siteye gidildiyse eski sitenin bekleyen istekleri reddedilir
+    // If we navigated to another site, the old site's pending requests are denied
     Vento.tabs.addEventListener("tabchange", e => {
       let origin = "";
       try {

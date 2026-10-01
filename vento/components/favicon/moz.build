@@ -1,4 +1,4 @@
-# Firefox'un browser/modules/FaviconLoader.sys.mjs dosyasının aynısı (browser/ dizinine bağımlılık yok kuralı).
+# Identical to Firefox's browser/modules/FaviconLoader.sys.mjs (rule: no dependency on the browser/ directory).
 EXTRA_JS_MODULES += [
     "FaviconLoader.sys.mjs",
 ]

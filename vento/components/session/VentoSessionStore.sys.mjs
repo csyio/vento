@@ -1,15 +1,15 @@
-// Oturum deposu: sekme durumunu profilde `vento-session.json` olarak saklar.
+// Session store: keeps tab state in the profile as `vento-session.json`.
 //
-// Neden pencereden ayrı bir modül: kapanış engelleyicisi (AsyncShutdown) pencere kapandıktan sonra çalışır;
-// pencerenin küresel nesnesinde bekleyen promise'ler o zaman hiç çözülmez → uygulama kapanışta takılır.
-// Bu modül pencereden bağımsız yaşar. Pencere yalnız `set()` ile son durumu bildirir.
+// Why a separate module from the window: the shutdown blocker (AsyncShutdown) runs after the window has closed;
+// promises pending on the window's global never resolve by then, so the app hangs on quit.
+// This module lives independently of the window. The window only reports the latest state via `set()`.
 
 import { AsyncShutdown } from "resource://gre/modules/AsyncShutdown.sys.mjs";
 import { setTimeout, clearTimeout } from "resource://gre/modules/Timer.sys.mjs";
 
 const VERSION = 1;
 const SAVE_DELAY = 1500;
-// Yalnız gerçek sayfalar saklanır/geri getirilir (hata sayfası, data:, javascript:, chrome: … asla)
+// Only real pages are saved/restored (never error pages, data:, javascript:, chrome: ...)
 const SAVABLE = /^(https?|file):/i;
 
 const trace = msg => {
@@ -34,7 +34,7 @@ export const VentoSessionStore = new (class {
     return typeof url === "string" && SAVABLE.test(url);
   }
 
-  /** Diskten okur; bozuk/eksikse yedeğe bakar. Süzülmüş geçerli durum ya da null. */
+  /** Reads from disk; if corrupt or missing, tries the backup. Returns the filtered valid state or null. */
   async read() {
     for (const p of [this.#path, this.#path + ".bak"]) {
       try {
@@ -49,19 +49,19 @@ export const VentoSessionStore = new (class {
         }
       } catch (e) {
         if (!DOMException.isInstance(e) || e.name !== "NotFoundError") {
-          trace(`oturum okunamadı (${p}): ${e}`);
+          trace(`could not read session (${p}): ${e}`);
         }
       }
     }
     return null;
   }
 
-  /** Son durumu bildirir ({selected, tabs:[{url,title}]}); kısa gecikmeyle diske yazılır. */
+  /** Reports the latest state ({selected, tabs:[{url,title}]}); written to disk after a short delay. */
   set(state) {
     this.#snapshot = { version: VERSION, selected: state.selected, tabs: state.tabs };
     if (!this.#blockerAdded) {
       this.#blockerAdded = true;
-      AsyncShutdown.profileBeforeChange.addBlocker("Vento: oturum kaydı", () => this.flush());
+      AsyncShutdown.profileBeforeChange.addBlocker("Vento: session save", () => this.flush());
     }
     if (!this.#timer) {
       this.#timer = setTimeout(() => {
@@ -71,7 +71,7 @@ export const VentoSessionStore = new (class {
     }
   }
 
-  /** Bekleyen durumu hemen yazar; yazma bitince çözülür. */
+  /** Writes the pending state immediately; resolves when the write finishes. */
   flush() {
     if (this.#timer) {
       clearTimeout(this.#timer);
@@ -85,10 +85,10 @@ export const VentoSessionStore = new (class {
     if (!state) {
       return this.#writing;
     }
-    // Sıralı yazma; önceki dosya .bak olarak kalır (yazma yarıda kesilirse oradan okunur).
+    // Sequential writes; the previous file is kept as .bak (read from there if a write is interrupted).
     this.#writing = this.#writing
       .then(() => IOUtils.writeJSON(this.#path, state, { tmpPath: this.#path + ".tmp", backupFile: this.#path + ".bak" }))
-      .catch(e => trace(`oturum yazılamadı: ${e}`));
+      .catch(e => trace(`could not write session: ${e}`));
     return this.#writing;
   }
 })();

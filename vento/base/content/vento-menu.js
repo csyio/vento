@@ -1,11 +1,11 @@
 "use strict";
 
-// Sağ tık menüsü (ana süreç tarafı). İçerik aktörü (VentoContextMenuChild) tıklanan yerin verisini yollar;
-// burada önce "ne gösterilecek" bir tarif olarak üretilir (build — test edilebilir), sonra macOS yerel
-// menüsüne (XUL menupopup) çevrilip açılır (render/show).
+// Context menu (main process side). The content actor (VentoContextMenuChild) sends data about the clicked spot;
+// here a recipe of "what to show" is built first (build — testable), then it is turned into a macOS native
+// menu (XUL menupopup) and opened (render/show).
 
 Vento.contextMenu = (() => {
-  const SEP = Symbol("ayırıcı");
+  const SEP = Symbol("separator");
   const state = { dryRun: false, last: null, items: [], copied: null, history: [] };
 
   const shorten = (text, n = 28) => {
@@ -20,7 +20,7 @@ Vento.contextMenu = (() => {
     }
   }
 
-  /** Bağlam verisinden menü tarifi: [{label, run, disabled?, sub?} | SEP]. */
+  /** Menu recipe from context data: [{label, run, disabled?, sub?} | SEP]. */
   function build(data) {
     const L = (id, args) => Vento.l10n.t(id, args);
     const t = Vento.tabs;
@@ -74,7 +74,7 @@ Vento.contextMenu = (() => {
     if (data.selection) {
       const q = data.selection;
       add(L("ctx-search-for", { text: shorten(q) }), () => {
-        // Seçili metin adres gibi görünse bile arama yap (kullanıcı "ara" dedi)
+        // Search even if the selected text looks like a URL (the user said "search")
         t.open(Vento.searchURL(q), { afterCurrent: true });
       });
       add(L("ctx-esin"), null, {
@@ -87,7 +87,7 @@ Vento.contextMenu = (() => {
       sep();
     }
 
-    // Sayfa menüsü: yalnızca özel bir hedef yokken (bağlantı/resim/yazı alanı/seçim değil)
+    // Page menu: only when there is no special target (not a link/image/text field/selection)
     if (!data.linkUrl && !data.imageUrl && !data.mediaUrl && !data.editable && !data.selection) {
       add(L("ctx-back"), () => t.back(), { disabled: !tab?.canGoBack });
       add(L("ctx-forward"), () => t.forward(), { disabled: !tab?.canGoForward });
@@ -136,10 +136,10 @@ Vento.contextMenu = (() => {
     return popup;
   }
 
-  /** İçerik aktöründen gelir. `browser`: tıklanan sekmenin <browser>'ı. */
+  /** Comes from the content actor. `browser`: the <browser> of the clicked tab. */
   function show(browser, data) {
     if (browser !== Vento.tabs.selected?.browser) {
-      return; // yalnızca görünen sekme menü açabilir
+      return; // only the visible tab can open a menu
     }
     data.pageUrl = Vento.tabs.selected?.url ?? "";
     state.last = data;

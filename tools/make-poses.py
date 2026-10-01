@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Ebabil pozlarını (assets/mascot/*.png) uygulama için kırpıp hafifletir → vento/base/content/art/pose-*.webp.
+"""Crops and slims down the Ebabil poses (assets/mascot/*.png) for the app -> vento/base/content/art/pose-*.webp.
 
-Şeffaf alan kırpılır (kenarlarda %3 pay), en uzun kenar 512 px'e indirilir, WebP (alfa korunur).
-Gereksinim: Pillow + numpy (venv). Kullanım: python3 tools/make-poses.py
+Transparent margins are cropped (3% padding), the longest edge is scaled down to 512 px, output is WebP (alpha kept).
+Requires Pillow + numpy (venv). Usage: python3 tools/make-poses.py
 """
 import os
 import numpy as np

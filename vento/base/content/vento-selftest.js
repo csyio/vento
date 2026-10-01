@@ -1,7 +1,7 @@
 "use strict";
 
-// Öz-test: VENTO_SELFTEST=1 ile çalışır. Sonuçlar VENTO_TRACE dosyasına yazılır, sonra çıkılır.
-// Gerçek ağ kullanır (example.com/org/net). `tools/selftest.sh` ile çalıştırılır.
+// Self-test: runs with VENTO_SELFTEST=1. Results are written to the VENTO_TRACE file, then the app quits.
+// Uses the real network (example.com/org/net). Run with `tools/selftest.sh`.
 
 (async () => {
   const PM_test = (principal, type) => Services.perms.testExactPermissionFromPrincipal(principal, type);
@@ -18,29 +18,29 @@
           return true;
         }
       } catch (e) {
-        // koşul henüz hazır değil
+        // condition isn't ready yet
       }
       await new Promise(r => setTimeout(r, 100));
     }
     return false;
   };
 
-  // ===== 2. aşama: aynı profille yeniden açıldı → oturum geri gelmiş olmalı (tools/selftest.sh ikinci kez çalıştırır) =====
+  // ===== Phase 2: reopened with the same profile -> the session should be back (tools/selftest.sh runs it a second time) =====
   if (Services.env.exists("VENTO_SELFTEST_PHASE2")) {
     try {
       const tabs = Vento.tabs;
       const llm = Services.env.get("VENTO_ESIN_ENDPOINT").replace(/\/v1$/, "");
       const u = n => `${llm}/oturum/${n}`;
-      check("yeniden açılış: 3 sekme geri geldi (fazladan boş sekme yok)", tabs.all.length === 3, String(tabs.all.length));
-      check("adresler ve sıra doğru", tabs.all.map(t => t.url).join(" ") === [u("a"), u("b"), u("c")].join(" "), tabs.all.map(t => t.url).join(" "));
-      check("seçili sekme B (kapanışta yazılan son durum)", tabs.selected === tabs.all[1], String(tabs.all.indexOf(tabs.selected)));
-      check("seçili sekme yüklendi, diğerleri bekliyor", !tabs.all[1].pending && !!tabs.all[0].pending && !!tabs.all[2].pending, tabs.all.map(t => t.pending ? "bekliyor" : "yüklü").join(","));
-      check("bekleyen sekmelerde başlık korundu", tabs.all[0].title === "Sayfa A" && tabs.all[2].title === "Sayfa C", tabs.all.map(t => t.title).join("|"));
-      check("seçili sekmenin sayfası gerçekten yüklendi", await wait(() => tabs.all[1].browser.currentURI?.spec === u("b"), 15000), tabs.all[1].browser.currentURI?.spec);
+      check("reopen: 3 tabs came back (no extra blank tab)", tabs.all.length === 3, String(tabs.all.length));
+      check("URLs and order are correct", tabs.all.map(t => t.url).join(" ") === [u("a"), u("b"), u("c")].join(" "), tabs.all.map(t => t.url).join(" "));
+      check("selected tab is B (last state written on quit)", tabs.selected === tabs.all[1], String(tabs.all.indexOf(tabs.selected)));
+      check("selected tab is loaded, the others are pending", !tabs.all[1].pending && !!tabs.all[0].pending && !!tabs.all[2].pending, tabs.all.map(t => t.pending ? "pending" : "loaded").join(","));
+      check("title kept on pending tabs", tabs.all[0].title === "Sayfa A" && tabs.all[2].title === "Sayfa C", tabs.all.map(t => t.title).join("|"));
+      check("selected tab's page actually loaded", await wait(() => tabs.all[1].browser.currentURI?.spec === u("b"), 15000), tabs.all[1].browser.currentURI?.spec);
       tabs.select(tabs.all[0]);
-      check("bekleyen sekmeye geçince sayfa yüklendi", !tabs.all[0].pending && await wait(() => tabs.all[0].browser.currentURI?.spec === u("a"), 15000), tabs.all[0].browser.currentURI?.spec);
+      check("page loaded after switching to a pending tab", !tabs.all[0].pending && await wait(() => tabs.all[0].browser.currentURI?.spec === u("a"), 15000), tabs.all[0].browser.currentURI?.spec);
     } catch (e) {
-      check("2. aşama istisna fırlatmadı", false, String(e) + "\n" + (e.stack || ""));
+      check("phase 2 threw no exception", false, String(e) + "\n" + (e.stack || ""));
     }
     Vento.trace(`ÖZET ${results.filter(Boolean).length}/${results.length} geçti`);
     Services.startup.quit(Ci.nsIAppStartup.eForceQuit);
@@ -50,67 +50,67 @@
   try {
     const tabs = Vento.tabs;
 
-    // -- pencere ve kabuk
-    check("başlangıçta 1 sekme", tabs.all.length === 1, String(tabs.all.length));
-    check("yerel menü kaynağı var", !!document.getElementById("main-menubar"));
-    // Not: özel başlık çubuğunun gerçekten çizildiği başsız modda ölçülemez (outer-inner hep 0).
-    // Yalnızca niteliğin varlığını sınarız; görsel doğrulama gözle yapılır.
-    check("customtitlebar niteliği var", document.documentElement.getAttribute("customtitlebar") === "true");
+    // -- window and shell
+    check("1 tab at startup", tabs.all.length === 1, String(tabs.all.length));
+    check("native menu source exists", !!document.getElementById("main-menubar"));
+    // Note: can't be measured in headless mode, where the custom title bar is really drawn (outer-inner is always 0).
+    // We only test that the attribute exists; visual verification is done by eye.
+    check("customtitlebar attribute exists", document.documentElement.getAttribute("customtitlebar") === "true");
     {
       const bb = document.querySelector(".titlebar-buttonbox").getBoundingClientRect();
-      check("trafik ışıkları kutusu yer kaplıyor", bb.width > 40 && bb.height > 8, `${Math.round(bb.width)}x${Math.round(bb.height)} @${Math.round(bb.left)},${Math.round(bb.top)}`);
+      check("traffic lights box takes up space", bb.width > 40 && bb.height > 8, `${Math.round(bb.width)}x${Math.round(bb.height)} @${Math.round(bb.left)},${Math.round(bb.top)}`);
     }
-    check("boş sekmede başlangıç görünümü", document.getElementById("stage").hasAttribute("blank"));
+    check("start view on a blank tab", document.getElementById("stage").hasAttribute("blank"));
 
-    // -- çözümleme (saf)
-    check("çözümle: alan adı → https", Vento.resolveInput("example.com/x") === "https://example.com/x");
-    check("çözümle: localhost → http", Vento.resolveInput("localhost:3000") === "http://localhost:3000");
-    check("çözümle: arama", Vento.resolveInput("rüzgar nedir") === "https://duckduckgo.com/?q=r%C3%BCzgar%20nedir");
-    check("çözümle: javascript: adres olmaz", !Vento.resolveInput("javascript:alert(1)").startsWith("javascript:"));
-    check("çözümle: chrome: adres olmaz", !Vento.resolveInput("chrome://browser/content/x").startsWith("chrome:"));
+    // -- resolving (pure)
+    check("resolve: domain -> https", Vento.resolveInput("example.com/x") === "https://example.com/x");
+    check("resolve: localhost -> http", Vento.resolveInput("localhost:3000") === "http://localhost:3000");
+    check("resolve: search", Vento.resolveInput("rüzgar nedir") === "https://duckduckgo.com/?q=r%C3%BCzgar%20nedir");
+    check("resolve: javascript: is not a URL", !Vento.resolveInput("javascript:alert(1)").startsWith("javascript:"));
+    check("resolve: chrome: is not a URL", !Vento.resolveInput("chrome://browser/content/x").startsWith("chrome:"));
 
-    // -- gezinme
+    // -- navigation
     const t1 = tabs.selected;
     tabs.navigate(t1, "example.com");
-    check("t1 example.com yüklendi", await wait(() => t1.title === "Example Domain"), t1.title);
-    check("t1 adresi https://example.com/", t1.url === "https://example.com/", t1.url);
-    check("başlangıç görünümü gizlendi", !document.getElementById("stage").hasAttribute("blank"));
+    check("t1 loaded example.com", await wait(() => t1.title === "Example Domain"), t1.title);
+    check("t1 URL is https://example.com/", t1.url === "https://example.com/", t1.url);
+    check("start view hidden", !document.getElementById("stage").hasAttribute("blank"));
 
-    // -- ikinci sekme, yalnız biri görünür
+    // -- second tab, only one is visible
     const t2 = tabs.open("https://example.org");
-    check("t2 seçili", tabs.selected === t2);
-    check("t2 yüklendi", await wait(() => /Example Domain/.test(t2.title)), t2.title);
-    check("t1 gizli / t2 görünür", t1.browser.hasAttribute("hidden-tab") && !t2.browser.hasAttribute("hidden-tab"));
+    check("t2 selected", tabs.selected === t2);
+    check("t2 loaded", await wait(() => /Example Domain/.test(t2.title)), t2.title);
+    check("t1 hidden / t2 visible", t1.browser.hasAttribute("hidden-tab") && !t2.browser.hasAttribute("hidden-tab"));
     tabs.select(t1);
-    check("t1'e dönüldü", tabs.selected === t1 && !t1.browser.hasAttribute("hidden-tab") && t2.browser.hasAttribute("hidden-tab"));
+    check("switched back to t1", tabs.selected === t1 && !t1.browser.hasAttribute("hidden-tab") && t2.browser.hasAttribute("hidden-tab"));
 
-    // -- geri / ileri
-    check("başta geri yok", !t1.canGoBack);
+    // -- back / forward
+    check("no back at first", !t1.canGoBack);
     tabs.navigate(t1, "example.net");
-    check("t1 example.net'e gitti", await wait(() => t1.url.includes("example.net") && !t1.loading), t1.url);
-    check("geri açıldı", await wait(() => t1.canGoBack));
+    check("t1 went to example.net", await wait(() => t1.url.includes("example.net") && !t1.loading), t1.url);
+    check("back became available", await wait(() => t1.canGoBack));
     tabs.back(t1);
-    check("geri döndü", await wait(() => t1.url === "https://example.com/"), t1.url);
-    check("ileri açıldı", await wait(() => t1.canGoForward));
+    check("went back", await wait(() => t1.url === "https://example.com/"), t1.url);
+    check("forward became available", await wait(() => t1.canGoForward));
 
-    // -- window.open / target=_blank yolu
+    // -- window.open / target=_blank path
     const before = tabs.all.length;
     const bc = window.browserDOMWindow.openURI(
       Services.io.newURI("https://example.com/"), null, Ci.nsIBrowserDOMWindow.OPEN_NEWTAB, 0,
       Vento.SYSTEM_PRINCIPAL, null
     );
-    check("browserDOMWindow.openURI yeni sekme açtı", tabs.all.length === before + 1 && !!bc, String(tabs.all.length));
+    check("browserDOMWindow.openURI opened a new tab", tabs.all.length === before + 1 && !!bc, String(tabs.all.length));
     const t3 = tabs.selected;
-    // -- yerleşim: "+" son sekmenin hemen yanında olmalı (sağa kaçmamalı)
+    // -- layout: "+" must sit right next to the last tab (not drift right)
     {
       const r = id => document.getElementById(id).getBoundingClientRect();
       const lastTab = document.getElementById("tabs").lastElementChild.getBoundingClientRect();
       const plus = r("newtab");
       const gap = Math.round(plus.left - lastTab.right);
-      check("+ düğmesi son sekmenin hemen yanında", gap >= 0 && gap < 24,
-        `boşluk=${gap}px; tabs=[${Math.round(r("tabs").left)}..${Math.round(r("tabs").right)}] son=[${Math.round(lastTab.left)}..${Math.round(lastTab.right)}] +=[${Math.round(plus.left)}..${Math.round(plus.right)}] şerit=${Math.round(r("tabstrip").width)}`);
+      check("+ button is right next to the last tab", gap >= 0 && gap < 24,
+        `gap=${gap}px; tabs=[${Math.round(r("tabs").left)}..${Math.round(r("tabs").right)}] last=[${Math.round(lastTab.left)}..${Math.round(lastTab.right)}] +=[${Math.round(plus.left)}..${Math.round(plus.right)}] strip=${Math.round(r("tabstrip").width)}`);
     }
-    // Uzun başlık, kabın doğal genişliğini şişirip "+" düğmesini sağa itmemeli (gerçek pencerede görüldü).
+    // A long title must not inflate the container's natural width and push the "+" button right (seen in a real window).
     {
       const longTitle = "Çok uzun bir sayfa başlığı — muhasebe programınız bulutta çalışır ";
       for (const tab of tabs.all) {
@@ -121,22 +121,22 @@
       const lastTab = document.getElementById("tabs").lastElementChild.getBoundingClientRect();
       const plus = document.getElementById("newtab").getBoundingClientRect();
       const gap = Math.round(plus.left - lastTab.right);
-      check("uzun başlıklarda da + sekmenin hemen yanında", gap >= 0 && gap < 24, `boşluk=${gap}px`);
+      check("+ stays right next to the tab with long titles too", gap >= 0 && gap < 24, `gap=${gap}px`);
     }
-    check("openURI sayfayı yükledi", await wait(() => t3.title === "Example Domain"), t3.title);
+    check("openURI loaded the page", await wait(() => t3.title === "Example Domain"), t3.title);
 
-    // -- kapatma
+    // -- closing
     tabs.close(t3);
     tabs.close(t2);
-    check("kapatınca 1 sekme kaldı", tabs.all.length === 1 && tabs.selected === t1, String(tabs.all.length));
+    check("1 tab left after closing", tabs.all.length === 1 && tabs.selected === t1, String(tabs.all.length));
 
-    // -- akıllı çubuk
+    // -- smart bar
     Vento.ui.focusBar();
-    check("⌘L çubuğa odak verir", document.activeElement === document.getElementById("smartbar-input"));
-    check("odakta tam adres görünür", document.getElementById("smartbar-input").value === "https://example.com/",
+    check("⌘L focuses the bar", document.activeElement === document.getElementById("smartbar-input"));
+    check("full URL shows on focus", document.getElementById("smartbar-input").value === "https://example.com/",
       document.getElementById("smartbar-input").value);
     Vento.ui.focusPage();
-    check("odak sayfaya dönünce kısa biçim", await wait(() => document.getElementById("smartbar-input").value === "example.com"),
+    check("short form when focus returns to the page", await wait(() => document.getElementById("smartbar-input").value === "example.com"),
       document.getElementById("smartbar-input").value);
 
     // ===================== Esin =====================
@@ -149,73 +149,73 @@
       const botText = () => bots().at(-1)?.textContent ?? "";
       const idle = () => !Vento.esin.state.busy;
 
-      // -- panel ve yerleşim
+      // -- panel and layout
       Services.prefs.setBoolPref("vento.esin.consented", false);
       const stageBefore = $("stage").getBoundingClientRect().width;
       Vento.esin.open();
       const er = $("esin").getBoundingClientRect();
       const sr = $("stage").getBoundingClientRect();
-      check("Esin paneli sayfa kartının yanında", er.left >= sr.right - 1 && Math.round(er.width) === 380,
-        `panel=[${Math.round(er.left)}..${Math.round(er.right)}] kart sağı=${Math.round(sr.right)}`);
-      check("panel açılınca kart daraldı", sr.width < stageBefore, `${Math.round(stageBefore)} → ${Math.round(sr.width)}`);
-      check("açılışta açık sayfa bağlama eklendi (1 çip)", $("esin-chips").children.length === 1);
+      check("Esin panel is next to the page card", er.left >= sr.right - 1 && Math.round(er.width) === 380,
+        `panel=[${Math.round(er.left)}..${Math.round(er.right)}] card right=${Math.round(sr.right)}`);
+      check("card narrowed when the panel opened", sr.width < stageBefore, `${Math.round(stageBefore)} → ${Math.round(sr.width)}`);
+      check("open page was added to the context on open (1 chip)", $("esin-chips").children.length === 1);
 
-      // -- onay kapısı: onaysız hiçbir şey gitmemeli
-      check("onay kartı görünür", !$("esin-consent").hidden);
+      // -- consent gate: nothing may be sent without consent
+      check("consent card is visible", !$("esin-consent").hidden);
       Vento.esin.send("Merhaba?");
       await new Promise(r => setTimeout(r, 300));
-      check("onaysız gönderim sağlayıcıya gitmedi", (await reqs()).length === 0);
+      check("unconsented send did not reach the provider", (await reqs()).length === 0);
       $("esin-consent-ok").click();
-      check("onaydan sonra bekleyen soru gitti", await wait(async () => (await reqs()).length === 1));
-      check("cevap akışla geldi", await wait(() => botText().includes("Soru: Merhaba?") && idle()), botText());
+      check("pending question was sent after consent", await wait(async () => (await reqs()).length === 1));
+      check("reply arrived via stream", await wait(() => botText().includes("Soru: Merhaba?") && idle()), botText());
       const r1 = (await reqs())[0];
-      check("istek: sayfa adresi + soru + sistem istemi", r1.urls.join() === "https://example.com/" && r1.question === "Merhaba?" && r1.systemOk, JSON.stringify(r1));
-      check("sayfa metni çıkarıldı ve gönderildi (>200 karakter)", r1.pageChars > 200, `pageChars=${r1.pageChars}`);
-      check("istemci Authorization göndermedi (anahtar sunucuda)", r1.hasAuth === false);
-      check("gönderilen sayfa kullanıcıya gösterildi", document.querySelector(".msg-ctx")?.textContent.includes("example.com"),
+      check("request: page URL + question + system prompt", r1.urls.join() === "https://example.com/" && r1.question === "Merhaba?" && r1.systemOk, JSON.stringify(r1));
+      check("page text was extracted and sent (>200 chars)", r1.pageChars > 200, `pageChars=${r1.pageChars}`);
+      check("client sent no Authorization (key is on the server)", r1.hasAuth === false);
+      check("the sent page was shown to the user", document.querySelector(".msg-ctx")?.textContent.includes("example.com"),
         document.querySelector(".msg-ctx")?.textContent);
 
-      // -- çoklu sekme (c)
+      // -- multiple tabs (c)
       const e2 = tabs.open("https://example.org");
-      check("e2 yüklendi", await wait(() => /Example Domain/.test(e2.title)), e2.title);
-      check("sekme değişince bağlam yeni sayfayı izledi", Vento.esin.state.attached.length === 1 && Vento.esin.state.attached[0] === e2);
-      check("t1 elle eklendi", Vento.esin.attach(t1) === true);
-      check("iki çip var", $("esin-chips").children.length === 2);
+      check("e2 loaded", await wait(() => /Example Domain/.test(e2.title)), e2.title);
+      check("context followed the new page when the tab changed", Vento.esin.state.attached.length === 1 && Vento.esin.state.attached[0] === e2);
+      check("t1 added by hand", Vento.esin.attach(t1) === true);
+      check("two chips exist", $("esin-chips").children.length === 2);
       Vento.esin.send("İkisini karşılaştır");
-      check("çoklu sekmeli cevap geldi", await wait(() => botText().includes("İkisini karşılaştır") && idle()), botText());
+      check("multi-tab reply arrived", await wait(() => botText().includes("İkisini karşılaştır") && idle()), botText());
       const r2 = (await reqs())[1];
-      check("iki sayfa da gitti", r2.urls.length === 2 && r2.urls.includes("https://example.com/") && r2.urls.includes("https://example.org/"), r2.urls.join());
-      check("önceki tur geçmişte (2 mesaj)", r2.historyLen === 2, String(r2.historyLen));
+      check("both pages were sent", r2.urls.length === 2 && r2.urls.includes("https://example.com/") && r2.urls.includes("https://example.org/"), r2.urls.join());
+      check("previous turn is in the history (2 messages)", r2.historyLen === 2, String(r2.historyLen));
 
-      // -- durdurma
+      // -- stopping
       Vento.esin.send("YAVAS bir soru");
-      check("yavaş cevap akmaya başladı", await wait(() => botText().startsWith("Başlıyorum")), botText());
+      check("slow reply started streaming", await wait(() => botText().startsWith("Başlıyorum")), botText());
       Vento.esin.stop();
-      check("durdurunca sağlayıcı bağlantısı kapandı", await wait(async () => (await stats()).aborted >= 1));
-      check("durdurunca meşgul değil", await wait(idle));
-      check("kısmi cevap korundu, 'Durduruldu' notu var", $("esin-thread").textContent.includes("Durduruldu") && botText().startsWith("Başlıyorum"));
+      check("provider connection closed on stop", await wait(async () => (await stats()).aborted >= 1));
+      check("not busy after stop", await wait(idle));
+      check("partial reply kept, 'Durduruldu' note is there", $("esin-thread").textContent.includes("Durduruldu") && botText().startsWith("Başlıyorum"));
 
-      // -- model çıktısı HTML olarak çizilmez
+      // -- model output is not rendered as HTML
       const tHtml = Date.now();
       Vento.esin.send("HTML dene");
-      check("markdown cevabı geldi", await wait(() => idle() && !!bots().at(-1)?.querySelector("strong")), botText());
-      Vento.trace(`TEST bilgi: HTML dene ${Date.now() - tHtml} ms sürdü`);
+      check("markdown reply arrived", await wait(() => idle() && !!bots().at(-1)?.querySelector("strong")), botText());
+      Vento.trace(`TEST info: "HTML dene" took ${Date.now() - tHtml} ms`);
       const body = bots().at(-1);
-      check("HTML etiketleri çizilmedi (b/img yok)", !body.querySelector("b, img") && body.textContent.includes("<b>x</b>"));
-      check("markdown çizildi (strong, code, 2 li)", !!body.querySelector("strong") && !!body.querySelector("code") && body.querySelectorAll("li").length === 2);
+      check("HTML tags were not rendered (no b/img)", !body.querySelector("b, img") && body.textContent.includes("<b>x</b>"));
+      check("markdown was rendered (strong, code, 2 li)", !!body.querySelector("strong") && !!body.querySelector("code") && body.querySelectorAll("li").length === 2);
 
-      // -- bağlamsız soruda sayfa metni GİTMEZ
+      // -- page text is NOT sent for a context-free question
       for (const tab of [...Vento.esin.state.attached]) {
         Vento.esin.detach(tab);
       }
-      check("çipler boşaldı", $("esin-chips").children.length === 0);
+      check("chips are empty", $("esin-chips").children.length === 0);
       Vento.esin.send("Sadece soru");
-      check("bağlamsız cevap geldi", await wait(() => botText().includes("Sadece soru") && idle()), botText());
+      check("context-free reply arrived", await wait(() => botText().includes("Sadece soru") && idle()), botText());
       const rs = await reqs();
       const rn = rs[rs.length - 1];
-      check("bağlamsız istekte sayfa metni gitmedi", rn.urls.length === 0 && rn.pageChars === 0, JSON.stringify(rn));
+      check("no page text was sent in the context-free request", rn.urls.length === 0 && rn.pageChars === 0, JSON.stringify(rn));
 
-      // -- akıllı çubuk önerileri
+      // -- smart bar suggestions
       tabs.close(e2);
       tabs.select(t1);
       const input = $("smartbar-input");
@@ -223,33 +223,33 @@
       input.value = "rüzgar nedir";
       input.dispatchEvent(new Event("input"));
       const rows = [...$("smartbar-suggest").querySelectorAll(".suggest-row")];
-      check("arama metninde öneri listesi çıktı (Esin varsayılan)", !$("smartbar-suggest").hidden && rows.length === 2 && rows[0].hasAttribute("selected") && rows[0].dataset.kind === "esin");
+      check("suggestion list appeared for search text (Esin is the default)", !$("smartbar-suggest").hidden && rows.length === 2 && rows[0].hasAttribute("selected") && rows[0].dataset.kind === "esin");
       input.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
-      check("↓ ile 'Ara' seçildi", rows[1].hasAttribute("selected") && !rows[0].hasAttribute("selected"));
+      check("'Ara' was selected with the down arrow", rows[1].hasAttribute("selected") && !rows[0].hasAttribute("selected"));
       input.value = "example.com";
       input.dispatchEvent(new Event("input"));
-      check("adres yazınca öneri yok (çıkış animasyonu bitince gizli)", await wait(() => $("smartbar-suggest").hidden));
+      check("no suggestions when typing a URL (hidden once the exit animation ends)", await wait(() => $("smartbar-suggest").hidden));
 
-      // -- çubuktan Esin'e sor: açık sayfa bağlam olur
+      // -- ask Esin from the bar: the open page becomes context
       Vento.ui.focusBar();
       input.value = "Bu sayfa nedir?";
       input.dispatchEvent(new Event("input"));
       const before = (await reqs()).length;
       input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-      check("çubuktan sorulan soru Esin'e gitti", await wait(async () => (await reqs()).length === before + 1));
+      check("question asked from the bar went to Esin", await wait(async () => (await reqs()).length === before + 1));
       const rq = (await reqs()).at(-1);
-      check("çubuktan sorulunca açık sayfa bağlamda", rq.question === "Bu sayfa nedir?" && rq.urls.join() === "https://example.com/", JSON.stringify(rq));
-      check("soru gönderilince çubuk sayfanın kısa adresine döndü", input.value === "example.com", input.value);
+      check("open page is in the context when asked from the bar", rq.question === "Bu sayfa nedir?" && rq.urls.join() === "https://example.com/", JSON.stringify(rq));
+      check("bar returned to the page's short URL after the question was sent", input.value === "example.com", input.value);
       await wait(idle);
 
-      // -- yeni sohbet ve kapatma
+      // -- new chat and closing
       Vento.esin.clearChat();
-      check("yeni sohbet mesajları sildi", $("esin-thread").querySelectorAll(".msg").length === 0 && !$("esin-empty").hidden);
+      check("new chat cleared the messages", $("esin-thread").querySelectorAll(".msg").length === 0 && !$("esin-empty").hidden);
       Vento.esin.close();
-      check("panel kapandı, kart eski genişliğe döndü", await wait(() => $("esin").hidden) && Math.abs($("stage").getBoundingClientRect().width - stageBefore) < 2);
+      check("panel closed, card returned to its old width", await wait(() => $("esin").hidden) && Math.abs($("stage").getBoundingClientRect().width - stageBefore) < 2);
     }
 
-    // ===================== Sağ tık menüsü =====================
+    // ===================== Context menu =====================
     {
       const cm = Vento.contextMenu;
       cm.dryRun = true;
@@ -280,16 +280,16 @@
       const tab = tabs.selected;
       const load = h => tab.browser.fixupAndLoadURIString("data:text/html," + encodeURIComponent(h), { triggeringPrincipal: Vento.SYSTEM_PRINCIPAL });
 
-      // -- GÜVENLİK: üretim kaydı yalnızca GERÇEK kullanıcı olaylarını dinler. Sayfa betiği sahte bir
-      //    contextmenu olayı üretip menümüzü açamamalı.
+      // -- SECURITY: the production registration only listens to REAL user events. A page script must not be able to
+      //    open our menu by forging a contextmenu event.
       load(`<meta charset="utf-8"><a id=l href="https://example.com/x">x</a><script>
         setTimeout(() => document.getElementById("l").dispatchEvent(new MouseEvent("contextmenu", {bubbles: true, cancelable: true, composed: true})), 500);
       </script>`);
       await new Promise(r => setTimeout(r, 2000));
-      check("GÜVENLİK: sayfa betiğinin sahte contextmenu olayı menü açmadı", cm.state.history.length === 0, String(cm.state.history.length));
+      check("SECURITY: a forged contextmenu event from a page script did not open the menu", cm.state.history.length === 0, String(cm.state.history.length));
 
-      // Testte gerçek fare olayı üretemiyoruz (windowUtils.sendMouseEvent yok) → aktörü YALNIZCA testte
-      // wantUntrusted ile yeniden kaydeder, gerisini (aynı çocuk/ebeveyn kodu) sınarız.
+      // We can't produce a real mouse event in the test (no windowUtils.sendMouseEvent) -> the actor is re-registered
+      // with wantUntrusted ONLY in the test, and we test the rest (same child/parent code).
       ChromeUtils.unregisterWindowActor("VentoContextMenu");
       ChromeUtils.registerWindowActor("VentoContextMenu", {
         parent: { esModuleURI: "resource:///actors/VentoContextMenuParent.sys.mjs" },
@@ -300,7 +300,7 @@
         allFrames: true,
         messageManagerGroups: ["browsers"],
       });
-      // Aktör modülleri geçerli mi? (yüklenemeyen modül içerikte sessizce ölür)
+      // Are the actor modules valid? (a module that fails to load dies silently in content)
       for (const m of ["VentoContextMenuChild", "VentoContextMenuParent"]) {
         let err = "";
         try {
@@ -308,53 +308,53 @@
         } catch (e) {
           err = String(e);
         }
-        check(`${m} modülü yükleniyor`, !err, err);
+        check(`${m} module loads`, !err, err);
       }
       load(html);
-      check("veri sayfası yüklendi ve betiği çalıştı", await wait(() => /^betik-/.test(tab.title), 10000), `başlık=${tab.title}`);
-      check("6 sağ tık olayı menü verisi üretti", await wait(() => cm.state.history.length >= 6, 15000), String(cm.state.history.length));
-      await new Promise(r => setTimeout(r, 800)); // "own" olayı çoktan işlendi: menü OLUŞMAMALI
-      check("sayfa kendi menüsünü yapıyorsa dokunulmadı (7 olaydan 6 kayıt)", cm.state.history.length === 6, String(cm.state.history.length));
+      check("data page loaded and its script ran", await wait(() => /^betik-/.test(tab.title), 10000), `title=${tab.title}`);
+      check("6 right-click events produced menu data", await wait(() => cm.state.history.length >= 6, 15000), String(cm.state.history.length));
+      await new Promise(r => setTimeout(r, 800)); // the "own" event was already handled: a menu must NOT be built
+      check("left alone when the page makes its own menu (6 records from 7 events)", cm.state.history.length === 6, String(cm.state.history.length));
 
       const labels = h => h.items.map(d => (d === cm.SEP ? "|" : d.label));
       const [link, img, edit, sel, page, pw] = cm.state.history;
       const has = (h, l) => labels(h).includes(l);
 
-      check("bağlantı: adres ve metin toplandı", link.data.linkUrl === "https://example.com/hedef" && link.data.linkText === "bağlantı metni", JSON.stringify(link.data.linkUrl));
-      check("bağlantı menüsü", has(link, "Bağlantıyı Yeni Sekmede Aç") && has(link, "Bağlantı Adresini Kopyala") && !has(link, "Yenile"), labels(link).join(","));
-      check("resim: adres toplandı + menü", img.data.imageUrl.endsWith("/resim.png") && has(img, "Resmi Yeni Sekmede Aç") && has(img, "Resim Adresini Kopyala"), img.data.imageUrl);
-      check("yazı alanı: düzenlenebilir + seçili metin", edit.data.editable === true && edit.data.selection === "merhaba", JSON.stringify(edit.data.selection));
-      check("yazı alanı menüsü (Kes açık, Yapıştır, Tümünü Seç)", has(edit, "Yapıştır") && has(edit, "Tümünü Seç") && edit.items.find(d => d.label === "Kes")?.disabled === false);
-      check("seçili metin: Kopyala + Ara + Esin alt menüsü", sel.data.selection === "Bu bir seçilecek metindir" && has(sel, "Kopyala") &&
+      check("link: URL and text were collected", link.data.linkUrl === "https://example.com/hedef" && link.data.linkText === "bağlantı metni", JSON.stringify(link.data.linkUrl));
+      check("link menu", has(link, "Bağlantıyı Yeni Sekmede Aç") && has(link, "Bağlantı Adresini Kopyala") && !has(link, "Yenile"), labels(link).join(","));
+      check("image: URL was collected + menu", img.data.imageUrl.endsWith("/resim.png") && has(img, "Resmi Yeni Sekmede Aç") && has(img, "Resim Adresini Kopyala"), img.data.imageUrl);
+      check("text field: editable + selected text", edit.data.editable === true && edit.data.selection === "merhaba", JSON.stringify(edit.data.selection));
+      check("text field menu (Cut enabled, Paste, Select All)", has(edit, "Yapıştır") && has(edit, "Tümünü Seç") && edit.items.find(d => d.label === "Kes")?.disabled === false);
+      check("selected text: Copy + Search + Esin submenu", sel.data.selection === "Bu bir seçilecek metindir" && has(sel, "Kopyala") &&
         labels(sel).some(l => l.endsWith("için Ara")) && sel.items.find(d => d.label === "Esin")?.sub?.length === 3 && !has(sel, "Kes"), labels(sel).join(","));
-      check("boş sayfa: gezinme + adres + Esin + kaynak", has(page, "Yenile") && has(page, "Sayfa Adresini Kopyala") && has(page, "Sayfayı Esin ile Özetle") && has(page, "Sayfa Kaynağını Göster"), labels(page).join(","));
-      check("menü ayırıcı ile başlayıp bitmiyor", cm.state.history.every(h => h.items[0] !== cm.SEP && h.items.at(-1) !== cm.SEP));
-      check("ekran konumu cihaz pikseline çevrildi", link.data.screenXDevPx > 0 && link.data.screenYDevPx > 0);
-      check("şifre alanı: düzenlenebilir ama seçili metin GÖNDERİLMEDİ", pw.data.editable === true && pw.data.password === true && pw.data.selection === "", JSON.stringify(pw.data.selection));
-      check("şifre alanı menüsünde Esin/Ara yok", !labels(pw).some(l => l === "Esin" || l.endsWith("için Ara")), labels(pw).join(","));
+      check("blank page: navigation + URL + Esin + source", has(page, "Yenile") && has(page, "Sayfa Adresini Kopyala") && has(page, "Sayfayı Esin ile Özetle") && has(page, "Sayfa Kaynağını Göster"), labels(page).join(","));
+      check("menu doesn't start or end with a separator", cm.state.history.every(h => h.items[0] !== cm.SEP && h.items.at(-1) !== cm.SEP));
+      check("screen position was converted to device pixels", link.data.screenXDevPx > 0 && link.data.screenYDevPx > 0);
+      check("password field: editable but the selected text was NOT sent", pw.data.editable === true && pw.data.password === true && pw.data.selection === "", JSON.stringify(pw.data.selection));
+      check("no Esin/Search in the password field menu", !labels(pw).some(l => l === "Esin" || l.endsWith("için Ara")), labels(pw).join(","));
 
-      // -- eylemler
+      // -- actions
       const run = (h, label) => h.items.find(d => d.label === label).run();
       const nBefore = tabs.all.length;
       const selBefore = tabs.selected;
       run(link, "Bağlantıyı Yeni Sekmede Aç");
-      check("bağlantı arka planda yeni sekmede açıldı", tabs.all.length === nBefore + 1 && tabs.selected === selBefore);
+      check("link opened in a new background tab", tabs.all.length === nBefore + 1 && tabs.selected === selBefore);
       tabs.close(tabs.all.at(-1));
       tabs.select(selBefore);
       run(link, "Bağlantı Adresini Kopyala");
-      check("bağlantı adresi kopyalandı", cm.state.copied === "https://example.com/hedef");
+      check("link URL was copied", cm.state.copied === "https://example.com/hedef");
       run(sel, "Kopyala");
-      check("seçili metin kopyalandı", cm.state.copied === "Bu bir seçilecek metindir");
+      check("selected text was copied", cm.state.copied === "Bu bir seçilecek metindir");
       const before = (await reqs()).length;
       sel.items.find(d => d.label === "Esin").sub.find(d => d.label === "Özetle").run();
-      check("Esin > Özetle seçili metinle soruyu gönderdi", await wait(async () => (await reqs()).length === before + 1), "");
+      check("Esin > Özetle sent the question with the selected text", await wait(async () => (await reqs()).length === before + 1), "");
       const rq = (await reqs()).at(-1);
-      check("gönderilen soru seçili metni içeriyor", rq.question.includes("Şu metni kısaca özetle") && rq.question.includes("Bu bir seçilecek metindir"), rq.question);
+      check("the sent question contains the selected text", rq.question.includes("Şu metni kısaca özetle") && rq.question.includes("Bu bir seçilecek metindir"), rq.question);
       await wait(idle);
       cm.dryRun = false;
     }
 
-    // ===================== Sayfada ara =====================
+    // ===================== Find in page =====================
     {
       const $ = id => document.getElementById(id);
       const tab = tabs.selected;
@@ -363,47 +363,47 @@
       const key = (k, extra = {}) => input.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, ...extra }));
       tab.browser.fixupAndLoadURIString("data:text/html," + encodeURIComponent(
         `<meta charset="utf-8"><title>bul</title><p>elma armut elma muz elma</p>`), { triggeringPrincipal: Vento.SYSTEM_PRINCIPAL });
-      check("arama sayfası yüklendi", await wait(() => tab.title === "bul"), tab.title);
+      check("find page loaded", await wait(() => tab.title === "bul"), tab.title);
 
-      check("menüde 'Sayfada Ara…' ve ⌘F kısayolu var", !!$("menu_find") && $("key_find").getAttribute("key") === "f");
+      check("menu has 'Sayfada Ara…' and the ⌘F shortcut", !!$("menu_find") && $("key_find").getAttribute("key") === "f");
       Vento.find.open();
-      check("⌘F çubuğu açtı, odak arama kutusunda", !$("findbar").hidden && document.activeElement === input);
+      check("⌘F opened the bar, focus is in the find box", !$("findbar").hidden && document.activeElement === input);
 
       input.value = "elma";
       input.dispatchEvent(new Event("input"));
       check("'elma' → 1/3", await wait(() => count() === "1/3"), count());
       key("Enter");
-      check("Enter → sonraki 2/3", await wait(() => count() === "2/3"), count());
+      check("Enter -> next 2/3", await wait(() => count() === "2/3"), count());
       Vento.find.next();
       check("⌘G → 3/3", await wait(() => count() === "3/3"), count());
       Vento.find.next();
-      check("sonuncudan sonra başa sardı 1/3", await wait(() => count() === "1/3"), count());
+      check("wrapped to the start after the last one, 1/3", await wait(() => count() === "1/3"), count());
       key("Enter", { shiftKey: true });
-      check("⇧Enter → geri (3/3)", await wait(() => count() === "3/3"), count());
+      check("Shift+Enter -> back (3/3)", await wait(() => count() === "3/3"), count());
 
       input.value = "yokkelime";
       input.dispatchEvent(new Event("input"));
-      check("olmayan kelime → 'Bulunamadı' ve kırmızı", await wait(() => count() === "Bulunamadı" && input.hasAttribute("notfound")), count());
+      check("missing word -> 'Bulunamadı' and red", await wait(() => count() === "Bulunamadı" && input.hasAttribute("notfound")), count());
       input.value = "armut";
       input.dispatchEvent(new Event("input"));
-      check("bulunca kırmızı kalktı, 1/1", await wait(() => count() === "1/1" && !input.hasAttribute("notfound")), count());
+      check("red cleared once found, 1/1", await wait(() => count() === "1/1" && !input.hasAttribute("notfound")), count());
 
       key("Escape");
-      check("Esc çubuğu kapattı", Vento.find.state.open === false && await wait(() => $("findbar").hidden === true));
+      check("Esc closed the bar", Vento.find.state.open === false && await wait(() => $("findbar").hidden === true));
 
-      // arama sekmeye bağlı: sekme değişince kapanır
+      // find is bound to the tab: it closes when the tab changes
       Vento.find.open();
       const other = tabs.open("about:blank");
-      check("sekme değişince arama çubuğu kapandı", await wait(() => $("findbar").hidden === true));
+      check("find bar closed when the tab changed", await wait(() => $("findbar").hidden === true));
       tabs.close(other);
       tabs.select(tab);
       Vento.find.open();
       Vento.find.close(false);
-      await wait(() => $("findbar").hidden); // önceki kapanışın animasyonu bitsin
-      check("boş sekmede ⌘F açmaz", (() => { const b = tabs.open("about:blank"); Vento.find.open(); const ok = $("findbar").hidden; tabs.close(b); tabs.select(tab); return ok; })());
+      await wait(() => $("findbar").hidden); // let the previous close's animation finish
+      check("⌘F doesn't open on a blank tab", (() => { const b = tabs.open("about:blank"); Vento.find.open(); const ok = $("findbar").hidden; tabs.close(b); tabs.select(tab); return ok; })());
     }
 
-    // ===================== İndirmeler =====================
+    // ===================== Downloads =====================
     {
       const $ = id => document.getElementById(id);
       const D = Vento.downloads;
@@ -417,55 +417,55 @@
       const rowOf = d => D.state.rows.get(d)?.row;
       const sizeOf = async name => (await IOUtils.exists(PathUtils.join(dir.path, name))) ? (await IOUtils.stat(PathUtils.join(dir.path, name))).size : -1;
 
-      check("indirme düğmesi başta gizli", $("nav-downloads").hidden === true);
+      check("download button is hidden at first", $("nav-downloads").hidden === true);
 
-      // -- sayfadan gelen ek (Content-Disposition: attachment) otomatik iner
+      // -- an attachment from a page (Content-Disposition: attachment) downloads automatically
       const tab = tabs.selected;
       tab.browser.fixupAndLoadURIString(`${llm}/dosya.bin`, { triggeringPrincipal: Vento.SYSTEM_PRINCIPAL });
-      check("ek dosya indirme listesine düştü", await wait(() => D.state.rows.size === 1, 15000), String(D.state.rows.size));
+      check("attachment landed in the download list", await wait(() => D.state.rows.size === 1, 15000), String(D.state.rows.size));
       const first = [...D.state.rows.keys()][0];
-      check("indirme tamamlandı", await wait(() => first.succeeded, 15000), `succeeded=${first.succeeded} error=${first.error}`);
-      check("dosya doğru adla, tam boyutta kaydedildi (rapor.bin, 200 KB)", (await sizeOf("rapor.bin")) === 204800, String(await sizeOf("rapor.bin")));
-      check("soru sormadı: yardımcı-uygulama diyaloğu açılmadı (tek pencere)", [...Services.wm.getEnumerator(null)].length === 1);
-      check("indirme düğmesi göründü", $("nav-downloads").hidden === false);
+      check("download finished", await wait(() => first.succeeded, 15000), `succeeded=${first.succeeded} error=${first.error}`);
+      check("file saved with the right name and full size (rapor.bin, 200 KB)", (await sizeOf("rapor.bin")) === 204800, String(await sizeOf("rapor.bin")));
+      check("didn't ask: no helper-app dialog opened (single window)", [...Services.wm.getEnumerator(null)].length === 1);
+      check("download button appeared", $("nav-downloads").hidden === false);
       D.showPanel(true);
-      check("panel satırı: ad + Tamamlandı", rowOf(first)?.querySelector(".dl-name").textContent === "rapor.bin" && rowOf(first)?.querySelector(".dl-meta").textContent.includes("Tamamlandı"), rowOf(first)?.querySelector(".dl-meta").textContent);
-      check("bitmiş satırda yalnızca 'Finder'da göster' ve 'kaldır' görünür", getComputedStyle(rowOf(first).querySelector(".dl-reveal")).display !== "none" && getComputedStyle(rowOf(first).querySelector(".dl-cancel")).display === "none");
+      check("panel row: name + Tamamlandı", rowOf(first)?.querySelector(".dl-name").textContent === "rapor.bin" && rowOf(first)?.querySelector(".dl-meta").textContent.includes("Tamamlandı"), rowOf(first)?.querySelector(".dl-meta").textContent);
+      check("finished row shows only 'Finder'da göster' and 'kaldır'", getComputedStyle(rowOf(first).querySelector(".dl-reveal")).display !== "none" && getComputedStyle(rowOf(first).querySelector(".dl-cancel")).display === "none");
 
-      // -- adresi kaydet (sağ tık "Resmi kaydet" yolu) + benzersiz ad
+      // -- save a URL (right-click "Save image" path) + unique name
       const d1 = await D.saveURL(`${llm}/dosya.bin?a=1`);
       check("saveURL tamamlandı (dosya.bin)", await wait(() => d1.succeeded, 15000) && (await sizeOf("dosya.bin")) === 204800, String(await sizeOf("dosya.bin")));
       const d2 = await D.saveURL(`${llm}/dosya.bin?a=2`);
-      check("aynı ad varsa benzersiz ad (dosya (1).bin)", await wait(() => d2.succeeded, 15000) && PathUtils.filename(d2.target.path) === "dosya (1).bin", PathUtils.filename(d2.target.path));
+      check("unique name if the name exists (dosya (1).bin)", await wait(() => d2.succeeded, 15000) && PathUtils.filename(d2.target.path) === "dosya (1).bin", PathUtils.filename(d2.target.path));
 
-      // -- iptal
+      // -- cancel
       const slow = await D.saveURL(`${llm}/yavas.bin`);
-      check("yavaş indirme ilerliyor", await wait(() => slow.currentBytes > 0 && !slow.stopped, 15000), String(slow.currentBytes));
-      check("sürerken iptal düğmesi görünür, kaldır gizli", getComputedStyle(rowOf(slow).querySelector(".dl-cancel")).display !== "none" && getComputedStyle(rowOf(slow).querySelector(".dl-remove")).display === "none");
-      check("ilerleme çubuğu genişliği yükseldi", rowOf(slow).querySelector(".dl-fill").style.width !== "");
+      check("slow download is progressing", await wait(() => slow.currentBytes > 0 && !slow.stopped, 15000), String(slow.currentBytes));
+      check("cancel button visible while running, remove hidden", getComputedStyle(rowOf(slow).querySelector(".dl-cancel")).display !== "none" && getComputedStyle(rowOf(slow).querySelector(".dl-remove")).display === "none");
+      check("progress bar width increased", rowOf(slow).querySelector(".dl-fill").style.width !== "");
       rowOf(slow).querySelector(".dl-cancel").click();
-      check("iptal edince indirme durdu", await wait(() => slow.canceled, 10000));
-      check("iptal satırı 'İptal edildi' + yeniden dene görünür", await wait(() => rowOf(slow)?.dataset.kind === "canceled") && getComputedStyle(rowOf(slow).querySelector(".dl-retry")).display !== "none");
+      check("download stopped on cancel", await wait(() => slow.canceled, 10000));
+      check("canceled row shows 'İptal edildi' + retry", await wait(() => rowOf(slow)?.dataset.kind === "canceled") && getComputedStyle(rowOf(slow).querySelector(".dl-retry")).display !== "none");
 
-      // -- kaldır
+      // -- remove
       const n = D.state.rows.size;
       rowOf(slow).querySelector(".dl-remove").click();
-      check("kaldırınca satır listeden gitti", await wait(() => D.state.rows.size === n - 1), String(D.state.rows.size));
+      check("row left the list on remove", await wait(() => D.state.rows.size === n - 1), String(D.state.rows.size));
 
-      // -- bağlam menüsü öğeleri
+      // -- context menu items
       const cmb = Vento.contextMenu.build({ imageUrl: "https://x/y.png", linkUrl: "https://x/f.pdf", pageUrl: "https://x/" });
       const lb = cmb.filter(d => d !== Vento.contextMenu.SEP).map(d => d.label);
-      check("bağlam menüsünde 'Resmi İndirilenler'e Kaydet' ve 'Bağlantıdaki Dosyayı İndir'", lb.includes("Resmi İndirilenler'e Kaydet") && lb.includes("Bağlantıdaki Dosyayı İndir"), lb.join(","));
+      check("context menu has 'Resmi İndirilenler'e Kaydet' and 'Bağlantıdaki Dosyayı İndir'", lb.includes("Resmi İndirilenler'e Kaydet") && lb.includes("Bağlantıdaki Dosyayı İndir"), lb.join(","));
 
-      // -- hepsi kalkınca düğme gizlenir
+      // -- the button hides when all are gone
       for (const d of [...D.state.rows.keys()]) {
         await D.state.list.remove(d);
       }
-      check("liste boşalınca düğme ve panel gizlendi", await wait(() => $("nav-downloads").hidden && $("downloads-panel").hidden));
+      check("button and panel hid when the list emptied", await wait(() => $("nav-downloads").hidden && $("downloads-panel").hidden));
       D.dryRun = false;
     }
 
-    // ===================== Sayfa diyalogları =====================
+    // ===================== Page dialogs =====================
     {
       const $ = id => document.getElementById(id);
       const D = Vento.dialogs;
@@ -478,21 +478,21 @@
       const load = h => tab.browser.fixupAndLoadURIString(du(h), { triggeringPrincipal: Vento.SYSTEM_PRINCIPAL });
       const visible = () => !$("dialog-layer").hidden;
 
-      // -- confirm → prompt → alert zinciri: sessizce iptal EDİLMEMELİ
+      // -- confirm -> prompt -> alert chain: must NOT be cancelled silently
       load(`<title>d</title><script>setTimeout(() => { const a = confirm("Emin misin?"); const b = prompt("Adın?", "varsayılan"); alert("bitti"); document.title = "sonuç:" + a + ":" + b; }, 300);</script>`);
-      check("confirm diyaloğu göründü (artık sessizce iptal edilmiyor)", await wait(() => shown() && visible(), 10000));
-      check("confirm: metin + Tamam/İptal", card().querySelector(".dlg-text").textContent === "Emin misin?" && card().querySelectorAll("button").length === 2 && btn(0).hasAttribute("primary"));
-      // data: sayfasında site adı yoktur (boş kaynak); http sayfasında görünmesi aşağıdaki izin testlerinde ölçülür
+      check("confirm dialog appeared (no longer cancelled silently)", await wait(() => shown() && visible(), 10000));
+      check("confirm: text + OK/Cancel", card().querySelector(".dlg-text").textContent === "Emin misin?" && card().querySelectorAll("button").length === 2 && btn(0).hasAttribute("primary"));
+      // A data: page has no site name (empty origin); it showing on an http page is checked in the permission tests below
       btn(0).click();
-      check("prompt: varsayılan değerli alan", await wait(() => card()?.querySelector(".dlg-value")?.value === "varsayılan"));
+      check("prompt: field with a default value", await wait(() => card()?.querySelector(".dlg-value")?.value === "varsayılan"));
       card().querySelector(".dlg-value").value = "Can";
       btn(0).click();
-      check("alert: tek düğme", await wait(() => card()?.querySelectorAll("button").length === 1 && card().querySelector(".dlg-text").textContent === "bitti"));
+      check("alert: single button", await wait(() => card()?.querySelectorAll("button").length === 1 && card().querySelector(".dlg-text").textContent === "bitti"));
       key("Enter");
-      check("sayfa cevapları aldı (confirm=true, prompt='Can')", await wait(() => tab.title === "sonuç:true:Can"), tab.title);
-      check("bitince katman gizlendi", await wait(() => !visible()));
+      check("page received the answers (confirm=true, prompt='Can')", await wait(() => tab.title === "sonuç:true:Can"), tab.title);
+      check("layer hid when done", await wait(() => !visible()));
 
-      // -- iptal (Esc): confirm=false, prompt=null
+      // -- cancel (Esc): confirm=false, prompt=null
       load(`<title>e</title><script>setTimeout(() => { const a = confirm("x?"); const b = prompt("y?"); document.title = "sonuç:" + a + ":" + b; }, 300);</script>`);
       await wait(() => shown());
       key("Escape");
@@ -500,57 +500,57 @@
       key("Escape");
       check("Esc: confirm=false, prompt=null", await wait(() => tab.title === "sonuç:false:null"), tab.title);
 
-      // -- arka plandaki sekmenin diyaloğu o sekme seçilene kadar görünmez
+      // -- a background tab's dialog stays hidden until that tab is selected
       const bg = tabs.open(du(`<title>bg</title><script>setTimeout(() => { document.title = "bg:" + confirm("arka plan?"); }, 300);</script>`), { select: false });
-      check("arka plan diyaloğu kuyruğa alındı", await wait(() => D.pending === 1, 10000), String(D.pending));
-      check("ama önde görünmedi", !visible());
+      check("background dialog was queued", await wait(() => D.pending === 1, 10000), String(D.pending));
+      check("but wasn't shown in front", !visible());
       tabs.select(bg);
-      check("sekmeye geçince göründü", await wait(() => visible() && card()?.querySelector(".dlg-text").textContent === "arka plan?"));
+      check("appeared when switching to the tab", await wait(() => visible() && card()?.querySelector(".dlg-text").textContent === "arka plan?"));
       tabs.select(tab);
-      check("başka sekmeye geçince gizlendi ama bekliyor", await wait(() => !visible()) && D.pending === 1);
+      check("hid when switching to another tab but still pending", await wait(() => !visible()) && D.pending === 1);
       tabs.select(bg);
       btn(0).click();
-      check("cevap sayfaya ulaştı (bg:true)", await wait(() => bg.title === "bg:true"), bg.title);
+      check("answer reached the page (bg:true)", await wait(() => bg.title === "bg:true"), bg.title);
       tabs.close(bg);
       tabs.select(tab);
 
-      // -- sekme kapanınca bekleyen istem iptal edilir
+      // -- a pending prompt is cancelled when the tab closes
       const bg2 = tabs.open(du(`<script>setTimeout(() => confirm("kapanacak"), 300);</script>`), { select: false });
       await wait(() => D.pending === 1, 10000);
       tabs.close(bg2);
-      check("sekme kapanınca bekleyen istem temizlendi", await wait(() => D.pending === 0), String(D.pending));
+      check("pending prompt was cleared when the tab closed", await wait(() => D.pending === 0), String(D.pending));
       tabs.select(tab);
 
-      // -- confirmEx: 3 düğme, varsayılan 2, onay kutusu
+      // -- confirmEx: 3 buttons, default 2, checkbox
       const p1 = D.open(tab.browser, { promptType: "confirmEx", text: "Üç seçenek", button0Label: "Kaydet", button1Label: "Vazgeç", button2Label: "Kaydetme", defaultButtonNum: 2, checkLabel: "Bir daha sorma", checked: false });
       await wait(() => card());
-      check("confirmEx: 3 düğme, 2. varsayılan (birincil)", card().querySelectorAll("button").length === 3 && btn(2).hasAttribute("primary") && !btn(0).hasAttribute("primary"));
+      check("confirmEx: 3 buttons, the 2nd is the default (primary)", card().querySelectorAll("button").length === 3 && btn(2).hasAttribute("primary") && !btn(0).hasAttribute("primary"));
       card().querySelector("input[type=checkbox]").checked = true;
       btn(2).click();
       const r1 = await p1;
-      check("confirmEx sonucu: buttonNumClicked=2, ok=false, checked=true", r1.buttonNumClicked === 2 && r1.ok === false && r1.checked === true, JSON.stringify(r1));
+      check("confirmEx result: buttonNumClicked=2, ok=false, checked=true", r1.buttonNumClicked === 2 && r1.ok === false && r1.checked === true, JSON.stringify(r1));
 
-      // -- kimlik doğrulama (HTTP auth) alanları
+      // -- authentication (HTTP auth) fields
       const p2 = D.open(tab.browser, { promptType: "promptUserAndPass", text: "Giriş gerekli", authOrigin: "example.com", isInsecureAuth: true, user: "", pass: "" });
       await wait(() => card());
-      check("kimlik: kullanıcı + parola (gizli) + güvensiz uyarı + kaynak",
+      check("auth: user + password (hidden) + insecure warning + origin",
         !!card().querySelector(".dlg-user") && card().querySelector(".dlg-pass").type === "password" && !!card().querySelector(".dlg-warn") && card().querySelector(".dlg-origin").textContent.includes("example.com"));
       card().querySelector(".dlg-user").value = "can";
       card().querySelector(".dlg-pass").value = "gizli";
       btn(0).click();
       const r2 = await p2;
-      check("kimlik sonucu: user, pass, ok", r2.user === "can" && r2.pass === "gizli" && r2.ok === true);
+      check("auth result: user, pass, ok", r2.user === "can" && r2.pass === "gizli" && r2.ok === true);
 
-      // -- iptalde alan değerleri geri verilmez
+      // -- field values are not returned on cancel
       const p3 = D.open(tab.browser, { promptType: "promptPassword", text: "Parola", pass: "" });
       await wait(() => card());
       card().querySelector(".dlg-pass").value = "sızmamalı";
       btn(1).click();
       const r3 = await p3;
-      check("İptal'de parola sonuca yazılmadı", r3.ok === false && (r3.pass ?? "") === "", JSON.stringify(r3));
+      check("password was not written to the result on cancel", r3.ok === false && (r3.pass ?? "") === "", JSON.stringify(r3));
     }
 
-    // ===================== Site izinleri =====================
+    // ===================== Site permissions =====================
     {
       const $ = id => document.getElementById(id);
       const P = Vento.permissions;
@@ -568,87 +568,87 @@
       };
       const titleIs = async t => wait(() => tab.title === t, 10000);
 
-      // -- bildirim: Engelle
+      // -- notification: Block
       goto("notif");
-      check("bildirim isteği kartı çıktı", await wait(() => visible() && card(), 10000));
-      check("kart: site + 'sana bildirim göndermek'", card().querySelector(".perm-origin").textContent === new URL(llm).host && card().querySelector(".perm-text").textContent.includes("bildirim göndermek"),
-        `origin=${card().querySelector(".perm-origin").textContent} beklenen=${new URL(llm).host}`);
-      check("'Hatırla' varsayılan KAPALI (gizlilik)", card().querySelector(".perm-remember input").checked === false);
+      check("notification request card appeared", await wait(() => visible() && card(), 10000));
+      check("card: site + 'sana bildirim göndermek'", card().querySelector(".perm-origin").textContent === new URL(llm).host && card().querySelector(".perm-text").textContent.includes("bildirim göndermek"),
+        `origin=${card().querySelector(".perm-origin").textContent} expected=${new URL(llm).host}`);
+      check("'Remember' is OFF by default (privacy)", card().querySelector(".perm-remember input").checked === false);
       btn(".perm-block").click();
-      check("Engelle → sayfa 'denied' aldı", await titleIs("n:denied"), tab.title);
+      check("Block -> page got 'denied'", await titleIs("n:denied"), tab.title);
       const denied = Services.perms.getPermissionObject(principal, "desktop-notification", true);
-      check("Engelle: kart kayboldu; karar YALNIZ oturum boyunca saklandı (kalıcı değil)", await wait(() => !visible()) && denied?.capability === Services.perms.DENY_ACTION && denied?.expireType === Services.perms.EXPIRE_SESSION, `${denied?.capability}/${denied?.expireType}`);
+      check("Block: card disappeared; decision was stored for the SESSION only (not persistent)", await wait(() => !visible()) && denied?.capability === Services.perms.DENY_ACTION && denied?.expireType === Services.perms.EXPIRE_SESSION, `${denied?.capability}/${denied?.expireType}`);
       Services.perms.removeAll();
 
-      // -- bildirim: İzin Ver + hatırla → ikinci sefer sormadan izin
+      // -- notification: Allow + remember -> allowed without asking the second time
       goto("notif");
       await wait(() => visible() && card(), 10000);
       card().querySelector(".perm-remember input").checked = true;
       btn(".perm-allow").click();
-      check("İzin Ver → 'granted'", await titleIs("n:granted"), tab.title);
-      check("hatırlandı (kalıcı izin yöneticisinde)", PM_test(principal, "desktop-notification") === Services.perms.ALLOW_ACTION);
+      check("Allow -> 'granted'", await titleIs("n:granted"), tab.title);
+      check("remembered (in the persistent permission manager)", PM_test(principal, "desktop-notification") === Services.perms.ALLOW_ACTION);
       goto("notif");
-      check("hatırlanan bildirim izninde kart çıkmadan 'granted' (platform kendisi cevaplar)", await wait(() => tab.title === "n:granted", 10000) && await wait(() => !visible()));
+      check("remembered notification permission gives 'granted' without a card (the platform answers itself)", await wait(() => tab.title === "n:granted", 10000) && await wait(() => !visible()));
       Services.perms.removeAll();
 
-      // -- konum: Engelle → PERMISSION_DENIED (1)
+      // -- location: Block -> PERMISSION_DENIED (1)
       goto("geo");
       await wait(() => visible() && card(), 10000);
-      check("konum kartı: 'konumunu görmek'", card().querySelector(".perm-text").textContent.includes("konumunu görmek"));
+      check("location card: 'konumunu görmek'", card().querySelector(".perm-text").textContent.includes("konumunu görmek"));
       btn(".perm-block").click();
-      check("konum Engelle → hata kodu 1 (PERMISSION_DENIED)", await titleIs("geo:1"), tab.title);
+      check("location Block -> error code 1 (PERMISSION_DENIED)", await titleIs("geo:1"), tab.title);
 
-      // -- kamera + mikrofon (sahte cihazlarla)
+      // -- camera + microphone (with fake devices)
       goto("media");
-      check("kamera+mikrofon kartı çıktı", await wait(() => visible() && card(), 10000));
-      check("metin: 'kameranı ve mikrofonunu kullanmak'", card().querySelector(".perm-text").textContent.includes("kameranı ve mikrofonunu kullanmak"), card().querySelector(".perm-text").textContent);
+      check("camera+microphone card appeared", await wait(() => visible() && card(), 10000));
+      check("text: 'kameranı ve mikrofonunu kullanmak'", card().querySelector(".perm-text").textContent.includes("kameranı ve mikrofonunu kullanmak"), card().querySelector(".perm-text").textContent);
       btn(".perm-allow").click();
-      check("İzin Ver → akış geldi (2 iz: video+ses)", await titleIs("media:ok:2"), tab.title);
-      check("kamera/mikrofon 'bu seferlik': hatırla kapalıyken HİÇ saklanmadı", PM_test(principal, "camera") === 0 && PM_test(principal, "microphone") === 0);
+      check("Allow -> stream arrived (2 tracks: video+audio)", await titleIs("media:ok:2"), tab.title);
+      check("camera/microphone 'just this once': NOT stored at all while remember is off", PM_test(principal, "camera") === 0 && PM_test(principal, "microphone") === 0);
       goto("media");
       await wait(() => visible() && card(), 10000);
       btn(".perm-block").click();
-      check("Engelle → NotAllowedError", await titleIs("media:NotAllowedError"), tab.title);
-      // -- kamera+mikrofon: "hatırla" işaretliyse bir dahaki istek kartsız (bizim otomatik cevap yolumuz)
+      check("Block -> NotAllowedError", await titleIs("media:NotAllowedError"), tab.title);
+      // -- camera+microphone: if "remember" is checked the next request has no card (our automatic answer path)
       goto("media");
       await wait(() => visible() && card(), 10000);
       card().querySelector(".perm-remember input").checked = true;
       btn(".perm-allow").click();
       await titleIs("media:ok:2");
-      check("hatırla açıkken kamera+mikrofon KALICI saklandı", PM_test(principal, "camera") === Services.perms.ALLOW_ACTION && PM_test(principal, "microphone") === Services.perms.ALLOW_ACTION);
+      check("camera+microphone was stored PERSISTENTLY while remember is on", PM_test(principal, "camera") === Services.perms.ALLOW_ACTION && PM_test(principal, "microphone") === Services.perms.ALLOW_ACTION);
       const autoBefore = P.state.autoAnswered.length;
       goto("media");
-      // Başlık önceki denemeden zaten "media:ok:2" kalmış olabilir → önce yeni isteğin bize ulaşmasını bekle
+      // The title may already be "media:ok:2" from the previous attempt -> first wait for the new request to reach us
       const answered = await wait(() => P.state.autoAnswered.length > autoBefore, 10000);
-      await new Promise(r => setTimeout(r, 700)); // akış sayfaya ulaşsın
-      check("hatırlanan kamera izninde kart çıkmadan (otomatik cevapla) akış geldi", answered && tab.title === "media:ok:2" && !visible(), `otomatik=${answered} başlık=${tab.title}`);
+      await new Promise(r => setTimeout(r, 700)); // let the stream reach the page
+      check("remembered camera permission gave a stream without a card (via auto-answer)", answered && tab.title === "media:ok:2" && !visible(), `auto=${answered} title=${tab.title}`);
       Services.perms.removeAll();
       goto("cam");
       await wait(() => visible() && card(), 10000);
-      check("yalnız kamera: metin 'kameranı kullanmak'", card().querySelector(".perm-text").textContent.includes("kameranı kullanmak") && !card().querySelector(".perm-text").textContent.includes("mikrofon"));
+      check("camera only: text 'kameranı kullanmak'", card().querySelector(".perm-text").textContent.includes("kameranı kullanmak") && !card().querySelector(".perm-text").textContent.includes("mikrofon"));
       btn(".perm-block").click();
       await titleIs("cam:NotAllowedError");
 
-      // -- sekmeye bağlı: arka plandaki sekmenin kartı görünmez
+      // -- bound to the tab: a background tab's card is not visible
       const bg = tabs.open(page("notif"), { select: false });
-      check("arka plan isteği kuyruğa alındı, görünmüyor", await wait(() => P.pending === 1, 10000) && !visible());
+      check("background request was queued, not visible", await wait(() => P.pending === 1, 10000) && !visible());
       tabs.select(bg);
-      check("sekmeye geçince kart göründü", await wait(() => visible() && !!card()));
+      check("card appeared when switching to the tab", await wait(() => visible() && !!card()));
       tabs.select(tab);
-      check("başka sekmeye geçince gizlendi ama bekliyor", await wait(() => !visible()) && P.pending === 1);
+      check("hid when switching to another tab but still pending", await wait(() => !visible()) && P.pending === 1);
       tabs.close(bg);
-      check("sekme kapanınca istek temizlendi", await wait(() => P.pending === 0));
+      check("request was cleared when the tab closed", await wait(() => P.pending === 0));
       tabs.select(tab);
 
-      // -- başka siteye gidilince bekleyen istek reddedilir
+      // -- a pending request is denied when navigating to another site
       goto("notif");
       await wait(() => visible() && card(), 10000);
       tab.browser.fixupAndLoadURIString("data:text/html," + encodeURIComponent("<meta charset=utf-8><title>gitti</title>"), { triggeringPrincipal: Vento.SYSTEM_PRINCIPAL });
-      check("siteden ayrılınca bekleyen kart kalktı", await wait(() => tab.title === "gitti" && !visible() && P.pending === 0), String(P.pending));
+      check("pending card went away on leaving the site", await wait(() => tab.title === "gitti" && !visible() && P.pending === 0), String(P.pending));
       Services.perms.removeAll();
     }
 
-    // ===================== Hareket / efekt =====================
+    // ===================== Motion / effects =====================
     {
       const M = Vento.motion;
       const $ = id => document.getElementById(id);
@@ -656,29 +656,29 @@
       const only = (set, allowed) => [...set].every(p => allowed.includes(p));
       const rootStyle = getComputedStyle(document.documentElement);
 
-      check("hareket değişkenleri tanımlı (--v-dur-fast/--v-dur/--v-dur-slow)", rootStyle.getPropertyValue("--v-dur-fast").trim() === "110ms" && rootStyle.getPropertyValue("--v-dur").trim() === "180ms" && rootStyle.getPropertyValue("--v-dur-slow").trim() === "260ms");
-      check("her ön ayarda çıkış girişten KISA (kullanıcı beklemez)", Object.values(M.PRESETS).every(p => p.exit < p.enter), JSON.stringify(Object.fromEntries(Object.entries(M.PRESETS).map(([k, p]) => [k, `${p.enter}/${p.exit}`]))));
-      check("hiçbir süre 260 ms'yi aşmıyor", Object.values(M.PRESETS).every(p => p.enter <= 260 && p.exit <= 260));
+      check("motion variables are defined (--v-dur-fast/--v-dur/--v-dur-slow)", rootStyle.getPropertyValue("--v-dur-fast").trim() === "110ms" && rootStyle.getPropertyValue("--v-dur").trim() === "180ms" && rootStyle.getPropertyValue("--v-dur-slow").trim() === "260ms");
+      check("in every preset the exit is SHORTER than the enter (the user doesn't wait)", Object.values(M.PRESETS).every(p => p.exit < p.enter), JSON.stringify(Object.fromEntries(Object.entries(M.PRESETS).map(([k, p]) => [k, `${p.enter}/${p.exit}`]))));
+      check("no duration exceeds 260 ms", Object.values(M.PRESETS).every(p => p.enter <= 260 && p.exit <= 260));
 
-      // -- çekirdek: giriş/çıkış/yarış (tek başına bir öğede)
+      // -- core: enter/exit/race (on a single element)
       const box = document.createElement("div");
       box.hidden = true;
       box.style.cssText = "position:absolute;top:0;left:0;width:10px;height:10px";
       $("stage").append(box);
       M.show(box, "pop");
-      check("show: hemen görünür ve giriş animasyonu çalışıyor", !box.hidden && M.isShown(box) && box.getAnimations().length === 1);
-      check("giriş yalnız opacity + transform kullanır (yerleşimi bozmaz)", only(animProps(box), ["opacity", "transform"]), [...animProps(box)].join(","));
+      check("show: visible right away and the enter animation is running", !box.hidden && M.isShown(box) && box.getAnimations().length === 1);
+      check("enter uses only opacity + transform (doesn't disturb layout)", only(animProps(box), ["opacity", "transform"]), [...animProps(box)].join(","));
       await wait(() => box.getAnimations().length === 0, 2000);
-      check("giriş bitince animasyon kalıntısı yok", box.getAnimations().length === 0 && !box.hidden);
+      check("no animation residue after the enter ends", box.getAnimations().length === 0 && !box.hidden);
 
       const hid = M.hide(box, "pop");
-      check("hide: çıkış sürerken öğe hâlâ DOM'da görünür, 'closing' var, isShown=false", !box.hidden && box.hasAttribute("closing") && !M.isShown(box));
-      check("ikinci hide aynı sözü döner (çift çıkış yok)", M.hide(box, "pop") === hid);
+      check("hide: while exiting the element is still visible in the DOM, has 'closing', isShown=false", !box.hidden && box.hasAttribute("closing") && !M.isShown(box));
+      check("a second hide returns the same promise (no double exit)", M.hide(box, "pop") === hid);
       await hid;
-      check("çıkış bitince hidden konur, kalıntı yok", box.hidden && !box.hasAttribute("closing") && box.getAnimations().length === 0);
-      check("zaten gizliyken hide hemen çözülür", (await Promise.race([M.hide(box), new Promise(r => setTimeout(() => r("ZAMAN"), 500))])) !== "ZAMAN");
+      check("hidden is set when the exit ends, no residue", box.hidden && !box.hasAttribute("closing") && box.getAnimations().length === 0);
+      check("hide resolves immediately when already hidden", (await Promise.race([M.hide(box), new Promise(r => setTimeout(() => r("ZAMAN"), 500))])) !== "ZAMAN");
 
-      // yarış: çıkarken yeniden göster → öğe takılı 'hidden' kalmaz
+      // race: show again while exiting -> the element doesn't get stuck 'hidden'
       M.show(box, "pop");
       await wait(() => box.getAnimations().length === 0, 2000);
       const p1 = M.hide(box, "pop");
@@ -686,51 +686,51 @@
       M.show(box, "pop");
       await p1;
       await new Promise(r => setTimeout(r, 400));
-      check("çıkarken yeniden göster: öğe görünür kalır (yarış güvenli)", !box.hidden && !box.hasAttribute("closing") && M.isShown(box));
-      // hızlı aç/kapa/aç/kapa
+      check("show again while exiting: the element stays visible (race-safe)", !box.hidden && !box.hasAttribute("closing") && M.isShown(box));
+      // quick open/close/open/close
       for (let i = 0; i < 6; i++) { M.show(box, "drop"); await new Promise(r => setTimeout(r, 15)); M.hide(box, "drop"); await new Promise(r => setTimeout(r, 15)); }
       await wait(() => box.hidden && !box.hasAttribute("closing"), 2000);
-      check("hızlı aç/kapa zinciri sonunda tutarlı durum (gizli, kalıntı yok)", box.hidden && !box.hasAttribute("closing") && box.getAnimations().length === 0);
+      check("consistent state after a quick open/close chain (hidden, no residue)", box.hidden && !box.hasAttribute("closing") && box.getAnimations().length === 0);
 
-      // -- hareketi azalt
+      // -- reduce motion
       M.reducedOverride = true;
       try {
         M.show(box, "pop");
-        check("hareketi azalt: yalnız opacity, konum/ölçek hareketi yok, ≤100 ms", only(animProps(box), ["opacity"]) && box.getAnimations()[0].effect.getTiming().duration <= 100, `${[...animProps(box)]} ${box.getAnimations()[0]?.effect.getTiming().duration}`);
+        check("reduce motion: opacity only, no position/scale motion, <=100 ms", only(animProps(box), ["opacity"]) && box.getAnimations()[0].effect.getTiming().duration <= 100, `${[...animProps(box)]} ${box.getAnimations()[0]?.effect.getTiming().duration}`);
         await M.hide(box, "pop");
-        check("hareketi azalt: çıkış da tamamlanıyor", box.hidden && !box.hasAttribute("closing"));
+        check("reduce motion: the exit completes too", box.hidden && !box.hasAttribute("closing"));
       } finally {
         M.reducedOverride = null;
       }
       box.remove();
-      check("CSS'te prefers-reduced-motion kuralı var", [...document.styleSheets].some(sh => { try { return [...sh.cssRules].some(r => r.media && /prefers-reduced-motion/.test(r.media.mediaText)); } catch (e) { return false; } }));
+      check("CSS has a prefers-reduced-motion rule", [...document.styleSheets].some(sh => { try { return [...sh.cssRules].some(r => r.media && /prefers-reduced-motion/.test(r.media.mediaText)); } catch (e) { return false; } }));
 
-      // -- gerçek bileşenler
-      // Sekme: açılış animasyonu, kapanışta hayalet, takılı kalıntı yok
+      // -- real components
+      // Tab: open animation, ghost on close, no stuck residue
       const strip = $("tabs");
       const live = () => [...strip.querySelectorAll(".tab:not(.closing)")].length;
       await wait(() => !document.documentElement.hasAttribute("booting"), 3000);
       const t1 = tabs.open("about:blank", { select: false });
       const el1 = strip.querySelector(`.tab[data-id="${t1.id}"]`);
-      check("yeni sekme animasyonla açıldı (yalnız genişlik/opaklık/ölçek)", el1.getAnimations().length > 0 && only(animProps(el1), ["flexBasis", "width", "minWidth", "paddingLeft", "paddingRight", "opacity", "transform"]), [...animProps(el1)].join(","));
+      check("new tab opened with an animation (width/opacity/scale only)", el1.getAnimations().length > 0 && only(animProps(el1), ["flexBasis", "width", "minWidth", "paddingLeft", "paddingRight", "opacity", "transform"]), [...animProps(el1)].join(","));
       tabs.close(t1);
-      check("kapanan sekmenin hayaleti şeritte (tıklanamaz)", !!strip.querySelector(".tab.closing") && getComputedStyle(strip.querySelector(".tab.closing")).pointerEvents === "none");
-      check("hayalet bitince kalkar", await wait(() => !strip.querySelector(".tab.closing"), 2000));
+      check("closing tab's ghost is in the strip (not clickable)", !!strip.querySelector(".tab.closing") && getComputedStyle(strip.querySelector(".tab.closing")).pointerEvents === "none");
+      check("ghost goes away when done", await wait(() => !strip.querySelector(".tab.closing"), 2000));
       const batch = Array.from({ length: 8 }, () => tabs.open("about:blank", { select: false }));
       batch.forEach(t => tabs.close(t));
-      check("8 sekme hızla aç/kapa: hayalet kalmaz, sekme sayısı modelle aynı", await wait(() => !strip.querySelector(".tab.closing") && live() === tabs.all.length, 3000), `${live()} / ${tabs.all.length}`);
+      check("8 tabs opened/closed quickly: no ghost left, tab count matches the model", await wait(() => !strip.querySelector(".tab.closing") && live() === tabs.all.length, 3000), `${live()} / ${tabs.all.length}`);
       M.reducedOverride = true;
       try {
         const t2 = tabs.open("about:blank", { select: false });
         const el2 = strip.querySelector(`.tab[data-id="${t2.id}"]`);
-        check("hareketi azalt: sekme yalnız solarak açılır", only(animProps(el2), ["opacity"]), [...animProps(el2)].join(","));
+        check("reduce motion: the tab opens by fading only", only(animProps(el2), ["opacity"]), [...animProps(el2)].join(","));
         tabs.close(t2);
         await wait(() => !strip.querySelector(".tab.closing"), 2000);
       } finally {
         M.reducedOverride = null;
       }
 
-      // Diyalog: karartma solar + kart belirir; kapanınca kart karartma solarken yerinde kalır, sonra kalkar
+      // Dialog: the dim fades in + the card appears; on close the card stays in place while the dim fades, then goes away
       {
         const D = Vento.dialogs;
         const layer = $("dialog-layer");
@@ -738,44 +738,44 @@
         const p = D.open(dtab.browser, { promptType: "alert", text: "hareket" });
         await wait(() => D.state.shown && !layer.hidden, 10000);
         const card = D.state.shown.ui.card;
-        check("diyalog: karartma solarak, kart 'pop' ile girdi", layer.getAnimations().length > 0 && card.getAnimations().length > 0 && only(animProps(card), ["opacity", "transform"]));
+        check("dialog: the dim faded in, the card entered with 'pop'", layer.getAnimations().length > 0 && card.getAnimations().length > 0 && only(animProps(card), ["opacity", "transform"]));
         card.querySelector('button[data-index="0"]').click();
         await p;
-        check("diyalog kapanırken kart solan karartmada yerinde kalır", await wait(() => layer.hasAttribute("closing") || layer.hidden, 3000) && (layer.hidden || !!layer.querySelector(".dlg-card")));
-        check("diyalog kapanınca katman gizli ve kart kaldırılmış", await wait(() => layer.hidden && !layer.querySelector(".dlg-card"), 3000));
+        check("when the dialog closes the card stays in place on the fading dim", await wait(() => layer.hasAttribute("closing") || layer.hidden, 3000) && (layer.hidden || !!layer.querySelector(".dlg-card")));
+        check("layer is hidden and the card removed after the dialog closes", await wait(() => layer.hidden && !layer.querySelector(".dlg-card"), 3000));
       }
 
-      // Sayfada ara çubuğu
+      // Find bar
       {
         const fb = $("findbar");
         const ftab = tabs.open(`${Services.env.get("VENTO_ESIN_ENDPOINT").replace(/\/v1$/, "")}/oturum/ara`);
         await wait(() => ftab.title === "Sayfa ARA" && !ftab.loading, 15000);
         Vento.find.open();
-        check("⌘F çubuğu 'bar' animasyonuyla açıldı", !fb.hidden && fb.getAnimations().length > 0 && only(animProps(fb), ["opacity", "transform"]));
+        check("⌘F opened the bar with the 'bar' animation", !fb.hidden && fb.getAnimations().length > 0 && only(animProps(fb), ["opacity", "transform"]));
         Vento.find.close(false);
-        check("çubuk kapanırken 'closing', sonra gizli", fb.hasAttribute("closing") && await wait(() => fb.hidden && !fb.hasAttribute("closing"), 3000));
+        check("'closing' while the bar closes, then hidden", fb.hasAttribute("closing") && await wait(() => fb.hidden && !fb.hasAttribute("closing"), 3000));
         tabs.close(ftab);
       }
 
-      // Başlangıç (boş sekme) görünümü: boş sekme seçilince içerik yumuşakça belirir (CSS animasyonu)
+      // Start (blank tab) view: the content fades in softly when a blank tab is selected (CSS animation)
       {
-        const blank = tabs.open("about:blank"); // seçili → #stage[blank]
+        const blank = tabs.open("about:blank"); // selected -> #stage[blank]
         await wait(() => $("stage").hasAttribute("blank"), 3000);
         const start = $("start");
         const names = [start, $("start-word"), $("start-hint")].map(e => getComputedStyle(e).animationName);
-        check("boş sekme görünümü: kap, başlık ve ipucu kademeli giriş animasyonuna sahip", names.every(n => n !== "none") && start.getAnimations().length > 0, names.join(","));
-        // Ebabil: 4 katman yüklenir, yalnız transform ile (GPU) hareket eder, toplamsal karışır
+        check("blank tab view: container, title and hint have a staggered enter animation", names.every(n => n !== "none") && start.getAnimations().length > 0, names.join(","));
+        // Ebabil: 4 layers load, move only with transform (GPU), blend additively
         const eb = $("ebabil");
         const layers = [...eb.querySelectorAll(".eb")];
         await wait(() => layers.every(i => i.complete && i.naturalWidth === 640), 5000);
-        check("Ebabil: 4 katman (sağ kanat, gövde, kuyruk, sol kanat) yüklendi (640 px)", layers.length === 4 && layers.every(i => i.complete && i.naturalWidth === 640), layers.map(i => `${i.className}:${i.naturalWidth}`).join(" "));
-        check("Ebabil: görünür boyutta (>100 px)", eb.getBoundingClientRect().width > 100, String(Math.round(eb.getBoundingClientRect().width)));
-        check("Ebabil: bütün kuş süzülür; 2 kanat + kuyruk ayrı çırpar, gövde yalnız süzülmeyi taşır", $("ebabil-rig").getAnimations().length === 1 && ["wl", "wr", "tail"].every(k => eb.querySelector(`.eb-${k}`).getAnimations().length === 1) && eb.querySelector(".eb-body").getAnimations().length === 0, layers.map(i => `${i.className.split(" ")[1]}:${i.getAnimations().length}`).join(" "));
-        check("Ebabil hareketi yalnız transform (GPU'da, yerleşimi bozmaz)", only(new Set([...layers, $("ebabil-rig")].flatMap(e => [...animProps(e)])), ["transform"]), [...new Set([...layers, $("ebabil-rig")].flatMap(e => [...animProps(e)]))].join(","));
-        check("Ebabil katmanları toplamsal karışır (plus-lighter), grup yalıtılmış", layers.every(i => getComputedStyle(i).mixBlendMode === "plus-lighter") && getComputedStyle($("ebabil-rig")).isolation === "isolate");
-        check("kanatlar zıt yönde, kuyruk ayrı sürede çırpar", (() => { const d = e => e.getAnimations()[0].effect.getTiming().duration; return d(eb.querySelector(".eb-wl")) === d(eb.querySelector(".eb-wr")) && d(eb.querySelector(".eb-tail")) !== d(eb.querySelector(".eb-wl")); })());
-        check("CSS'te Ebabil için hareketi-azalt kuralı var (durur)", [...document.styleSheets].some(sh => { try { return [...sh.cssRules].some(r => r.media && /prefers-reduced-motion/.test(r.media.mediaText) && [...r.cssRules].some(x => x.cssText.includes("#ebabil-rig") && x.cssText.includes("animation: none"))); } catch (e) { return false; } }));
-        // Dinlenme hâli özgün maskotla AYNI mı? Katmanları tarayıcının tuvalinde toplayıp (lighter = toplamsal) still.webp ile karşılaştır
+        check("Ebabil: 4 layers (right wing, body, tail, left wing) loaded (640 px)", layers.length === 4 && layers.every(i => i.complete && i.naturalWidth === 640), layers.map(i => `${i.className}:${i.naturalWidth}`).join(" "));
+        check("Ebabil: visible size (>100 px)", eb.getBoundingClientRect().width > 100, String(Math.round(eb.getBoundingClientRect().width)));
+        check("Ebabil: the whole bird glides; 2 wings + tail flap separately, the body only carries the glide", $("ebabil-rig").getAnimations().length === 1 && ["wl", "wr", "tail"].every(k => eb.querySelector(`.eb-${k}`).getAnimations().length === 1) && eb.querySelector(".eb-body").getAnimations().length === 0, layers.map(i => `${i.className.split(" ")[1]}:${i.getAnimations().length}`).join(" "));
+        check("Ebabil motion is transform only (on the GPU, doesn't disturb layout)", only(new Set([...layers, $("ebabil-rig")].flatMap(e => [...animProps(e)])), ["transform"]), [...new Set([...layers, $("ebabil-rig")].flatMap(e => [...animProps(e)]))].join(","));
+        check("Ebabil layers blend additively (plus-lighter), the group is isolated", layers.every(i => getComputedStyle(i).mixBlendMode === "plus-lighter") && getComputedStyle($("ebabil-rig")).isolation === "isolate");
+        check("wings flap in opposite directions, the tail with a different duration", (() => { const d = e => e.getAnimations()[0].effect.getTiming().duration; return d(eb.querySelector(".eb-wl")) === d(eb.querySelector(".eb-wr")) && d(eb.querySelector(".eb-tail")) !== d(eb.querySelector(".eb-wl")); })());
+        check("CSS has a reduce-motion rule for Ebabil (it stops)", [...document.styleSheets].some(sh => { try { return [...sh.cssRules].some(r => r.media && /prefers-reduced-motion/.test(r.media.mediaText) && [...r.cssRules].some(x => x.cssText.includes("#ebabil-rig") && x.cssText.includes("animation: none"))); } catch (e) { return false; } }));
+        // Is the resting state the SAME as the original mascot? Sum the layers on the browser canvas (lighter = additive) and compare with still.webp
         {
           const still = new Image();
           still.src = "chrome://vento/content/ebabil/still.webp";
@@ -790,14 +790,14 @@
           let max = 0, sum = 0;
           for (let k = 0; k < a.length; k += 4) { for (let c = 0; c < 3; c++) { const d = Math.abs(a[k + c] - b[k + c]); sum += d; if (d > max) { max = d; } } }
           const mean = sum / (a.length / 4 * 3);
-          check("Ebabil dinlenme hâli özgün maskotla aynı (katman toplamı ≈ still; tuvalde ölçüldü)", max <= 24 && mean < 1.2, `maks fark ${max}, ortalama ${mean.toFixed(3)}`);
+          check("Ebabil resting state matches the original mascot (layer sum ≈ still; measured on a canvas)", max <= 24 && mean < 1.2, `max diff ${max}, mean ${mean.toFixed(3)}`);
         }
         M.reducedOverride = null;
         tabs.close(blank);
       }
     }
 
-    // ===================== Ebabil pozları (hata sayfası, boş durumlar) =====================
+    // ===================== Ebabil poses (error page, empty states) =====================
     {
       const $ = id => document.getElementById(id);
       const llm = Services.env.get("VENTO_ESIN_ENDPOINT").replace(/\/v1$/, "");
@@ -812,55 +812,55 @@
         mm.loadFrameScript("data:,(" + encodeURIComponent(`function(){ Promise.resolve().then(() => (${body})()).then(r => sendAsyncMessage(${JSON.stringify(id)}, r), e => sendAsyncMessage(${JSON.stringify(id)}, "HATA " + e)); }`) + ")()", false);
         setTimeout(() => resolve("ZAMAN ASIMI"), ms);
       });
-      // Sayfadaki Ebabil: {pose, yuklendi, gorunur}; yoksa null
+      // The Ebabil on the page: {pose, yuklendi, gorunur}; null if none
       const probe = () => inPage(`() => { const i = content.document.querySelector(".vento-ebabil"); return i ? { pose: content.document.documentElement.dataset.ventoPose, yuklendi: i.complete && i.naturalWidth > 0, gorunur: content.getComputedStyle(i).display === "block", src: i.src } : null; }`);
 
-      // Bağlantı hatası → Ebabil (şaşkın)
+      // Connection error -> Ebabil (confused)
       load("http://nonexistent.invalid/");
       await wait(() => docURI().startsWith("about:neterror?e=dnsNotFound"), 15000);
       await wait(async () => (await probe())?.yuklendi, 8000);
       const dns = await probe();
-      check("DNS hatası: şaşkın Ebabil görünür ve yüklendi (stil uygulandı)", dns?.pose === "error" && dns.yuklendi && dns.gorunur && dns.src.endsWith("pose-error.webp"), JSON.stringify(dns));
-      check("hata sayfasında tek Ebabil (çift eklenmedi)", (await inPage(`() => content.document.querySelectorAll(".vento-ebabil").length`)) === 1);
+      check("DNS error: the confused Ebabil is visible and loaded (style applied)", dns?.pose === "error" && dns.yuklendi && dns.gorunur && dns.src.endsWith("pose-error.webp"), JSON.stringify(dns));
+      check("a single Ebabil on the error page (not added twice)", (await inPage(`() => content.document.querySelectorAll(".vento-ebabil").length`)) === 1);
 
-      // Çevrimdışı → uyuyan Ebabil
+      // Offline -> sleeping Ebabil
       load("about:neterror?e=netOffline&u=http%3A//x.invalid/&c=UTF-8&d=x");
       await wait(() => docURI().startsWith("about:neterror?e=netOffline"), 10000);
       await wait(async () => (await probe())?.yuklendi, 8000);
       const off = await probe();
-      check("çevrimdışı: uyuyan Ebabil", off?.pose === "idle" && off.src.endsWith("pose-idle.webp"), JSON.stringify(off));
+      check("offline: sleeping Ebabil", off?.pose === "idle" && off.src.endsWith("pose-idle.webp"), JSON.stringify(off));
 
-      // Ciddi uyarılarda Ebabil YOK
+      // No Ebabil on serious warnings
       load("about:neterror?e=blockedByPolicy&u=http%3A//x.invalid/&c=UTF-8&d=x");
       await wait(() => docURI().startsWith("about:neterror?e=blockedByPolicy"), 10000);
       await new Promise(r => setTimeout(r, 1200));
-      check("güvenlik engelinde (blockedByPolicy) Ebabil YOK", (await probe()) === null);
+      check("no Ebabil on a security block (blockedByPolicy)", (await probe()) === null);
       load(`${https}/`);
       await wait(() => docURI().startsWith("about:certerror"), 15000);
       await new Promise(r => setTimeout(r, 1200));
-      check("sertifika uyarısında Ebabil YOK (ciddi risk sevimli kuşla yumuşatılmaz)", (await probe()) === null);
+      check("no Ebabil on a certificate warning (a serious risk isn't softened with a cute bird)", (await probe()) === null);
 
-      // Güvenlik: web sayfası yalnız SANAT paketine erişir, Vento'nun asıl arayüz paketine erişemez
+      // Security: a web page can only reach the ART package, not Vento's main UI package
       load(`${llm}/oturum/guvenlik`);
       await wait(() => tab.title === "Sayfa GUVENLIK" && !tab.loading, 15000);
       const yukle = url => inPage(`() => new Promise(res => { const i = new content.Image(); i.onload = () => res("yuklendi"); i.onerror = () => res("engellendi"); i.src = ${JSON.stringify(url)}; content.setTimeout(() => res("zaman"), 4000); })`);
-      check("web sayfası sanat paketini (vento-art) yükleyebilir", (await yukle("chrome://vento-art/content/pose-icon.webp")) === "yuklendi");
-      check("web sayfası Vento arayüz paketine (chrome://vento/) ERİŞEMEZ", (await yukle("chrome://vento/content/art/pose-icon.webp")) === "engellendi");
-      check("web sayfası Ebabil animasyon katmanlarına (vento) erişemez", (await yukle("chrome://vento/content/ebabil/body.webp")) === "engellendi");
+      check("web page can load the art package (vento-art)", (await yukle("chrome://vento-art/content/pose-icon.webp")) === "yuklendi");
+      check("web page CANNOT reach Vento's UI package (chrome://vento/)", (await yukle("chrome://vento/content/art/pose-icon.webp")) === "engellendi");
+      check("web page cannot reach the Ebabil animation layers (vento)", (await yukle("chrome://vento/content/ebabil/body.webp")) === "engellendi");
       tabs.close(tab);
 
-      // Boş durumlar ve boş sekme simgesi
+      // Empty states and the blank tab icon
       const emptyImgs = [$("esin-empty").querySelector(".empty-ebabil"), $("dl-empty").querySelector(".empty-ebabil")];
       await wait(() => emptyImgs.every(i => i.complete), 5000);
-      check("Esin ve indirme boş durumlarında tünemiş Ebabil yüklendi", emptyImgs.every(i => i.complete && i.naturalWidth > 0 && i.src.endsWith("pose-empty.webp")), emptyImgs.map(i => i.naturalWidth).join(","));
+      check("perched Ebabil loaded in the Esin and download empty states", emptyImgs.every(i => i.complete && i.naturalWidth > 0 && i.src.endsWith("pose-empty.webp")), emptyImgs.map(i => i.naturalWidth).join(","));
       const bl = tabs.open("about:blank");
       await wait(() => document.querySelector(`.tab[data-id="${bl.id}"] .tab-mark img`)?.complete, 5000);
       const markImg = document.querySelector(`.tab[data-id="${bl.id}"] .tab-mark img`);
-      check("boş sekmenin simgesi Ebabil'in başı (harf değil)", !!markImg && markImg.src.endsWith("pose-icon.webp") && markImg.naturalWidth > 0, markImg?.src);
+      check("blank tab's icon is Ebabil's head (not a letter)", !!markImg && markImg.src.endsWith("pose-icon.webp") && markImg.naturalWidth > 0, markImg?.src);
       tabs.close(bl);
     }
 
-    // ===================== Başlangıç kişiselleştirme (duvar kâğıdı, Ebabil), Esin logosu, belge simgeleri =====================
+    // ===================== Start personalization (wallpaper, Ebabil), Esin logo, document icons =====================
     {
       const $ = id => document.getElementById(id);
       const S = Vento.start;
@@ -868,89 +868,89 @@
       const lum = c => { const m = c.match(/\d+(\.\d+)?/g).map(Number); return (0.2126 * m[0] + 0.7152 * m[1] + 0.0722 * m[2]) / 255; };
       const setWall = id => prefs.setStringPref("vento.start.wallpaper", id);
 
-      check("açılışta panel GİZLİ, duvar kâğıdı yok (sade varsayılan)", $("custom-panel").hidden === true && !$("start").hasAttribute("data-wallpaper") && prefs.getStringPref("vento.start.wallpaper", "?") === "", `panel.hidden=${$("custom-panel").hidden}`);
-      check("6 duvar kâğıdı (4 koyu, 2 açık) + 'Yok' karosu = 7 karo; varsayılanda 'Yok' seçili", S.WALLPAPERS.length === 6 && S.WALLPAPERS.filter(w => w.tone === "dark").length === 4 && $("cp-walls").querySelectorAll("button").length === 7 && $("cp-walls").querySelector('button[data-id=""]').getAttribute("aria-pressed") === "true");
+      check("panel is HIDDEN at startup, no wallpaper (plain default)", $("custom-panel").hidden === true && !$("start").hasAttribute("data-wallpaper") && prefs.getStringPref("vento.start.wallpaper", "?") === "", `panel.hidden=${$("custom-panel").hidden}`);
+      check("6 wallpapers (4 dark, 2 light) + a 'Yok' tile = 7 tiles; 'Yok' is selected by default", S.WALLPAPERS.length === 6 && S.WALLPAPERS.filter(w => w.tone === "dark").length === 4 && $("cp-walls").querySelectorAll("button").length === 7 && $("cp-walls").querySelector('button[data-id=""]').getAttribute("aria-pressed") === "true");
 
-      // Görünür bir boş sekmede ölç (başlangıç ekranı yalnız boş sekmede görünür)
+      // Measure on a visible blank tab (the start screen is only visible on a blank tab)
       const blank = tabs.open("about:blank");
       await wait(() => $("stage").hasAttribute("blank"), 3000);
       const word = () => getComputedStyle($("start-word")).color;
 
       setWall("tide");
-      check("koyu duvar kâğıdı: uygulandı, ton 'dark', yazı AÇIK renk (okunur)", await wait(() => $("start").dataset.wallpaper === "tide" && $("start").dataset.tone === "dark", 8000) && lum(word()) > 0.6 && $("start-wall").style.backgroundImage.includes("vento-tide.jpg"), word());
+      check("dark wallpaper: applied, tone 'dark', text is a LIGHT color (readable)", await wait(() => $("start").dataset.wallpaper === "tide" && $("start").dataset.tone === "dark", 8000) && lum(word()) > 0.6 && $("start-wall").style.backgroundImage.includes("vento-tide.jpg"), word());
       setWall("mist");
-      check("açık duvar kâğıdı: ton 'light', yazı KOYU renk (okunur)", await wait(() => $("start").dataset.tone === "light", 8000) && lum(word()) < 0.4, word());
-      check("seçili karo güncellendi (aria-pressed)", $("cp-walls").querySelector('button[data-id="mist"]').getAttribute("aria-pressed") === "true" && $("cp-walls").querySelector('button[data-id="tide"]').getAttribute("aria-pressed") === "false");
+      check("light wallpaper: tone 'light', text is a DARK color (readable)", await wait(() => $("start").dataset.tone === "light", 8000) && lum(word()) < 0.4, word());
+      check("selected tile updated (aria-pressed)", $("cp-walls").querySelector('button[data-id="mist"]').getAttribute("aria-pressed") === "true" && $("cp-walls").querySelector('button[data-id="tide"]').getAttribute("aria-pressed") === "false");
       setWall("");
-      check("'Yok': duvar kâğıdı ve ton kalktı", await wait(() => !$("start").hasAttribute("data-wallpaper") && !$("start").hasAttribute("data-tone") && $("start-wall").style.backgroundImage === "", 4000));
+      check("'Yok': wallpaper and tone were cleared", await wait(() => !$("start").hasAttribute("data-wallpaper") && !$("start").hasAttribute("data-tone") && $("start-wall").style.backgroundImage === "", 4000));
       setWall("bozuk-kimlik");
       await new Promise(r => setTimeout(r, 400));
-      check("bozuk tercih değeri güvenli: 'yok' sayılır", !$("start").hasAttribute("data-wallpaper"));
-      // yarış: hızlı art arda seçim → SON seçim kazanır
+      check("a corrupt pref value is safe: treated as 'none'", !$("start").hasAttribute("data-wallpaper"));
+      // race: quick successive picks -> the LAST pick wins
       for (const id of ["ink", "tide", "mist", "dusk"]) { setWall(id); }
-      check("hızlı art arda seçimde son seçim kazanır (yarış güvenli)", await wait(() => $("start").dataset.wallpaper === "dusk", 8000) && await new Promise(r => setTimeout(() => r($("start").dataset.wallpaper === "dusk" && $("start").dataset.tone === "dark"), 900)));
+      check("the last pick wins on quick successive picks (race-safe)", await wait(() => $("start").dataset.wallpaper === "dusk", 8000) && await new Promise(r => setTimeout(() => r($("start").dataset.wallpaper === "dusk" && $("start").dataset.tone === "dark"), 900)));
 
-      // Panel: düğmeyle açılır/kapanır, karo tıklayınca tercih yazılır
+      // Panel: opens/closes with the button, clicking a tile writes the pref
       $("start-custom").click();
-      check("Özelleştir düğmesi paneli açar (pop animasyonuyla)", S.isOpen() && !$("custom-panel").hidden && $("custom-panel").getAnimations().length > 0);
+      check("Özelleştir button opens the panel (with the pop animation)", S.isOpen() && !$("custom-panel").hidden && $("custom-panel").getAnimations().length > 0);
       $("cp-walls").querySelector('button[data-id="paper"]').click();
-      check("karo tıklanınca tercih yazıldı ve uygulandı", prefs.getStringPref("vento.start.wallpaper") === "paper" && await wait(() => $("start").dataset.wallpaper === "paper" && $("start").dataset.tone === "light", 8000));
-      check("panel ton değişiminden etkilenmez: yazı rengi uygulamanın kendi rengi (başlangıç yazısından bağımsız)", getComputedStyle($("custom-panel")).color === getComputedStyle(document.body).color && $("start").dataset.tone === "light", `${getComputedStyle($("custom-panel")).color} / gövde ${getComputedStyle(document.body).color}`);
-      // Ebabil aç/kapa
+      check("pref was written and applied when a tile was clicked", prefs.getStringPref("vento.start.wallpaper") === "paper" && await wait(() => $("start").dataset.wallpaper === "paper" && $("start").dataset.tone === "light", 8000));
+      check("panel is unaffected by the tone change: text color is the app's own color (independent of the start text)", getComputedStyle($("custom-panel")).color === getComputedStyle(document.body).color && $("start").dataset.tone === "light", `${getComputedStyle($("custom-panel")).color} / body ${getComputedStyle(document.body).color}`);
+      // Ebabil on/off
       $("cp-ebabil").checked = false;
       $("cp-ebabil").dispatchEvent(new Event("change"));
-      check("'Ebabil'i göster' kapatılınca Ebabil gizlenir, tercih yazılır", $("ebabil").hidden === true && prefs.getBoolPref("vento.start.ebabil") === false);
+      check("when 'Ebabil'i göster' is turned off Ebabil is hidden and the pref is written", $("ebabil").hidden === true && prefs.getBoolPref("vento.start.ebabil") === false);
       prefs.setBoolPref("vento.start.ebabil", true);
-      check("tercih dışarıdan değişince (gözlemci) Ebabil geri gelir ve kutu işaretlenir", $("ebabil").hidden === false && $("cp-ebabil").checked === true);
-      // kapanma yolları
+      check("when the pref changes from outside (observer) Ebabil comes back and the box is checked", $("ebabil").hidden === false && $("cp-ebabil").checked === true);
+      // ways to close
       document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-      check("Esc paneli kapatır", await wait(() => $("custom-panel").hidden, 3000));
+      check("Esc closes the panel", await wait(() => $("custom-panel").hidden, 3000));
       S.open();
       $("stage").dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
-      check("panel dışına tıklayınca kapanır", await wait(() => $("custom-panel").hidden, 3000));
+      check("closes on a click outside the panel", await wait(() => $("custom-panel").hidden, 3000));
       S.open();
       const other = tabs.open(`${Services.env.get("VENTO_ESIN_ENDPOINT").replace(/\/v1$/, "")}/oturum/baska`);
-      check("başlangıç ekranı gidince (sayfaya geçince) panel de kapanır", await wait(() => $("custom-panel").hidden, 5000));
+      check("the panel closes too when the start screen goes away (navigating to a page)", await wait(() => $("custom-panel").hidden, 5000));
       tabs.close(other);
       tabs.select(blank);
       setWall("");
       prefs.setBoolPref("vento.start.ebabil", true);
       await wait(() => !$("start").hasAttribute("data-wallpaper"), 3000);
 
-      // Esin logosu: araç çubuğunda tek renk maske, panel başlığında renkli
+      // Esin logo: a single-color mask in the toolbar, colored in the panel header
       const g = document.querySelector("#nav-esin .esin-glyph");
       const logo = document.querySelector(".esin-logo");
       await wait(() => logo.complete, 4000);
-      check("Esin düğmesi: tek renk logo maskesi (renk = currentColor), eski ✦ yok", getComputedStyle(g).maskImage.includes("esin-mask.png") && g.getBoundingClientRect().width >= 16 && !document.querySelector("#nav-esin svg"), getComputedStyle(g).maskImage);
-      check("Esin panel başlığında renkli logo yüklendi", logo.complete && logo.naturalWidth === 256 && logo.src.endsWith("esin-color.png"), String(logo.naturalWidth));
+      check("Esin button: single-color logo mask (color = currentColor), no old ✦", getComputedStyle(g).maskImage.includes("esin-mask.png") && g.getBoundingClientRect().width >= 16 && !document.querySelector("#nav-esin svg"), getComputedStyle(g).maskImage);
+      check("colored logo loaded in the Esin panel header", logo.complete && logo.naturalWidth === 256 && logo.src.endsWith("esin-color.png"), String(logo.naturalWidth));
 
-      // Belge simgeleri: pakette ve Vento'ya ait
+      // Document icons: in the bundle and Vento's own
       const res = Services.dirsvc.get("GreD", Ci.nsIFile);
       const readIcns = async name => { const f = res.clone(); f.append(name); return IOUtils.read(f.path); };
       const [doc, app] = [await readIcns("document.icns"), await readIcns("firefox.icns")];
       const magic = b => new TextDecoder().decode(b.slice(0, 4));
-      check("document.icns geçerli bir icns ve Vento belge simgesi (uygulama simgesinden farklı)", magic(doc) === "icns" && doc.length > 50000 && doc.length !== app.length, `${doc.length} B`);
+      check("document.icns is a valid icns and the Vento document icon (different from the app icon)", magic(doc) === "icns" && doc.length > 50000 && doc.length !== app.length, `${doc.length} B`);
     }
 
-    // ===================== Arayüz dili (Türkçe) =====================
+    // ===================== UI language (Turkish) =====================
     {
       const L = Services.locale;
-      check("arayüz dili Türkçe (tr), varsayılan en-US kalır", L.appLocaleAsBCP47 === "tr" && L.defaultLocale === "en-US", `${L.appLocaleAsBCP47} / varsayılan ${L.defaultLocale}`);
-      check("paketli diller: tr ve en-US (yedek)", L.packagedLocales.includes("tr") && L.packagedLocales.includes("en-US"), L.packagedLocales.join(","));
-      check("istenen diller: tr, en-US'e düşer", L.requestedLocales[0] === "tr" && L.appLocalesAsBCP47.includes("en-US"), `${L.requestedLocales} → ${L.appLocalesAsBCP47}`);
-      // .properties (chrome://…/locale/) Türkçe
+      check("UI language is Turkish (tr), the default stays en-US", L.appLocaleAsBCP47 === "tr" && L.defaultLocale === "en-US", `${L.appLocaleAsBCP47} / default ${L.defaultLocale}`);
+      check("packaged languages: tr and en-US (fallback)", L.packagedLocales.includes("tr") && L.packagedLocales.includes("en-US"), L.packagedLocales.join(","));
+      check("requested languages: tr, falls back to en-US", L.requestedLocales[0] === "tr" && L.appLocalesAsBCP47.includes("en-US"), `${L.requestedLocales} → ${L.appLocalesAsBCP47}`);
+      // .properties (chrome://.../locale/) in Turkish
       const dlg = Services.strings.createBundle("chrome://global/locale/commonDialogs.properties");
-      Vento.trace(`DİL-TANI commonDialogs Yes="${dlg.GetStringFromName("Yes")}" Cancel="${dlg.GetStringFromName("Cancel")}" EnterUserPasswordFor2="${dlg.GetStringFromName("EnterUserPasswordFor2")}"`);
-      check("commonDialogs.properties Türkçe ('&Evet', & = erişim tuşu)", dlg.GetStringFromName("Yes") === "&Evet" && dlg.GetStringFromName("Cancel") === "Vazgeç", `${dlg.GetStringFromName("Yes")} / ${dlg.GetStringFromName("Cancel")}`);
-      // Fluent (.ftl) Türkçe + tek dosya eksikse bile kümenin çökmediği
+      Vento.trace(`LOCALE-DIAG commonDialogs Yes="${dlg.GetStringFromName("Yes")}" Cancel="${dlg.GetStringFromName("Cancel")}" EnterUserPasswordFor2="${dlg.GetStringFromName("EnterUserPasswordFor2")}"`);
+      check("commonDialogs.properties in Turkish ('&Evet', & = access key)", dlg.GetStringFromName("Yes") === "&Evet" && dlg.GetStringFromName("Cancel") === "Vazgeç", `${dlg.GetStringFromName("Yes")} / ${dlg.GetStringFromName("Cancel")}`);
+      // Fluent (.ftl) in Turkish + the set doesn't crash even if a single file is missing
       const loc = new Localization(["toolkit/neterror/netError.ftl", "branding/brand.ftl"], true);
       const v = loc.formatValueSync("neterror-page-title");
-      check("Fluent: neterror-page-title Türkçe", typeof v === "string" && v.length > 0 && v !== "neterror-page-title", String(v));
+      check("Fluent: neterror-page-title in Turkish", typeof v === "string" && v.length > 0 && v !== "neterror-page-title", String(v));
     }
 
-    // ===================== Hata sayfaları =====================
-    // Toolkit'in about:neterror'u, uygulama dil kaynağı (brand.ftl) kayıtlı değilse hiçbir iletiyi çözemez:
-    // başlık boş, metinler ham kalır. Kayıt: vento/l10n-registry.manifest.
+    // ===================== Error pages =====================
+    // Toolkit's about:neterror can't resolve any message if the app locale resource (brand.ftl) isn't registered:
+    // the title is empty, the texts stay raw. Registration: vento/l10n-registry.manifest.
     {
       const tab = tabs.selected;
       const docURI = () => tab.browser.browsingContext?.currentWindowGlobal?.documentURI?.spec ?? "";
@@ -958,7 +958,7 @@
       const listener = { observe(m) { if (m instanceof Ci.nsIScriptError && /Missing resource/.test(m.errorMessage)) missing.push(m.errorMessage); } };
       Services.console.registerListener(listener);
       tab.browser.fixupAndLoadURIString("http://nonexistent.invalid/", { triggeringPrincipal: Vento.SYSTEM_PRINCIPAL });
-      check("DNS hatası: about:neterror açıldı", await wait(() => docURI().startsWith("about:neterror?e=dnsNotFound"), 15000), docURI());
+      check("DNS error: about:neterror opened", await wait(() => docURI().startsWith("about:neterror?e=dnsNotFound"), 15000), docURI());
       await wait(() => tab.title === "Sunucu bulunamadı", 10000);
       Services.console.unregisterListener(listener);
       const text = await new Promise(resolve => {
@@ -967,63 +967,63 @@
         mm.loadFrameScript("data:,(" + encodeURIComponent(`function(){ sendAsyncMessage("vento:errtext", content.document.body?.innerText || ""); }`) + ")()", false);
         setTimeout(() => resolve(""), 5000);
       });
-      check("hata sayfası başlığı çözüldü ve Türkçe", tab.title === "Sunucu bulunamadı", `"${tab.title}"`);
-      check("hata sayfası metni Türkçe ('Aradığınız siteyi bulamıyoruz')", text.includes("Aradığınız siteyi bulamıyoruz"), text.slice(0, 120));
-      check("marka adı Vento (Nightly/Firefox değil)", /Vento/.test(text) && !/Nightly|Firefox/.test(text), text.match(/.{0,30}Vento.{0,40}/)?.[0] ?? text.slice(0, 200));
-      check("dil kaynağı eksikliği raporlanmadı (brand.ftl)", missing.length === 0, missing.join(" | "));
-      check("uygulama dil kaynağı kayıtlı", L10nRegistry.getInstance().getSourceNames().some(n => n.includes("vento")));
+      check("error page title resolved and in Turkish", tab.title === "Sunucu bulunamadı", `"${tab.title}"`);
+      check("error page text in Turkish ('Aradığınız siteyi bulamıyoruz')", text.includes("Aradığınız siteyi bulamıyoruz"), text.slice(0, 120));
+      check("brand name is Vento (not Nightly/Firefox)", /Vento/.test(text) && !/Nightly|Firefox/.test(text), text.match(/.{0,30}Vento.{0,40}/)?.[0] ?? text.slice(0, 200));
+      check("no missing locale resource was reported (brand.ftl)", missing.length === 0, missing.join(" | "));
+      check("app locale resource is registered", L10nRegistry.getInstance().getSourceNames().some(n => n.includes("vento")));
     }
 
-    // ===================== Sertifika hata sayfası (gerçek HTTPS, kendinden imzalı) =====================
+    // ===================== Certificate error page (real HTTPS, self-signed) =====================
     {
       const https = Services.env.get("VENTO_TEST_HTTPS");
-      const tab = tabs.open("about:blank"); // temiz sekme (önceki hata sayfası testinin durumu karışmasın)
+      const tab = tabs.open("about:blank"); // clean tab (so the previous error page test's state doesn't interfere)
       const docURI = () => tab.browser.browsingContext?.currentWindowGlobal?.documentURI?.spec ?? "";
       const load = u => tab.browser.fixupAndLoadURIString(u, { triggeringPrincipal: Vento.SYSTEM_PRINCIPAL });
-      // İçerik sürecinde bir işlev çalıştırıp sonucunu alır
+      // Runs a function in the content process and gets its result
       const inPage = (body, ms = 8000) => new Promise(resolve => {
         body = body.replace(/\bdocument\b/g, "content.document");
         const id = "vento:sonuc:" + Math.random();
         const mm = tab.browser.messageManager;
         mm.addMessageListener(id, m => resolve(m.data), { once: true });
-        // async destekli; kaynak ASCII olmalı (data: betik Latin-1 okunuyor)
+        // async supported; the source must be ASCII (the data: script is read as Latin-1)
         mm.loadFrameScript("data:,(" + encodeURIComponent(`function(){ Promise.resolve().then(() => (${body})()).then(r => sendAsyncMessage(${JSON.stringify(id)}, r), e => sendAsyncMessage(${JSON.stringify(id)}, "HATA " + e)); }`) + ")()", false);
         setTimeout(() => resolve("ZAMAN AŞIMI"), ms);
       });
-      check("gizlilik: sertifika hatasında Mozilla MITM sunucusuna istek atılmıyor", Services.prefs.getBoolPref("security.certerrors.mitm.priming.enabled") === false);
-      Services.prefs.setIntPref("security.dialog_enable_delay", 0); // "Riski kabul et" düğmesinin 1 sn'lik bekleme süresi (yalnız test)
+      check("privacy: no request is made to Mozilla's MITM server on a certificate error", Services.prefs.getBoolPref("security.certerrors.mitm.priming.enabled") === false);
+      Services.prefs.setIntPref("security.dialog_enable_delay", 0); // the 1 s wait on the "Riski kabul et" button (test only)
       const overrides = Cc["@mozilla.org/security/certoverride;1"].getService(Ci.nsICertOverrideService);
 
       load(`${https}/`);
-      check("kendinden imzalı HTTPS: about:certerror açıldı", await wait(() => docURI().startsWith("about:certerror"), 15000), docURI().slice(0, 80));
-      check("sertifika hata sayfasının başlığı çözüldü ve Türkçe", await wait(() => tab.title === "Uyarı: Güvenlik riskiyle karşılaşabilirsiniz", 10000), `"${tab.title}"`);
+      check("self-signed HTTPS: about:certerror opened", await wait(() => docURI().startsWith("about:certerror"), 15000), docURI().slice(0, 80));
+      check("certificate error page title resolved and in Turkish", await wait(() => tab.title === "Uyarı: Güvenlik riskiyle karşılaşabilirsiniz", 10000), `"${tab.title}"`);
       const page = await inPage(`() => ({ text: document.body.innerText, adv: !!document.getElementById("advancedButton"), ret: !!document.getElementById("returnButton"), exc: !!document.getElementById("exceptionDialogButton") })`);
-      check("sayfa metni: 'Vento' adı geçiyor, Nightly/Firefox yok", /Vento/.test(page.text) && !/Nightly|Firefox/.test(page.text), String(page.text).slice(0, 160).replace(/\n/g, " | "));
-      check("düğmeler: Gelişmiş, Geri dön, İstisna", page.adv && page.ret && page.exc, JSON.stringify(page));
+      check("page text: 'Vento' appears, no Nightly/Firefox", /Vento/.test(page.text) && !/Nightly|Firefox/.test(page.text), String(page.text).slice(0, 160).replace(/\n/g, " | "));
+      check("buttons: Gelişmiş, Geri dön, İstisna", page.adv && page.ret && page.exc, JSON.stringify(page));
 
       await inPage(`() => document.getElementById("advancedButton").click()`);
       const adv = await inPage(`() => { const b = document.getElementById("exceptionDialogButton"); return { hidden: b.closest("[hidden]") ? "gizli" : "gorunur", disabled: b.disabled }; }`);
-      check("'Gelişmiş' → 'Riski kabul et' düğmesi görünür", adv.hidden === "gorunur", JSON.stringify(adv));
+      check("'Gelişmiş' -> the 'Riski kabul et' button is visible", adv.hidden === "gorunur", JSON.stringify(adv));
 
       await wait(async () => (await inPage(`() => !document.getElementById("exceptionDialogButton").disabled`)) === true, 8000);
       await inPage(`() => document.getElementById("exceptionDialogButton").click()`);
-      check("riski kabul edince sayfa gerçekten yüklendi", await wait(() => tab.title === "Güvenli sayfa", 15000), `"${tab.title}" ${docURI().slice(0, 50)}`);
-      check("adres çubuğu HTTPS adresini gösteriyor (hata adresi değil)", tab.url === `${https}/`, tab.url);
-      check("istisna saklandı (aynı oturumda yeniden sorulmaz)", await (async () => { load(`${https}/?ikinci`); return wait(() => tab.title === "Güvenli sayfa" && tab.url.endsWith("?ikinci"), 15000); })());
+      check("page actually loaded after accepting the risk", await wait(() => tab.title === "Güvenli sayfa", 15000), `"${tab.title}" ${docURI().slice(0, 50)}`);
+      check("address bar shows the HTTPS URL (not the error URL)", tab.url === `${https}/`, tab.url);
+      check("exception was stored (not asked again in the same session)", await (async () => { load(`${https}/?ikinci`); return wait(() => tab.title === "Güvenli sayfa" && tab.url.endsWith("?ikinci"), 15000); })());
       overrides.clearAllOverrides();
 
-      // "Geri dön": önceki sayfaya (temiz geçmiş: data: sayfası → sertifika hatası → geri)
+      // "Geri dön": to the previous page (clean history: data: page -> certificate error -> back)
       load("data:text/html,<title>onceki</title>");
       await wait(() => tab.title === "onceki" && !tab.loading, 10000);
       load(`${https}/?geri`);
       await wait(() => docURI().startsWith("about:certerror"), 15000);
       await inPage(`() => document.getElementById("returnButton").click()`);
-      check("'Geri dön' önceki sayfaya götürdü", await wait(() => tab.title === "onceki" && !docURI().startsWith("about:certerror"), 10000), `${docURI().slice(0, 40)} "${tab.title}"`);
+      check("'Geri dön' took us to the previous page", await wait(() => tab.title === "onceki" && !docURI().startsWith("about:certerror"), 10000), `${docURI().slice(0, 40)} "${tab.title}"`);
       Services.prefs.clearUserPref("security.dialog_enable_delay");
       tabs.close(tab);
     }
 
-    // ===================== HTTP kimlik doğrulama (gerçek sunucu, uçtan uca) =====================
+    // ===================== HTTP authentication (real server, end to end) =====================
     {
       const llm = Services.env.get("VENTO_ESIN_ENDPOINT").replace(/\/v1$/, "");
       const D = Vento.dialogs;
@@ -1037,46 +1037,46 @@
       clearLogins();
 
       load(`${llm}/kimlik/bir`);
-      check("korumalı sayfa: kimlik diyaloğu açıldı", await wait(() => visible() && card()?.querySelector(".dlg-user") && card().querySelector(".dlg-pass"), 15000));
+      check("protected page: auth dialog opened", await wait(() => visible() && card()?.querySelector(".dlg-user") && card().querySelector(".dlg-pass"), 15000));
       const text = card()?.textContent ?? "";
-      // Güvenlik: realm sunucunun kontrolünde (sahte istem metni yazılabilir) → Firefox yalnız proxy için gösterir; biz de göstermemeliyiz
-      check("diyalog: site (127.0.0.1) görünür, sunucunun yazdığı alan adı (realm) GÖRÜNMEZ", text.includes("127.0.0.1") && !text.includes("Test Alani"), text.slice(0, 160));
-      check("diyalog: http için 'güvensiz' uyarısı var", !!card()?.querySelector(".dlg-warn, .dlg-insecure") || /güvens|şifrelen|encrypt/i.test(text), text.slice(0, 160));
-      check("parola alanı gizli (type=password)", card()?.querySelector(".dlg-pass")?.type === "password");
+      // Security: the realm is under the server's control (a fake prompt text can be written) -> Firefox only shows it for a proxy; we must not show it either
+      check("dialog: the site (127.0.0.1) is visible, the realm written by the server is NOT shown", text.includes("127.0.0.1") && !text.includes("Test Alani"), text.slice(0, 160));
+      check("dialog: there is an 'insecure' warning for http", !!card()?.querySelector(".dlg-warn, .dlg-insecure") || /güvens|şifrelen|encrypt/i.test(text), text.slice(0, 160));
+      check("password field is hidden (type=password)", card()?.querySelector(".dlg-pass")?.type === "password");
 
-      // yanlış parola → sunucu yine 401 → diyalog YENİDEN açılır
+      // wrong password -> the server returns 401 again -> the dialog opens AGAIN
       card().querySelector(".dlg-user").value = "can";
       card().querySelector(".dlg-pass").value = "yanlis";
       btn(0).click();
-      check("yanlış parola: diyalog yeniden sordu", await wait(() => visible() && card()?.querySelector(".dlg-pass")?.value === "", 15000));
+      check("wrong password: the dialog asked again", await wait(() => visible() && card()?.querySelector(".dlg-pass")?.value === "", 15000));
 
       card().querySelector(".dlg-user").value = "can";
       card().querySelector(".dlg-pass").value = "gizli";
       btn(0).click();
-      check("doğru parola: sayfa yüklendi", await wait(() => tab.title === "Giris yapildi" && !visible(), 15000), `"${tab.title}"`);
+      check("correct password: page loaded", await wait(() => tab.title === "Giris yapildi" && !visible(), 15000), `"${tab.title}"`);
       const a1 = await attempts();
-      check("sunucu: önce kimliksiz, sonra yanlış, sonra doğru", a1.length >= 3 && !a1[0].sent && a1.some(a => a.sent && !a.ok) && a1.at(-1).ok, JSON.stringify(a1));
+      check("server: first without credentials, then wrong, then correct", a1.length >= 3 && !a1[0].sent && a1.some(a => a.sent && !a.ok) && a1.at(-1).ok, JSON.stringify(a1));
 
-      // başarılı girişten sonra aynı alanda yeniden sorulmaz
+      // not asked again in the same realm after a successful login
       load(`${llm}/kimlik/iki`);
-      check("giriş sonrası aynı alanda diyalog çıkmadı", await wait(() => tab.title === "Giris yapildi" && tab.url.endsWith("/iki"), 15000) && !visible(), `"${tab.title}" diyalog=${visible()}`);
+      check("no dialog in the same realm after login", await wait(() => tab.title === "Giris yapildi" && tab.url.endsWith("/iki"), 15000) && !visible(), `"${tab.title}" dialog=${visible()}`);
 
-      // iptal → 401 sayfası görünür, diyalog kapanır
+      // cancel -> the 401 page shows, the dialog closes
       clearLogins();
       load(`${llm}/kimlik/uc`);
       await wait(() => visible() && card()?.querySelector(".dlg-user"), 15000);
       btn(1).click();
-      check("İptal: sunucunun 401 sayfası gösterildi, diyalog kapandı", await wait(() => tab.title === "Yetkisiz" && !visible(), 15000), `"${tab.title}" diyalog=${visible()}`);
+      check("Cancel: the server's 401 page was shown, the dialog closed", await wait(() => tab.title === "Yetkisiz" && !visible(), 15000), `"${tab.title}" dialog=${visible()}`);
       const a2 = await attempts();
-      check("İptal: iptalden sonra sunucuya parola GİTMEDİ", !a2.filter(a => a.url.endsWith("/uc")).some(a => a.sent), JSON.stringify(a2.filter(a => a.url.endsWith("/uc"))));
+      check("Cancel: no password was sent to the server after cancelling", !a2.filter(a => a.url.endsWith("/uc")).some(a => a.sent), JSON.stringify(a2.filter(a => a.url.endsWith("/uc"))));
 
       clearLogins();
       tabs.close(tab);
     }
 
-    // ===================== Dosya seçici (<input type=file>) =====================
-    // Yerel macOS paneli başsız testte tıklanamaz → kayıtlı sahte seçici. Ölçülen: sayfa seçiciyi gerçekten çağırıyor mu,
-    // mod/filtre doğru mu, seçilen dosya sayfaya ulaşıyor mu, İptal'de sayfa değişmiyor mu.
+    // ===================== File picker (<input type=file>) =====================
+    // The native macOS panel can't be clicked in a headless test -> a registered mock picker. What is measured: does the page really call the picker,
+    // are the mode/filter right, does the chosen file reach the page, does the page stay unchanged on Cancel.
     {
       const llm = Services.env.get("VENTO_ESIN_ENDPOINT").replace(/\/v1$/, "");
       const tab = tabs.open("about:blank");
@@ -1088,14 +1088,14 @@
         mm.loadFrameScript("data:,(" + encodeURIComponent(`function(){ Promise.resolve().then(() => (${body})()).then(r => sendAsyncMessage(${JSON.stringify(id)}, r), e => sendAsyncMessage(${JSON.stringify(id)}, "HATA " + e)); }`) + ")()", false);
         setTimeout(() => resolve("ZAMAN ASIMI"), ms);
       });
-      // Gerçek kullanıcı etkinleştirmesiyle (aksi hâlde sayfa seçici açamaz) girdiye tıklar
+      // Clicks the input with a real user activation (otherwise the page can't open the picker)
       const tikla = id => inPage(`() => { content.document.notifyUserGestureActivation(); content.document.getElementById("${id}").click(); return true; }`);
       const tmp = name => PathUtils.join(PathUtils.tempDir, name);
       const nsFile = path => { const f = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsIFile); f.initWithPath(path); return f; };
       await IOUtils.writeUTF8(tmp("vento-test-a.txt"), "merhaba");
       await IOUtils.writeUTF8(tmp("vento-test-b.txt"), "dunya");
 
-      // Gerçek (yerel) seçici bileşeni var ve penceremizle başlatılabiliyor
+      // The real (native) picker component exists and can be initialized with our window
       {
         let ok = false, err = "";
         try {
@@ -1103,10 +1103,10 @@
           fp.init(window.browsingContext, "Dosya sec", Ci.nsIFilePicker.modeOpen);
           ok = true;
         } catch (e) { err = String(e); }
-        check("yerel dosya seçici bileşeni var ve pencereyle başlatılıyor", ok, err);
+        check("native file picker component exists and initializes with the window", ok, err);
       }
 
-      // -- sahte seçici
+      // -- mock picker
       const registrar = Components.manager.QueryInterface(Ci.nsIComponentRegistrar);
       const CONTRACT = "@mozilla.org/filepicker;1";
       const oldCID = registrar.contractIDToCID(CONTRACT);
@@ -1133,13 +1133,13 @@
         load(`${llm}/dosya.html`);
         await wait(() => tab.title === "hazir", 15000);
 
-        // tek dosya
+        // single file
         mock.files = [nsFile(tmp("vento-test-a.txt"))];
         await tikla("tek");
-        check("tek dosya: sayfa seçiciyi çağırdı (Aç modu, başlık var, pencere bağlı)", await wait(() => mock.calls.length === 1, 10000) && mock.calls[0].mode === Ci.nsIFilePicker.modeOpen && mock.calls[0].hasBC && mock.calls[0].title !== "", JSON.stringify(mock.calls[0]));
-        check("tek dosya: ad ve İÇERİK sayfaya ulaştı", await wait(() => tab.title === "dosya:tek:vento-test-a.txt=merhaba", 10000), `"${tab.title}"`);
+        check("single file: the page called the picker (Open mode, has a title, window attached)", await wait(() => mock.calls.length === 1, 10000) && mock.calls[0].mode === Ci.nsIFilePicker.modeOpen && mock.calls[0].hasBC && mock.calls[0].title !== "", JSON.stringify(mock.calls[0]));
+        check("single file: name and CONTENT reached the page", await wait(() => tab.title === "dosya:tek:vento-test-a.txt=merhaba", 10000), `"${tab.title}"`);
 
-        // İptal: sayfa değişmemeli
+        // Cancel: the page must not change
         mock.result = Ci.nsIFilePicker.returnCancel;
         mock.files = [];
         load(`${llm}/dosya.html?iptal`);
@@ -1149,29 +1149,29 @@
         await wait(() => mock.calls.length === n0 + 1, 10000);
         await new Promise(r => setTimeout(r, 800));
         const secim = await inPage(`() => content.document.getElementById("tek").files.length`);
-        check("İptal: seçici açıldı ama sayfada dosya seçilmedi, başlık değişmedi", secim === 0 && tab.title === "hazir", `dosya=${secim} başlık="${tab.title}"`);
+        check("Cancel: the picker opened but no file was chosen on the page, the title didn't change", secim === 0 && tab.title === "hazir", `files=${secim} title="${tab.title}"`);
 
-        // çoklu
+        // multiple
         mock.result = Ci.nsIFilePicker.returnOK;
         mock.files = [nsFile(tmp("vento-test-a.txt")), nsFile(tmp("vento-test-b.txt"))];
         const n1 = mock.calls.length;
         await tikla("cok");
-        check("çoklu: Aç-çoklu modu istendi", await wait(() => mock.calls.length === n1 + 1, 10000) && mock.calls.at(-1).mode === Ci.nsIFilePicker.modeOpenMultiple, String(mock.calls.at(-1)?.mode));
-        check("çoklu: iki dosya da sayfaya ulaştı", await wait(() => tab.title === "dosya:cok:vento-test-a.txt=merhaba|vento-test-b.txt=dunya", 10000), `"${tab.title}"`);
+        check("multiple: Open-multiple mode was requested", await wait(() => mock.calls.length === n1 + 1, 10000) && mock.calls.at(-1).mode === Ci.nsIFilePicker.modeOpenMultiple, String(mock.calls.at(-1)?.mode));
+        check("multiple: both files reached the page", await wait(() => tab.title === "dosya:cok:vento-test-a.txt=merhaba|vento-test-b.txt=dunya", 10000), `"${tab.title}"`);
 
-        // accept="…": filtre seçiciye iletilir
+        // accept="...": the filter is passed to the picker
         mock.files = [nsFile(tmp("vento-test-a.txt"))];
         const n2 = mock.calls.length;
         await tikla("acc");
         await wait(() => mock.calls.length === n2 + 1, 10000);
         const rec = mock.calls.at(-1);
-        check("accept='.txt,image/png': filtre seçiciye iletildi", rec.filters.some(f => /\*\.txt/.test(f)) || rec.masks !== 0, JSON.stringify(rec));
+        check("accept='.txt,image/png': the filter was passed to the picker", rec.filters.some(f => /\*\.txt/.test(f)) || rec.masks !== 0, JSON.stringify(rec));
 
-        // klasör seçimi
+        // folder selection
         const n3 = mock.calls.length;
         mock.files = [nsFile(PathUtils.tempDir)];
         await tikla("dir");
-        check("webkitdirectory: klasör seçme modu istendi", await wait(() => mock.calls.length === n3 + 1, 10000) && mock.calls.at(-1).mode === Ci.nsIFilePicker.modeGetFolder, String(mock.calls.at(-1)?.mode));
+        check("webkitdirectory: folder-select mode was requested", await wait(() => mock.calls.length === n3 + 1, 10000) && mock.calls.at(-1).mode === Ci.nsIFilePicker.modeGetFolder, String(mock.calls.at(-1)?.mode));
       } finally {
         registrar.unregisterFactory(newCID, factory);
         if (oldCID) { registrar.registerFactory(oldCID, "", CONTRACT, null); }
@@ -1181,8 +1181,8 @@
       tabs.close(tab);
     }
 
-    // ===================== Yazdırma =====================
-    // Yerel macOS paneli başsız testte tıklanamaz → "PDF'e kaydet" sanal yazıcısı + sessiz kip: gerçek bir PDF üretilip üretilmediği ölçülür.
+    // ===================== Printing =====================
+    // The native macOS panel can't be clicked in a headless test -> the "Save to PDF" virtual printer + silent mode: we measure whether a real PDF is produced.
     {
       const llm = Services.env.get("VENTO_ESIN_ENDPOINT").replace(/\/v1$/, "");
       const tab = tabs.open("about:blank");
@@ -1203,29 +1203,29 @@
       };
       const browsersBefore = document.querySelectorAll("browser").length;
 
-      check("yazdırma katmanı yüklenebiliyor (PrintUtils) ve sistem paneli tercih edilmiş", typeof Vento.loadPrintUtils()?.startPrintWindow === "function" && Services.prefs.getBoolPref("print.prefer_system_dialog") === true);
+      check("printing layer can be loaded (PrintUtils) and the system panel is preferred", typeof Vento.loadPrintUtils()?.startPrintWindow === "function" && Services.prefs.getBoolPref("print.prefer_system_dialog") === true);
       const key = document.getElementById("key_print");
-      check("⌘P kısayolu ve Dosya ▸ Yazdır… menüsü bağlı", key?.getAttribute("key") === "p" && key.getAttribute("modifiers") === "accel" && document.getElementById("menu_print")?.getAttribute("command") === "cmd_print");
-      check("boş sekmede yazdırma başlamaz (false)", Vento.print(tab) === false);
+      check("⌘P shortcut and the File > Yazdır… menu are wired", key?.getAttribute("key") === "p" && key.getAttribute("modifiers") === "accel" && document.getElementById("menu_print")?.getAttribute("command") === "cmd_print");
+      check("printing doesn't start on a blank tab (false)", Vento.print(tab) === false);
 
       Services.prefs.setBoolPref("print.always_print_silent", true);
       try {
-        // ⌘P yolu
+        // ⌘P path
         load(`${llm}/yazdir.html`);
         await wait(() => tab.title === "Yazdirma sayfasi" && !tab.loading, 15000);
         await IOUtils.remove(pdf("vento-yazdir-a.pdf"), { ignoreAbsent: true });
         setOut(pdf("vento-yazdir-a.pdf"));
-        check("⌘P: yazdırma başladı (true)", Vento.print() === true);
-        check("⌘P: gerçek bir PDF üretildi (%PDF-, >1 KB)", await wait(() => isPDF(pdf("vento-yazdir-a.pdf")), 20000), String((await IOUtils.exists(pdf("vento-yazdir-a.pdf"))) && (await IOUtils.stat(pdf("vento-yazdir-a.pdf"))).size));
+        check("⌘P: printing started (true)", Vento.print() === true);
+        check("⌘P: a real PDF was produced (%PDF-, >1 KB)", await wait(() => isPDF(pdf("vento-yazdir-a.pdf")), 20000), String((await IOUtils.exists(pdf("vento-yazdir-a.pdf"))) && (await IOUtils.stat(pdf("vento-yazdir-a.pdf"))).size));
 
-        // window.print(): sayfanın kendisi çağırır
+        // window.print(): the page itself calls it
         await IOUtils.remove(pdf("vento-yazdir-b.pdf"), { ignoreAbsent: true });
         setOut(pdf("vento-yazdir-b.pdf"));
         load(`${llm}/yazdir.html?pencere`);
-        check("window.print(): gerçek bir PDF üretildi", await wait(() => isPDF(pdf("vento-yazdir-b.pdf")), 25000), String(await IOUtils.exists(pdf("vento-yazdir-b.pdf"))));
+        check("window.print(): a real PDF was produced", await wait(() => isPDF(pdf("vento-yazdir-b.pdf")), 25000), String(await IOUtils.exists(pdf("vento-yazdir-b.pdf"))));
         await new Promise(r => setTimeout(r, 1500));
-        check("yazdırma sonrası sayfa hâlâ yüklü ve sekme sayısı aynı", tab.title === "Yazdirma sayfasi" && tabs.all.includes(tab), `"${tab.title}"`);
-        check("yazdırma için açılan geçici tarayıcılar temizlendi", document.querySelectorAll("browser").length <= browsersBefore + 0, `${document.querySelectorAll("browser").length} / önce ${browsersBefore}`);
+        check("after printing the page is still loaded and the tab count is the same", tab.title === "Yazdirma sayfasi" && tabs.all.includes(tab), `"${tab.title}"`);
+        check("temporary browsers opened for printing were cleaned up", document.querySelectorAll("browser").length <= browsersBefore + 0, `${document.querySelectorAll("browser").length} / before ${browsersBefore}`);
       } finally {
         Services.prefs.clearUserPref("print.always_print_silent");
         Services.prefs.clearUserPref("print_printer");
@@ -1237,53 +1237,53 @@
       tabs.close(tab);
     }
 
-    // ===================== Kapatılan sekmeyi yeniden aç (⌘⇧T) =====================
+    // ===================== Reopen closed tab (⌘⇧T) =====================
     {
       const llm = Services.env.get("VENTO_ESIN_ENDPOINT").replace(/\/v1$/, "");
       const u = n => `${llm}/kapali/${n}`;
       const cmd = document.getElementById("cmd_reopenTab");
-      tabs.forgetClosed(); // önceki testlerin kapattığı sekmeler karışmasın
+      tabs.forgetClosed(); // so tabs closed by earlier tests don't interfere
       const base = tabs.all.length;
       const open = (n, select = false) => tabs.open(u(n), { select, lazy: { url: u(n), title: "Sayfa " + n } });
       const key = document.getElementById("key_reopenTab");
-      check("⌘⇧T kısayolu ve Geçmiş menüsü bağlı", key?.getAttribute("key") === "t" && key.getAttribute("modifiers") === "accel,shift" && document.getElementById("menu_reopenTab")?.getAttribute("command") === "cmd_reopenTab");
-      check("kapatılmış sekme yokken komut devre dışı, reopenClosed() null", cmd.hasAttribute("disabled") && tabs.closed.length === 0 && tabs.reopenClosed() === null);
+      check("⌘⇧T shortcut and the Geçmiş menu are wired", key?.getAttribute("key") === "t" && key.getAttribute("modifiers") === "accel,shift" && document.getElementById("menu_reopenTab")?.getAttribute("command") === "cmd_reopenTab");
+      check("command is disabled when there is no closed tab, reopenClosed() is null", cmd.hasAttribute("disabled") && tabs.closed.length === 0 && tabs.reopenClosed() === null);
 
       const [A, B, C] = [open("a"), open("b"), open("c")];
       tabs.close(B);
-      check("kapatılan sekme yığına girdi (adres + başlık + sıra)", tabs.closed.length === 1 && tabs.closed[0].url === u("b") && tabs.closed[0].title === "Sayfa b" && tabs.closed[0].index === base + 1, JSON.stringify(tabs.closed));
-      check("komut etkinleşti", !cmd.hasAttribute("disabled"));
+      check("closed tab went onto the stack (URL + title + index)", tabs.closed.length === 1 && tabs.closed[0].url === u("b") && tabs.closed[0].title === "Sayfa b" && tabs.closed[0].index === base + 1, JSON.stringify(tabs.closed));
+      check("command became enabled", !cmd.hasAttribute("disabled"));
 
       const back = tabs.reopenClosed();
-      check("⌘⇧T: sekme ESKİ yerine döndü (A ile C arasında) ve seçildi", back && tabs.all.indexOf(back) === base + 1 && tabs.all[base] === A && tabs.all[base + 2] === C && tabs.selected === back, String(tabs.all.indexOf(back)));
-      check("yeniden açılan sekmenin sayfası yüklendi", await wait(() => back.url === u("b") && back.browser.currentURI?.spec === u("b"), 15000), back.url);
-      check("yığın boşaldı, komut yine devre dışı", tabs.closed.length === 0 && cmd.hasAttribute("disabled"));
+      check("⌘⇧T: the tab returned to its OLD position (between A and C) and was selected", back && tabs.all.indexOf(back) === base + 1 && tabs.all[base] === A && tabs.all[base + 2] === C && tabs.selected === back, String(tabs.all.indexOf(back)));
+      check("reopened tab's page loaded", await wait(() => back.url === u("b") && back.browser.currentURI?.spec === u("b"), 15000), back.url);
+      check("stack emptied, command disabled again", tabs.closed.length === 0 && cmd.hasAttribute("disabled"));
 
-      // sıra: en son kapatılan önce döner
+      // order: the most recently closed comes back first
       tabs.close(A); tabs.close(C);
-      check("en yeni başta: C, sonra A", tabs.closed[0].url === u("c") && tabs.closed[1].url === u("a"), JSON.stringify(tabs.closed.map(c => c.url)));
+      check("newest first: C, then A", tabs.closed[0].url === u("c") && tabs.closed[1].url === u("a"), JSON.stringify(tabs.closed.map(c => c.url)));
       const r1 = tabs.reopenClosed();
       const r2 = tabs.reopenClosed();
-      check("ilk ⌘⇧T C'yi, ikincisi A'yı açar, yığın boşalır", tabs.closed.length === 0 && !!r1 && !!r2 && await wait(() => r1.url === u("c") && r2.url === u("a"), 15000), `${r1?.url} ${r2?.url}`);
+      check("the first ⌘⇧T opens C, the second A, the stack empties", tabs.closed.length === 0 && !!r1 && !!r2 && await wait(() => r1.url === u("c") && r2.url === u("a"), 15000), `${r1?.url} ${r2?.url}`);
 
-      // yalnız gerçek sayfalar: boş sekme, data: ve hata sayfası yığına girmez
+      // real pages only: blank tabs, data: and error pages don't go on the stack
       const blank = tabs.open("about:blank", { select: false });
       const dat = tabs.open("data:text/html,<title>d</title>", { select: false });
       await wait(() => dat.url.startsWith("data:"), 10000);
       tabs.close(blank); tabs.close(dat);
-      check("boş sekme ve data: sekmesi yığına girmez", tabs.closed.length === 0, JSON.stringify(tabs.closed));
+      check("blank and data: tabs don't go on the stack", tabs.closed.length === 0, JSON.stringify(tabs.closed));
 
-      // sınır: 25
+      // limit: 25
       const many = Array.from({ length: 30 }, (_, i) => open("m" + i));
       many.forEach(t => tabs.close(t));
-      check("yığın en fazla 25 kayıt tutar, en yenisi başta", tabs.closed.length === 25 && tabs.closed[0].url === u("m29") && tabs.closed.at(-1).url === u("m5"), `${tabs.closed.length} ${tabs.closed[0]?.url.slice(-3)}`);
+      check("stack keeps at most 25 entries, newest first", tabs.closed.length === 25 && tabs.closed[0].url === u("m29") && tabs.closed.at(-1).url === u("m5"), `${tabs.closed.length} ${tabs.closed[0]?.url.slice(-3)}`);
       tabs.forgetClosed();
-      check("forgetClosed: yığın boşaldı ve komut devre dışı", tabs.closed.length === 0 && cmd.hasAttribute("disabled"));
+      check("forgetClosed: stack emptied and command disabled", tabs.closed.length === 0 && cmd.hasAttribute("disabled"));
       for (const t of tabs.all.slice(base)) { tabs.close(t); }
       tabs.forgetClosed();
     }
 
-    // ===================== Sekme simgeleri (favicon) =====================
+    // ===================== Tab icons (favicon) =====================
     {
       const llm = Services.env.get("VENTO_ESIN_ENDPOINT").replace(/\/v1$/, "");
       const tab = tabs.selected;
@@ -1292,85 +1292,85 @@
       const img = () => mark()?.querySelector("img");
 
       load(`${llm}/simge/link.html`);
-      check("<link rel=icon>: sekme simgesi geldi (data:image)", await wait(() => tab.icon.startsWith("data:image/"), 15000), tab.icon.slice(0, 40));
+      check("<link rel=icon>: the tab icon arrived (data:image)", await wait(() => tab.icon.startsWith("data:image/"), 15000), tab.icon.slice(0, 40));
       const linkIcon = tab.icon;
-      check("simge sekme şeridinde <img> olarak çizildi", await wait(() => !tab.loading && img()?.complete && img().naturalWidth === 16), `${img()?.naturalWidth}`);
-      check("simge varken harf işareti yok, has-icon sınıfı var", mark()?.classList.contains("has-icon") && !mark().textContent.trim());
+      check("icon was drawn as an <img> in the tab strip", await wait(() => !tab.loading && img()?.complete && img().naturalWidth === 16), `${img()?.naturalWidth}`);
+      check("no letter mark while there is an icon, has-icon class is present", mark()?.classList.contains("has-icon") && !mark().textContent.trim());
 
       load(`${llm}/simge/kok.html`);
-      check("bağlantısız sayfa: /favicon.ico'ya düşüldü", await wait(() => tab.icon.startsWith("data:image/") && tab.icon !== linkIcon, 15000), tab.icon.slice(0, 40));
+      check("page without a link: fell back to /favicon.ico", await wait(() => tab.icon.startsWith("data:image/") && tab.icon !== linkIcon, 15000), tab.icon.slice(0, 40));
 
       load("data:text/html,<title>x</title>");
-      check("başka sayfaya gidince eski site simgesi kalmadı", await wait(() => tab.icon === "" && !tab.loading), tab.icon.slice(0, 40));
-      check("simge yokken harf işareti geri geldi", await wait(() => !img() && mark()?.textContent.trim() !== "" && !mark().classList.contains("has-icon")));
+      check("old site icon is gone after navigating to another page", await wait(() => tab.icon === "" && !tab.loading), tab.icon.slice(0, 40));
+      check("letter mark came back when there is no icon", await wait(() => !img() && mark()?.textContent.trim() !== "" && !mark().classList.contains("has-icon")));
 
       Vento.tabs.setIcon(tab.browser, "data:image/png;base64,AAAA");
-      check("bozuk simge → sessizce harf işaretine döner", await wait(() => tab.icon === "" && !img() && mark()?.textContent.trim() !== ""), tab.icon);
+      check("broken icon -> quietly falls back to the letter mark", await wait(() => tab.icon === "" && !img() && mark()?.textContent.trim() !== ""), tab.icon);
 
-      // Ziyaret edilen sayfanın simgesi Places'e saklanır → oturumdan tembel açılan sekme yüklenmeden simgesini gösterir
+      // A visited page's icon is stored in Places -> a lazily opened session tab shows its icon without loading
       load(`${llm}/simge/link.html`);
       await wait(() => tab.icon.startsWith("data:image/") && !tab.loading, 15000);
-      await new Promise(r => setTimeout(r, 1500)); // Places yazımı asenkron
+      await new Promise(r => setTimeout(r, 1500)); // Places write is async
       const before = tabs.all.length;
       Vento.session.restore({ selected: 1, tabs: [{ url: `${llm}/simge/link.html`, title: "Bağlantılı" }, { url: "http://127.0.0.1:1/bos", title: "b" }] });
       const cached = tabs.all[before];
-      check("tembel sekme: yüklenmeden önbellekten simge geldi", await wait(() => cached.pending && cached.icon.startsWith("data:image/"), 10000), `bekliyor=${!!cached.pending} icon=${cached.icon.slice(0, 30)}`);
+      check("lazy tab: icon came from the cache before loading", await wait(() => cached.pending && cached.icon.startsWith("data:image/"), 10000), `pending=${!!cached.pending} icon=${cached.icon.slice(0, 30)}`);
       for (const t of tabs.all.slice(before)) { tabs.close(t); }
       load("data:text/html,<title>x</title>");
       await wait(() => tab.icon === "" && !tab.loading);
     }
 
-    // ===================== Yer imleri + sık siteler =====================
+    // ===================== Bookmarks + top sites =====================
     {
       const B = Vento.bookmarks;
       const $ = id => document.getElementById(id);
       const bmUrl = "https://example.com/vento-yerimi-testi";
       await B.remove(bmUrl);
-      check("yer imi: başta yok", !(await B.isBookmarked(bmUrl)));
-      check("yer imi: web olmayan adres eklenmez", (await B.add("javascript:alert(1)")) === null && (await B.add("chrome://vento/content/vento.xhtml")) === null);
+      check("bookmark: none at first", !(await B.isBookmarked(bmUrl)));
+      check("bookmark: a non-web URL is not added", (await B.add("javascript:alert(1)")) === null && (await B.add("chrome://vento/content/vento.xhtml")) === null);
       let changed = 0;
       const onChange = () => changed++;
       B.addEventListener("change", onChange);
       await B.add(bmUrl, "Yer imi testi");
-      check("yer imi: eklendi ve 'change' yayınlandı", (await B.isBookmarked(bmUrl)) && changed >= 1, String(changed));
+      check("bookmark: added and 'change' was fired", (await B.isBookmarked(bmUrl)) && changed >= 1, String(changed));
       const listed = (await B.list(50)).find(b => b.url === bmUrl);
-      check("yer imi: listede, başlığıyla", listed?.title === "Yer imi testi", JSON.stringify(listed));
-      check("yer imi: 'Diğer yer imleri' klasöründe", (await B.find(bmUrl))?.parentGuid === Places.bookmarks.unfiledGuid);
+      check("bookmark: in the list, with its title", listed?.title === "Yer imi testi", JSON.stringify(listed));
+      check("bookmark: in the 'Diğer yer imleri' folder", (await B.find(bmUrl))?.parentGuid === Places.bookmarks.unfiledGuid);
 
-      // ⌘D komutu ve yıldız düğmesi (geçerli sekme: example.com)
+      // ⌘D command and the star button (current tab: example.com)
       const cur = tabs.open("https://example.com/", { select: true });
       await wait(() => cur.title === "Example Domain");
-      check("yıldız: web sayfasında etkin", await wait(() => !$("nav-bookmark").disabled), cur.url);
-      check("yıldız: yer imi değilken işaretsiz", !$("nav-bookmark").hasAttribute("active"));
-      check("toggle: ekledi (true)", (await B.toggle(cur)) === true && (await B.isBookmarked(cur.url)));
-      check("yıldız: yer imi olunca dolu", await wait(() => $("nav-bookmark").hasAttribute("active"), 5000));
-      check("toggle: kaldırdı (false)", (await B.toggle(cur)) === false && !(await B.isBookmarked(cur.url)));
-      check("yıldız: kaldırınca boş", await wait(() => !$("nav-bookmark").hasAttribute("active"), 5000));
+      check("star: enabled on a web page", await wait(() => !$("nav-bookmark").disabled), cur.url);
+      check("star: unmarked when not bookmarked", !$("nav-bookmark").hasAttribute("active"));
+      check("toggle: added (true)", (await B.toggle(cur)) === true && (await B.isBookmarked(cur.url)));
+      check("star: filled when bookmarked", await wait(() => $("nav-bookmark").hasAttribute("active"), 5000));
+      check("toggle: removed (false)", (await B.toggle(cur)) === false && !(await B.isBookmarked(cur.url)));
+      check("star: empty after removing", await wait(() => !$("nav-bookmark").hasAttribute("active"), 5000));
       tabs.close(cur);
 
-      // menü: açılırken kurulur
+      // menu: built when it opens
       const popup = $("menu_BookmarksPopup");
       popup.dispatchEvent(new Event("popupshowing"));
-      check("Yer İmleri menüsü: yer imi satırı kuruldu", await wait(() => [...popup.querySelectorAll(".bm-item")].some(m => m.getAttribute("tooltiptext") === bmUrl), 5000));
+      check("Yer İmleri menu: the bookmark row was built", await wait(() => [...popup.querySelectorAll(".bm-item")].some(m => m.getAttribute("tooltiptext") === bmUrl), 5000));
 
-      // başlangıç ekranı karoları
+      // start screen tiles
       const tops = await B.topSites(8);
-      check("topSites: yer imi karo olarak geldi (bookmark=true)", tops.some(s => s.url === bmUrl && s.bookmark === true), JSON.stringify(tops.map(s => s.host)));
-      check("topSites: sunucu başına tek karo", new Set(tops.map(s => s.host)).size === tops.length);
-      check("topSites: en çok 8", tops.length <= 8);
-      // ×: yer imi karosu → silinir
+      check("topSites: the bookmark came as a tile (bookmark=true)", tops.some(s => s.url === bmUrl && s.bookmark === true), JSON.stringify(tops.map(s => s.host)));
+      check("topSites: one tile per host", new Set(tops.map(s => s.host)).size === tops.length);
+      check("topSites: at most 8", tops.length <= 8);
+      // x: a bookmark tile -> deleted
       await B.remove(bmUrl);
-      check("yer imi silinince listeden çıktı", !(await B.list(50)).some(b => b.url === bmUrl));
+      check("bookmark left the list when deleted", !(await B.list(50)).some(b => b.url === bmUrl));
 
-      // sık site gizleme (sunucu adına göre)
+      // hiding a top site (by hostname)
       const hiddenBefore = Services.prefs.getStringPref(B.constructor.PREF_HIDDEN, "[]");
       B.hideHost("gizli-site.example");
-      check("hideHost: tercihe yazıldı", JSON.parse(Services.prefs.getStringPref(B.constructor.PREF_HIDDEN, "[]")).includes("gizli-site.example"));
+      check("hideHost: written to the pref", JSON.parse(Services.prefs.getStringPref(B.constructor.PREF_HIDDEN, "[]")).includes("gizli-site.example"));
       Services.prefs.setStringPref(B.constructor.PREF_HIDDEN, hiddenBefore);
       B.removeEventListener("change", onChange);
     }
 
-    // ===================== Güncelleme =====================
+    // ===================== Update =====================
     {
       const U = Vento.update;
       const $ = id => document.getElementById(id);
@@ -1379,23 +1379,23 @@
       const hadLast = Services.prefs.prefHasUserValue(prefLast);
       const oldLast = Services.prefs.getStringPref(prefLast, "");
 
-      // sürüm notları adresi: dile göre, sürüm parametreli
-      check("sürüm notları: Türkçede /surum-notlari/?v=", U.releaseNotesURL("1.2.0") === "https://vento.cansoykanyilmaz.com/surum-notlari/?v=1.2.0", U.releaseNotesURL("1.2.0"));
-      // güncelleme sonrası ilk açılış mantığı
+      // release notes URL: by language, with a version parameter
+      check("release notes: /surum-notlari/?v= in Turkish", U.releaseNotesURL("1.2.0") === "https://vento.cansoykanyilmaz.com/surum-notlari/?v=1.2.0", U.releaseNotesURL("1.2.0"));
+      // first launch after an update logic
       const r1 = U.afterUpdate({ last: "", current: "1.0.0", open: false });
-      check("afterUpdate: ilk kurulumda (kayıt yok) açmaz", r1 === null);
-      check("afterUpdate: sürümü kaydetti", Services.prefs.getStringPref(prefLast) === "1.0.0");
-      check("afterUpdate: aynı sürümde açmaz", U.afterUpdate({ last: "1.0.0", current: "1.0.0", open: false }) === null);
-      check("afterUpdate: eski sürüme dönüşte açmaz", U.afterUpdate({ last: "1.1.0", current: "1.0.0", open: false }) === null);
-      check("afterUpdate: sürüm yükselince sürüm notlarını verir", U.afterUpdate({ last: "1.0.0", current: "1.1.0", open: false }) === U.releaseNotesURL("1.1.0"));
-      check("afterUpdate: '1.9' → '1.10' doğru sıralanır (metin değil sürüm karşılaştırması)", U.afterUpdate({ last: "1.9.0", current: "1.10.0", open: false }) === U.releaseNotesURL("1.10.0"));
+      check("afterUpdate: doesn't open on first install (no record)", r1 === null);
+      check("afterUpdate: recorded the version", Services.prefs.getStringPref(prefLast) === "1.0.0");
+      check("afterUpdate: doesn't open on the same version", U.afterUpdate({ last: "1.0.0", current: "1.0.0", open: false }) === null);
+      check("afterUpdate: doesn't open when going back to an older version", U.afterUpdate({ last: "1.1.0", current: "1.0.0", open: false }) === null);
+      check("afterUpdate: gives the release notes when the version goes up", U.afterUpdate({ last: "1.0.0", current: "1.1.0", open: false }) === U.releaseNotesURL("1.1.0"));
+      check("afterUpdate: '1.9' -> '1.10' sorts correctly (version comparison, not text)", U.afterUpdate({ last: "1.9.0", current: "1.10.0", open: false }) === U.releaseNotesURL("1.10.0"));
       const nTabs = tabs.all.length;
       const opened = U.afterUpdate({ last: "0.9.0", current: "1.0.0" });
-      check("afterUpdate: open=true sürüm notlarını yeni sekmede açtı", tabs.all.length === nTabs + 1 && opened === U.releaseNotesURL("1.0.0") && await wait(() => tabs.selected.url.includes("surum-notlari"), 10000), tabs.selected.url);
+      check("afterUpdate: open=true opened the release notes in a new tab", tabs.all.length === nTabs + 1 && opened === U.releaseNotesURL("1.0.0") && await wait(() => tabs.selected.url.includes("surum-notlari"), 10000), tabs.selected.url);
       tabs.close(tabs.selected);
       if (hadLast) { Services.prefs.setStringPref(prefLast, oldLast); } else { Services.prefs.clearUserPref(prefLast); }
 
-      // sahte güncelleyici: durumlar metne ve çubuğa yansır
+      // fake updater: states are reflected in the text and the bar
       const statuses = [];
       const onStatus = e => statuses.push(e.detail.id);
       U.addEventListener("status", onStatus);
@@ -1406,62 +1406,62 @@
       let f = fake();
       await U.check(f);
       f.emit(AU.STATUS.CHECKING);
-      check("güncelleme: denetleniyor durumu", U.status.id === "checking" && U.status.text.length > 0 && U.status.text !== "up-checking", JSON.stringify(U.status));
+      check("update: checking state", U.status.id === "checking" && U.status.text.length > 0 && U.status.text !== "up-checking", JSON.stringify(U.status));
       f.emit(AU.STATUS.NO_UPDATES_FOUND);
-      check("güncelleme: güncel durumu sürümü söyler", U.status.id === "current" && U.status.text.includes(Services.appinfo.version), JSON.stringify(U.status));
+      check("update: the current state reports the version", U.status.id === "current" && U.status.text.includes(Services.appinfo.version), JSON.stringify(U.status));
       f.emit(AU.STATUS.DOWNLOADING, 50, 200);
-      check("güncelleme: indirme yüzdesi (%25)", U.status.id === "downloading" && /25/.test(U.status.text), JSON.stringify(U.status));
+      check("update: download percentage (%25)", U.status.id === "downloading" && /25/.test(U.status.text), JSON.stringify(U.status));
       f.emit(AU.STATUS.DOWNLOAD_FAILED);
-      check("güncelleme: hata durumu", U.status.id === "failed");
+      check("update: error state", U.status.id === "failed");
       f.emit(AU.STATUS.NO_UPDATER);
-      check("güncelleme: güncelleyici yok → 'kullanılamıyor'", U.status.id === "unavailable");
-      check("hata/güncel durumlarında çubuk açılmadı", $("update-bar").hidden);
+      check("update: no updater -> 'unavailable'", U.status.id === "unavailable");
+      check("the bar didn't open in the error/current states", $("update-bar").hidden);
 
-      // otomatik kapalı: "İndir ve kur" çubuğu → izin verilir
+      // auto off: the "İndir ve kur" bar -> permission is granted
       f.emit(AU.STATUS.DOWNLOAD_AND_INSTALL);
-      check("güncelleme bulundu: çubuk açıldı, 'indir' düğmesi", await wait(() => !$("update-bar").hidden && $("ub-primary").dataset.kind === "available"), $("ub-primary").dataset.kind);
+      check("update found: the bar opened, 'download' button", await wait(() => !$("update-bar").hidden && $("ub-primary").dataset.kind === "available"), $("ub-primary").dataset.kind);
       $("ub-primary").click();
-      check("'indir' izin verdi (allowUpdateDownload) ve çubuk kapandı", f.allowed === true && await wait(() => $("update-bar").hidden, 5000));
-      // otomatik açık: hazır → "yeniden başlat" çubuğu; "sonra" kapatır
+      check("'download' granted permission (allowUpdateDownload) and the bar closed", f.allowed === true && await wait(() => $("update-bar").hidden, 5000));
+      // auto on: ready -> the "restart" bar; "later" dismisses it
       f.emit(AU.STATUS.READY_FOR_RESTART);
-      check("güncelleme hazır: çubuk 'yeniden başlat' düğmesiyle", await wait(() => !$("update-bar").hidden && $("ub-primary").dataset.kind === "ready"), $("ub-primary").dataset.kind);
-      check("çubuk metni çözüldü (ham kimlik değil)", $("ub-text").textContent.length > 5 && !/^ub-/.test($("ub-text").textContent), $("ub-text").textContent);
+      check("update ready: the bar with a 'restart' button", await wait(() => !$("update-bar").hidden && $("ub-primary").dataset.kind === "ready"), $("ub-primary").dataset.kind);
+      check("bar text was resolved (not a raw id)", $("ub-text").textContent.length > 5 && !/^ub-/.test($("ub-text").textContent), $("ub-text").textContent);
       $("ub-later").click();
-      check("'sonra' çubuğu kapattı", await wait(() => $("update-bar").hidden, 5000));
-      check("durum olayları sırayla yayınlandı", statuses.join() === "checking,current,downloading,failed,unavailable,found,ready", statuses.join());
+      check("'later' closed the bar", await wait(() => $("update-bar").hidden, 5000));
+      check("status events were fired in order", statuses.join() === "checking,current,downloading,failed,unavailable,found,ready", statuses.join());
       U.removeEventListener("status", onStatus);
 
-      // Özelleştir panelinden elle denetim düğmesi ve durum metni
-      check("Özelleştir: 'Güncellemeleri denetle' düğmesi var", !!$("cp-update-check") && !!$("cp-update-status"));
+      // Manual check button and status text in the Customize panel
+      check("Özelleştir: the 'Güncellemeleri denetle' button exists", !!$("cp-update-check") && !!$("cp-update-status"));
     }
 
-    // ===================== Arayüz dili (Fluent, canlı değişim) =====================
+    // ===================== UI language (Fluent, live switching) =====================
     {
       const L = Vento.l10n;
       const reqBefore = Services.prefs.prefHasUserValue("intl.locale.requested") ? Services.prefs.getStringPref("intl.locale.requested") : null;
-      check("l10n: öznitelik metni (.title) çözüldü", L.attr("tip-tab-close") !== "tip-tab-close" && L.attr("tip-tab-close").length > 3, L.attr("tip-tab-close"));
-      check("l10n: Türkçe çözüldü", L.locale === "tr" && L.t("up-checking") !== "up-checking", L.t("up-checking"));
+      check("l10n: attribute text (.title) resolved", L.attr("tip-tab-close") !== "tip-tab-close" && L.attr("tip-tab-close").length > 3, L.attr("tip-tab-close"));
+      check("l10n: Turkish resolved", L.locale === "tr" && L.t("up-checking") !== "up-checking", L.t("up-checking"));
       const tr = L.t("w-start");
-      check("l10n: değişkenli metin", L.t("up-current", { version: "9.9.9" }).includes("9.9.9"), L.t("up-current", { version: "9.9.9" }));
-      check("l10n: olmayan kimlik → kimliğin kendisi ve 'missing'e yazıldı", L.t("yok-boyle-bir-kimlik") === "yok-boyle-bir-kimlik" && L.missing.includes("yok-boyle-bir-kimlik"));
+      check("l10n: text with a variable", L.t("up-current", { version: "9.9.9" }).includes("9.9.9"), L.t("up-current", { version: "9.9.9" }));
+      check("l10n: missing id -> the id itself, and it was recorded in 'missing'", L.t("yok-boyle-bir-kimlik") === "yok-boyle-bir-kimlik" && L.missing.includes("yok-boyle-bir-kimlik"));
       let changes = 0;
       const onChange = () => changes++;
       L.addEventListener("change", onChange);
       L.setLocale("en-US");
-      check("l10n: İngilizceye geçti (olay + dil)", await wait(() => L.locale === "en-US" && changes >= 1, 10000), `${L.locale} olay=${changes}`);
+      check("l10n: switched to English (event + language)", await wait(() => L.locale === "en-US" && changes >= 1, 10000), `${L.locale} event=${changes}`);
       const en = L.t("w-start");
-      check("l10n: İngilizce metin Türkçeden farklı", en !== tr && en !== "w-start", `${tr} ↔ ${en}`);
-      check("l10n: statik metin (data-l10n-id) canlı yenilendi", await wait(() => document.getElementById("w-next").textContent === L.t("w-next"), 10000), document.getElementById("w-next").textContent);
-      check("l10n: sürüm notları İngilizce adresi", Vento.update.releaseNotesURL("2.0.0").startsWith("https://vento.cansoykanyilmaz.com/en/release-notes/"), Vento.update.releaseNotesURL("2.0.0"));
+      check("l10n: English text differs from Turkish", en !== tr && en !== "w-start", `${tr} ↔ ${en}`);
+      check("l10n: static text (data-l10n-id) refreshed live", await wait(() => document.getElementById("w-next").textContent === L.t("w-next"), 10000), document.getElementById("w-next").textContent);
+      check("l10n: English release notes URL", Vento.update.releaseNotesURL("2.0.0").startsWith("https://vento.cansoykanyilmaz.com/en/release-notes/"), Vento.update.releaseNotesURL("2.0.0"));
       L.setLocale(reqBefore ?? "tr");
       if (reqBefore === null) { Services.prefs.clearUserPref("intl.locale.requested"); }
-      check("l10n: Türkçeye geri döndü", await wait(() => L.locale === "tr", 10000), L.locale);
+      check("l10n: switched back to Turkish", await wait(() => L.locale === "tr", 10000), L.locale);
       L.removeEventListener("change", onChange);
-      // eksik kimlik yalnız bu testin uydurduğu kimlik olmalı (kodda ham kimlik görünmemeli)
-      check("l10n: testler boyunca yalnız uydurma kimlik eksik çıktı", L.missing.every(id => id === "yok-boyle-bir-kimlik"), L.missing.join());
+      // the only missing id must be the one this test made up (no raw id should show up in code)
+      check("l10n: only the made-up id was missing throughout the tests", L.missing.every(id => id === "yok-boyle-bir-kimlik"), L.missing.join());
     }
 
-    // ===================== İlk açılış (karşılama) =====================
+    // ===================== First launch (welcome) =====================
     {
       const W = Vento.welcome;
       const $ = id => document.getElementById(id);
@@ -1475,56 +1475,56 @@
       const stepShown = () => [...document.querySelectorAll("#w-card .w-step")].filter(s => !s.hidden).map(s => s.dataset.step);
 
       W.show();
-      check("karşılama: açıldı, ilk adım dil", await wait(visible, 5000) && W.isOpen && W.step === "lang" && stepShown().join() === "lang", stepShown().join());
-      check("karşılama: dil düğmeleri (tr, en-US) ve biri seçili", document.querySelectorAll('[data-lang]').length === 2 && document.querySelectorAll('[data-lang][aria-pressed="true"]').length === 1);
-      // dil seçimi anında uygulanır
+      check("welcome: opened, the first step is language", await wait(visible, 5000) && W.isOpen && W.step === "lang" && stepShown().join() === "lang", stepShown().join());
+      check("welcome: language buttons (tr, en-US) and one is selected", document.querySelectorAll('[data-lang]').length === 2 && document.querySelectorAll('[data-lang][aria-pressed="true"]').length === 1);
+      // the language choice applies instantly
       document.querySelector('[data-lang="en-US"]').click();
-      check("karşılama: dil seçimi canlı uygulandı (en-US)", await wait(() => Vento.l10n.locale === "en-US", 10000), Vento.l10n.locale);
+      check("welcome: the language choice applied live (en-US)", await wait(() => Vento.l10n.locale === "en-US", 10000), Vento.l10n.locale);
       document.querySelector('[data-lang="tr"]').click();
-      check("karşılama: Türkçeye döndü", await wait(() => Vento.l10n.locale === "tr", 10000));
-      // ileri: lang → hello → esin
+      check("welcome: switched back to Turkish", await wait(() => Vento.l10n.locale === "tr", 10000));
+      // forward: lang -> hello -> esin
       W.next();
-      check("karşılama: 2. adım tanışma", W.step === "hello" && stepShown().join() === "hello", W.step);
+      check("welcome: step 2 is the intro", W.step === "hello" && stepShown().join() === "hello", W.step);
       W.next();
-      check("karşılama: 3. adım Esin", W.step === "esin", W.step);
+      check("welcome: step 3 is Esin", W.step === "esin", W.step);
       document.querySelector('[data-esin="off"]').click();
-      check("Esin kapat: tercih kapandı, onay verilmedi sayılır", P.getBoolPref("vento.esin.enabled") === false && P.getBoolPref("vento.esin.consented", false) === false);
-      check("Esin kapalıyken uyuyan Ebabil", $("w-eb-img").src.includes("pose-idle"), $("w-eb-img").src);
+      check("Esin off: pref turned off, consent counts as not given", P.getBoolPref("vento.esin.enabled") === false && P.getBoolPref("vento.esin.consented", false) === false);
+      check("sleeping Ebabil while Esin is off", $("w-eb-img").src.includes("pose-idle"), $("w-eb-img").src);
       document.querySelector('[data-esin="on"]').click();
-      check("Esin aç: tercih açıldı ve onay bu ekranda alınmış sayıldı", P.getBoolPref("vento.esin.enabled") === true && P.getBoolPref("vento.esin.consented") === true);
-      check("Esin açıkken uçan Ebabil", $("w-eb-img").src.includes("ebabil/still"), $("w-eb-img").src);
+      check("Esin on: pref turned on and consent counts as taken on this screen", P.getBoolPref("vento.esin.enabled") === true && P.getBoolPref("vento.esin.consented") === true);
+      check("flying Ebabil while Esin is on", $("w-eb-img").src.includes("ebabil/still"), $("w-eb-img").src);
       W.next();
-      check("karşılama: 4. adım güncelleme", W.step === "update" && $("w-update-off-note").hidden);
+      check("welcome: step 4 is updates", W.step === "update" && $("w-update-off-note").hidden);
       document.querySelector('[data-update="off"]').click();
-      check("Güncelleme kapat: app.update.auto kapandı ve uyarı notu göründü", P.getBoolPref("app.update.auto") === false && !$("w-update-off-note").hidden);
+      check("Updates off: app.update.auto turned off and the warning note appeared", P.getBoolPref("app.update.auto") === false && !$("w-update-off-note").hidden);
       document.querySelector('[data-update="on"]').click();
-      check("Güncelleme aç: geri açıldı, not gizlendi", P.getBoolPref("app.update.auto") === true && $("w-update-off-note").hidden);
+      check("Updates on: turned back on, the note was hidden", P.getBoolPref("app.update.auto") === true && $("w-update-off-note").hidden);
       W.next();
-      check("karşılama: son adım, 'Atla' gizli, düğme 'Başla'", W.step === "done" && $("w-skip").hidden && $("w-next").getAttribute("data-l10n-id") === "w-start");
-      check("noktalar: 5 adım, sonuncusu işaretli", $("w-dots").children.length === 5 && $("w-dots").children[4].hasAttribute("on"));
+      check("welcome: last step, 'Atla' hidden, the button is 'Başla'", W.step === "done" && $("w-skip").hidden && $("w-next").getAttribute("data-l10n-id") === "w-start");
+      check("dots: 5 steps, the last one is marked", $("w-dots").children.length === 5 && $("w-dots").children[4].hasAttribute("on"));
       W.next();
-      check("karşılama: bitirince kapandı ve tamamlandı sayıldı", await wait(() => !visible() && !W.isOpen, 5000) && W.completed === true);
+      check("welcome: closed on finish and counted as completed", await wait(() => !visible() && !W.isOpen, 5000) && W.completed === true);
 
-      // Esc akışı kapatır ve tamamlanmış sayar; yanlış kalan seçimler geri alınmaz
+      // Esc closes the flow and counts it as completed; choices already made are not undone
       P.setBoolPref("vento.welcome.completed", false);
       W.show();
-      check("karşılama: yeniden açıldı", await wait(visible, 5000) && W.step === "lang");
+      check("welcome: reopened", await wait(visible, 5000) && W.step === "lang");
       document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-      check("Esc: karşılamayı kapattı ve tamamlandı saydı", await wait(() => !visible(), 5000) && W.completed === true);
+      check("Esc: closed the welcome and counted it as completed", await wait(() => !visible(), 5000) && W.completed === true);
       W.show();
-      W.show(); // açıkken tekrar çağrı ikinci kopya üretmez
-      check("show() açıkken tekrar çağrılınca adım sıfırlanmadı/çift açılmadı", W.isOpen && $("w-dots").children.length === 5);
+      W.show(); // calling again while open doesn't create a second copy
+      check("calling show() again while open didn't reset the step or open it twice", W.isOpen && $("w-dots").children.length === 5);
       $("w-skip").click();
-      check("'Atla' düğmesi kapattı", await wait(() => !visible() && !W.isOpen, 5000));
+      check("'Atla' button closed it", await wait(() => !visible() && !W.isOpen, 5000));
 
-      // tercihleri eski hâline getir
+      // restore the prefs
       for (const [k, v] of keep) {
         if (v === undefined) { P.clearUserPref(k); } else if (typeof v === "boolean") { P.setBoolPref(k, v); } else { P.setStringPref(k, v); }
       }
-      check("karşılama testi sonrası dil Türkçe", await wait(() => Vento.l10n.locale === "tr", 10000), Vento.l10n.locale);
+      check("language is Turkish after the welcome test", await wait(() => Vento.l10n.locale === "tr", 10000), Vento.l10n.locale);
     }
 
-    // ===================== Esin: LLMTR logosu ve teşekkür =====================
+    // ===================== Esin: LLMTR logo and thanks =====================
     {
       const $ = id => document.getElementById(id);
       const keepConsent = Services.prefs.getBoolPref("vento.esin.consented", false);
@@ -1533,33 +1533,33 @@
       Vento.esin.clearChat();
       const card = $("esin-llmtr");
       const img = card.querySelector("img");
-      check("LLMTR: boş durumda logo kartı görünür", await wait(() => card.getBoundingClientRect().width > 100 && !$("esin-empty").hidden), `${JSON.stringify(card.getBoundingClientRect())} panelHidden=${$("esin").hidden} panelDisplay=${getComputedStyle($("esin")).display} emptyHidden=${$("esin-empty").hidden} emptyDisplay=${getComputedStyle($("esin-empty")).display} enabled=${Vento.esin.enabled} panelW=${$("esin").getBoundingClientRect().width}`);
-      check("LLMTR: resmi logo yüklendi (SVG, oran korunmuş)", await wait(() => img.complete && img.naturalWidth > 0), `${img.naturalWidth}x${img.naturalHeight} ${img.currentSrc}`);
+      check("LLMTR: the logo card is visible in the empty state", await wait(() => card.getBoundingClientRect().width > 100 && !$("esin-empty").hidden), `${JSON.stringify(card.getBoundingClientRect())} panelHidden=${$("esin").hidden} panelDisplay=${getComputedStyle($("esin")).display} emptyHidden=${$("esin-empty").hidden} emptyDisplay=${getComputedStyle($("esin-empty")).display} enabled=${Vento.esin.enabled} panelW=${$("esin").getBoundingClientRect().width}`);
+      check("LLMTR: official logo loaded (SVG, aspect ratio kept)", await wait(() => img.complete && img.naturalWidth > 0), `${img.naturalWidth}x${img.naturalHeight} ${img.currentSrc}`);
       const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      check("LLMTR: zemine uygun sürüm (koyu/açık)", img.currentSrc.endsWith(dark ? "llmtr-on-dark.svg" : "llmtr-on-light.svg"), img.currentSrc);
+      check("LLMTR: the version that fits the ground (dark/light)", img.currentSrc.endsWith(dark ? "llmtr-on-dark.svg" : "llmtr-on-light.svg"), img.currentSrc);
       const r = img.getBoundingClientRect();
-      check("LLMTR: logo oranı bozulmadı (141.435:36)", Math.abs(r.width / r.height - 141.435 / 36) < 0.05, `${r.width}x${r.height}`);
+      check("LLMTR: logo aspect ratio is intact (141.435:36)", Math.abs(r.width / r.height - 141.435 / 36) < 0.05, `${r.width}x${r.height}`);
       const cr = card.getBoundingClientRect();
-      check("LLMTR: çevresinde ≥ %50 logo yüksekliği boşluk", (r.left - cr.left) >= r.height * 0.5 && (r.top - cr.top) >= r.height * 0.5, `${r.left - cr.left}px / ${r.top - cr.top}px, yükseklik ${r.height}`);
+      check("LLMTR: padding of >= 50% of the logo height around it", (r.left - cr.left) >= r.height * 0.5 && (r.top - cr.top) >= r.height * 0.5, `${r.left - cr.left}px / ${r.top - cr.top}px, height ${r.height}`);
       const bg = getComputedStyle(card).backgroundColor;
-      check("LLMTR: kart rengi markanın belirteci (#F8FAFC / #111113)", bg === (dark ? "rgb(17, 17, 19)" : "rgb(248, 250, 252)"), bg);
+      check("LLMTR: card color is the brand's token (#F8FAFC / #111113)", bg === (dark ? "rgb(17, 17, 19)" : "rgb(248, 250, 252)"), bg);
       const thanks = document.querySelector("#esin-thanks p");
-      // statik metinler dil değişiminden sonra eşzamansız yenilenir: beklenir
-      check("LLMTR: teşekkür metni çözüldü ve görünür", await wait(() => thanks.textContent.includes("LLMTR") && thanks.textContent.includes("teşekkür") && thanks.getBoundingClientRect().height > 10, 10000), thanks.textContent);
-      check("LLMTR: erişilebilir ad ve ipucu", card.getAttribute("role") === "link" && /LLMTR/.test(card.getAttribute("aria-label") ?? "") && !!card.title, `${card.getAttribute("aria-label")} / ${card.title}`);
-      // tıklama → llmtr.com yeni sekmede
+      // static texts refresh asynchronously after a language change: wait for it
+      check("LLMTR: the thanks text resolved and is visible", await wait(() => thanks.textContent.includes("LLMTR") && thanks.textContent.includes("teşekkür") && thanks.getBoundingClientRect().height > 10, 10000), thanks.textContent);
+      check("LLMTR: accessible name and hint", card.getAttribute("role") === "link" && /LLMTR/.test(card.getAttribute("aria-label") ?? "") && !!card.title, `${card.getAttribute("aria-label")} / ${card.title}`);
+      // click -> llmtr.com in a new tab
       const n = tabs.all.length;
       card.click();
-      check("LLMTR: tıklayınca llmtr.com yeni sekmede açıldı", tabs.all.length === n + 1 && await wait(() => tabs.selected.url.includes("llmtr.com"), 15000), tabs.selected.url);
+      check("LLMTR: clicking opened llmtr.com in a new tab", tabs.all.length === n + 1 && await wait(() => tabs.selected.url.includes("llmtr.com"), 15000), tabs.selected.url);
       tabs.close(tabs.selected);
       card.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-      check("LLMTR: Enter ile de açılır", tabs.all.length === n + 1 && await wait(() => tabs.selected.url.includes("llmtr.com"), 15000), tabs.selected.url);
+      check("LLMTR: also opens with Enter", tabs.all.length === n + 1 && await wait(() => tabs.selected.url.includes("llmtr.com"), 15000), tabs.selected.url);
       tabs.close(tabs.selected);
       Vento.esin.close();
       Services.prefs.setBoolPref("vento.esin.consented", keepConsent);
     }
 
-    // ===================== Esin günlük kota (vekilin başlıkları ve 429 kodları) =====================
+    // ===================== Esin daily quota (the proxy's headers and 429 codes) =====================
     {
       const $ = id => document.getElementById(id);
       const llm = Services.env.get("VENTO_ESIN_ENDPOINT").replace(/\/v1$/, "");
@@ -1572,37 +1572,37 @@
       const left = () => Number(/(\d+) \/ (\d+)/.exec($("esin-quota").textContent)?.[1]);
 
       Vento.esin.send("Kota birinci soru");
-      check("kota: cevap geldi", await wait(() => idle() && lastBot()?.textContent.includes("Kota birinci soru")), lastBot()?.textContent);
-      check("kota: 'Bugün kalan: N / 30' görünür (vekil başlığından)", !$("esin-quota").hidden && /Bugün kalan: \d+ \/ 30/.test($("esin-quota").textContent), $("esin-quota").textContent);
+      check("quota: reply arrived", await wait(() => idle() && lastBot()?.textContent.includes("Kota birinci soru")), lastBot()?.textContent);
+      check("quota: 'Bugün kalan: N / 30' is visible (from the proxy header)", !$("esin-quota").hidden && /Bugün kalan: \d+ \/ 30/.test($("esin-quota").textContent), $("esin-quota").textContent);
       const l1 = left();
       Vento.esin.send("Kota ikinci soru");
-      check("kota: ikinci soruda kalan hak 1 azaldı", await wait(() => idle() && lastBot()?.textContent.includes("Kota ikinci soru") && left() === l1 - 1, 10000), `${l1} → ${left()}`);
-      check("kota: az kalmamışken vurgulanmaz", !$("esin-quota").hasAttribute("low") || left() <= 3);
+      check("quota: the remaining count dropped by 1 on the second question", await wait(() => idle() && lastBot()?.textContent.includes("Kota ikinci soru") && left() === l1 - 1, 10000), `${l1} → ${left()}`);
+      check("quota: not highlighted when plenty is left", !$("esin-quota").hasAttribute("low") || left() <= 3);
 
-      // kullanıcı kotası doldu: anlaşılır mesaj, yenilenme zamanı, TEKRAR DENE yok, sağlayıcıya ikinci istek gitmez
+      // user quota used up: a clear message, the renewal time, no RETRY, no second request goes to the provider
       Vento.esin.send("KOTA-DOLU");
-      check("kota dolu: hata balonu göründü", await wait(() => idle() && !!lastBot()?.classList.contains("msg-error")), lastBot()?.textContent);
+      check("quota full: the error bubble appeared", await wait(() => idle() && !!lastBot()?.classList.contains("msg-error")), lastBot()?.textContent);
       const msg = lastBot()?.textContent ?? "";
-      check("kota dolu: mesaj kotayı (30 soru) ve yenilenmeyi söyler", /30 soru/.test(msg) && /Yenilenme: /.test(msg), msg);
-      check("kota dolu: 'Tekrar dene' düğmesi yok (anlamsız)", !lastBot()?.querySelector(".msg-retry"));
-      check("kota dolu: panel '0 / 30' ve vurgulu", left() === 0 && $("esin-quota").hasAttribute("low"), $("esin-quota").textContent);
-      // toplam kapasite doldu
+      check("quota full: the message states the quota (30 questions) and the renewal", /30 soru/.test(msg) && /Yenilenme: /.test(msg), msg);
+      check("quota full: no 'Tekrar dene' button (pointless)", !lastBot()?.querySelector(".msg-retry"));
+      check("quota full: the panel shows '0 / 30' and is highlighted", left() === 0 && $("esin-quota").hasAttribute("low"), $("esin-quota").textContent);
+      // total capacity used up
       Vento.esin.send("GLOBAL-DOLU");
-      check("toplam kapasite dolu: ayrı mesaj, tekrar dene yok", await wait(() => idle() && /bugünlük kapasitesini/.test(lastBot()?.textContent ?? "")) && !lastBot()?.querySelector(".msg-retry"), lastBot()?.textContent);
+      check("total capacity full: a separate message, no retry", await wait(() => idle() && /bugünlük kapasitesini/.test(lastBot()?.textContent ?? "")) && !lastBot()?.querySelector(".msg-retry"), lastBot()?.textContent);
 
       Vento.esin.clearChat();
       Vento.esin.close();
       Services.prefs.setBoolPref("vento.esin.consented", keepConsent);
     }
 
-    // ===================== Kullanıcı aracısı (siteler tanısın) =====================
+    // ===================== User agent (so sites recognize us) =====================
     {
       const ua = Cc["@mozilla.org/network/protocol;1?name=http"].getService(Ci.nsIHttpProtocolHandler).userAgent;
-      check("UA: 'Firefox/x.y' uyumluluk belirteci var (Google gibi siteler modern sayfa sunsun)", /Gecko\/\d+ Firefox\/\d+\.\d+ Vento\/\S+$/.test(ua), ua);
-      check("UA: Vento adı dürüstçe duruyor, Nightly/Mozilla ürün adı sızmıyor", /Vento\//.test(ua) && !/Nightly|Zen/.test(ua), ua);
+      check("UA: has the 'Firefox/x.y' compatibility token (so sites like Google serve the modern page)", /Gecko\/\d+ Firefox\/\d+\.\d+ Vento\/\S+$/.test(ua), ua);
+      check("UA: the Vento name is stated honestly, the Nightly/Mozilla product name doesn't leak", /Vento\//.test(ua) && !/Nightly|Zen/.test(ua), ua);
     }
 
-    // ===================== Arama motoru (DuckDuckGo varsayılan, Google seçilebilir) =====================
+    // ===================== Search engine (DuckDuckGo default, Google selectable) =====================
     {
       const $ = id => document.getElementById(id);
       const P = Services.prefs;
@@ -1610,102 +1610,102 @@
       const old = P.getStringPref("vento.search.engine", "duckduckgo");
       const q = "rüzgar nedir", enc = "r%C3%BCzgar%20nedir";
       P.clearUserPref("vento.search.engine");
-      check("arama: varsayılan DuckDuckGo", Vento.resolveInput(q) === `https://duckduckgo.com/?q=${enc}` && Vento.searchURL(q) === `https://duckduckgo.com/?q=${enc}`);
-      check("arama: panelde DuckDuckGo seçili, Google notu gizli", $("cp-search").value === "duckduckgo" && $("cp-search-note").hidden);
+      check("search: DuckDuckGo is the default", Vento.resolveInput(q) === `https://duckduckgo.com/?q=${enc}` && Vento.searchURL(q) === `https://duckduckgo.com/?q=${enc}`);
+      check("search: DuckDuckGo is selected in the panel, the Google note is hidden", $("cp-search").value === "duckduckgo" && $("cp-search-note").hidden);
       P.setStringPref("vento.search.engine", "google");
-      check("arama: Google seçilince metin Google'da aranır", Vento.resolveInput(q) === `https://www.google.com/search?q=${enc}`, Vento.resolveInput(q));
-      check("arama: sağ tık 'Ara' adresi de Google (adres gibi metin bile aranır)", Vento.searchURL("example.com") === "https://www.google.com/search?q=example.com", Vento.searchURL("example.com"));
-      check("arama: Google'da da çubuk önerisi 'arama' sayılır, adres sayılmaz", Vento.isSearchText(q) && !Vento.isSearchText("example.com"));
-      check("arama: adresler etkilenmedi", Vento.resolveInput("example.com/x") === "https://example.com/x" && !Vento.resolveInput("javascript:alert(1)").startsWith("javascript:"));
-      check("arama: panel tercihle eşitlendi, Google gizlilik notu göründü", await wait(() => $("cp-search").value === "google" && !$("cp-search-note").hidden, 5000), `${$("cp-search").value} notGizli=${!$("cp-search-note").hidden}`);
-      // panelden değiştirme tercihi yazar
+      check("search: with Google selected the text is searched on Google", Vento.resolveInput(q) === `https://www.google.com/search?q=${enc}`, Vento.resolveInput(q));
+      check("search: the right-click 'Ara' URL is Google too (even URL-like text is searched)", Vento.searchURL("example.com") === "https://www.google.com/search?q=example.com", Vento.searchURL("example.com"));
+      check("search: with Google too, the bar suggestion counts as 'search', not a URL", Vento.isSearchText(q) && !Vento.isSearchText("example.com"));
+      check("search: URLs were not affected", Vento.resolveInput("example.com/x") === "https://example.com/x" && !Vento.resolveInput("javascript:alert(1)").startsWith("javascript:"));
+      check("search: the panel synced with the pref, the Google privacy note appeared", await wait(() => $("cp-search").value === "google" && !$("cp-search-note").hidden, 5000), `${$("cp-search").value} noteHidden=${!$("cp-search-note").hidden}`);
+      // changing from the panel writes the pref
       $("cp-search").value = "duckduckgo";
       $("cp-search").dispatchEvent(new Event("change", { bubbles: true }));
-      check("arama: panelden DuckDuckGo'ya dönünce tercih yazıldı ve not gizlendi", P.getStringPref("vento.search.engine") === "duckduckgo" && await wait(() => $("cp-search-note").hidden, 5000));
+      check("search: switching back to DuckDuckGo in the panel wrote the pref and hid the note", P.getStringPref("vento.search.engine") === "duckduckgo" && await wait(() => $("cp-search-note").hidden, 5000));
       P.setStringPref("vento.search.engine", "yok-boyle-motor");
-      check("arama: bilinmeyen değer DuckDuckGo'ya düşer", Vento.resolveInput(q) === `https://duckduckgo.com/?q=${enc}`);
+      check("search: an unknown value falls back to DuckDuckGo", Vento.resolveInput(q) === `https://duckduckgo.com/?q=${enc}`);
       if (had) { P.setStringPref("vento.search.engine", old); } else { P.clearUserPref("vento.search.engine"); }
     }
 
-    // ===================== Oturum geri yükleme =====================
+    // ===================== Session restore =====================
     {
       const S = Vento.session;
       const llm = Services.env.get("VENTO_ESIN_ENDPOINT").replace(/\/v1$/, "");
       const u = n => `${llm}/oturum/${n}`;
-      // Temiz başlangıç: seçili sekme dışındakileri kapat
+      // Clean start: close everything except the selected tab
       for (const t of tabs.all) { if (t !== tabs.selected) { tabs.close(t); } }
       const first = tabs.selected;
       first.browser.fixupAndLoadURIString("data:text/html,<title>x</title>", { triggeringPrincipal: Vento.SYSTEM_PRINCIPAL });
       await wait(() => first.url.startsWith("data:"));
 
-      // -- capture: yalnız gerçek sayfalar, seçili indeks saklanabilir sekmelere göre
+      // -- capture: real pages only, the selected index is relative to the savable tabs
       const A = tabs.open(u("a"), { select: false });
       const B = tabs.open(u("b"), { select: true });
       const C = tabs.open(u("c"), { select: false });
       await wait(() => [A, B, C].every(t => t.url === t.browser.currentURI?.spec && t.url.startsWith("http")), 15000);
       const cap = S.capture();
-      check("capture: data: sekmesi dışarıda, 3 http sekmesi", cap.tabs.length === 3 && cap.tabs.every(t => t.url.startsWith(llm)), JSON.stringify(cap.tabs.map(t => t.url)));
-      check("capture: seçili indeks saklanabilir sekmelere göre (B → 1)", cap.selected === 1, String(cap.selected));
+      check("capture: the data: tab is left out, 3 http tabs", cap.tabs.length === 3 && cap.tabs.every(t => t.url.startsWith(llm)), JSON.stringify(cap.tabs.map(t => t.url)));
+      check("capture: selected index is relative to the savable tabs (B -> 1)", cap.selected === 1, String(cap.selected));
 
-      // -- diske yazma + okuma
+      // -- writing to disk + reading
       tabs.select(C);
       await S.flush();
       const back = await S.read();
-      check("flush + read: aynı durum diske gitti", back?.tabs.length === 3 && back.selected === 2 && back.tabs[1].url === u("b"), JSON.stringify(back));
+      check("flush + read: the same state went to disk", back?.tabs.length === 3 && back.selected === 2 && back.tabs[1].url === u("b"), JSON.stringify(back));
 
-      // -- bozuk dosya → yedek
-      await S.flush(); // ikinci yazma: ilk dosya .bak olur
-      check(".bak yedeği oluştu", await IOUtils.exists(S.path + ".bak"));
+      // -- corrupt file -> backup
+      await S.flush(); // second write: the first file becomes .bak
+      check(".bak backup was created", await IOUtils.exists(S.path + ".bak"));
       await IOUtils.writeUTF8(S.path, "{ bozuk json");
       const fallback = await S.read();
-      check("ana dosya bozukken yedekten okundu", fallback?.tabs.length === 3, JSON.stringify(fallback));
+      check("read from the backup when the main file was corrupt", fallback?.tabs.length === 3, JSON.stringify(fallback));
 
-      // -- kurcalanmış dosya: tehlikeli şemalar süzülür
+      // -- tampered file: dangerous schemes are filtered out
       await IOUtils.writeJSON(S.path, { version: 1, selected: 9, tabs: [{ url: "javascript:alert(1)" }, { url: "chrome://vento/content/vento.xhtml" }, { url: u("ok"), title: "t" }, { url: 5 }] });
       const tampered = await S.read();
-      check("javascript:/chrome:/tip hatalı girdiler süzüldü", tampered?.tabs.length === 1 && tampered.tabs[0].url === u("ok"), JSON.stringify(tampered));
-      check("geçersiz sürüm/boş durum → null", (await IOUtils.writeJSON(S.path, { version: 99, tabs: [] }), await (async () => { await IOUtils.remove(S.path + ".bak", { ignoreAbsent: true }); return (await S.read()) === null; })()));
+      check("javascript:/chrome:/wrong-type entries were filtered out", tampered?.tabs.length === 1 && tampered.tabs[0].url === u("ok"), JSON.stringify(tampered));
+      check("invalid version/empty state -> null", (await IOUtils.writeJSON(S.path, { version: 99, tabs: [] }), await (async () => { await IOUtils.remove(S.path + ".bak", { ignoreAbsent: true }); return (await S.read()) === null; })()));
 
-      // -- restore: seçili yüklenir, diğerleri bekler
+      // -- restore: the selected one loads, the others wait
       const before = tabs.all.length;
       const state = { selected: 1, tabs: [{ url: u("x"), title: "Sayfa X" }, { url: u("y"), title: "Sayfa Y" }, { url: u("z"), title: "Sayfa Z" }] };
-      check("restore: true döner", S.restore(state) === true);
+      check("restore: returns true", S.restore(state) === true);
       const [X, Y, Z] = tabs.all.slice(before);
-      check("restore: 3 sekme eklendi, seçili olan Y", tabs.all.length === before + 3 && tabs.selected === Y);
-      check("restore: Y yüklendi, X ve Z bekliyor", !Y.pending && X.pending === u("x") && Z.pending === u("z"));
-      check("restore: bekleyen sekmelerde başlık ve adres şeritte", X.title === "Sayfa X" && X.url === u("x") && X.label === "Sayfa X");
-      check("restore: Y'nin sayfası yüklendi", await wait(() => Y.browser.currentURI?.spec === u("y"), 15000), Y.browser.currentURI?.spec);
-      check("restore: bekleyen X'in sayfası HENÜZ yüklenmedi", X.browser.currentURI?.spec !== u("x"), X.browser.currentURI?.spec);
+      check("restore: 3 tabs were added, the selected one is Y", tabs.all.length === before + 3 && tabs.selected === Y);
+      check("restore: Y loaded, X and Z are pending", !Y.pending && X.pending === u("x") && Z.pending === u("z"));
+      check("restore: title and URL show in the strip on pending tabs", X.title === "Sayfa X" && X.url === u("x") && X.label === "Sayfa X");
+      check("restore: Y's page loaded", await wait(() => Y.browser.currentURI?.spec === u("y"), 15000), Y.browser.currentURI?.spec);
+      check("restore: pending X's page has NOT loaded yet", X.browser.currentURI?.spec !== u("x"), X.browser.currentURI?.spec);
       tabs.select(Z);
-      check("restore: Z'ye geçince yüklendi", !Z.pending && await wait(() => Z.browser.currentURI?.spec === u("z"), 15000), Z.browser.currentURI?.spec);
-      // adres çubuğundan gezinme beklemeyi iptal eder (eski adres sonradan yüklenip ezmesin)
+      check("restore: Z loaded when switched to", !Z.pending && await wait(() => Z.browser.currentURI?.spec === u("z"), 15000), Z.browser.currentURI?.spec);
+      // navigating from the address bar cancels the pending state (so the old URL doesn't load later and overwrite it)
       tabs.navigate(X, u("q"));
-      check("bekleyen sekmede başka adrese gidince bekleme iptal", X.pending === null);
+      check("navigating to another URL on a pending tab cancels the pending state", X.pending === null);
       for (const t of [X, Y, Z]) { tabs.close(t); }
 
-      // -- komut satırı adresi: ayrı sekme, o seçili
+      // -- command-line URL: its own tab, selected
       const n0 = tabs.all.length;
       S.restore({ selected: 0, tabs: [{ url: u("m"), title: "M" }] }, u("extra"));
-      check("restore + -url: ek adres ayrı sekmede ve seçili, geri gelen sekme bekliyor", tabs.all.length === n0 + 2 && tabs.selected === tabs.all[n0 + 1] && tabs.all[n0].pending === u("m"));
-      check("restore + -url: ek adres yüklendi", await wait(() => tabs.selected.url === u("extra"), 15000), tabs.selected.url);
+      check("restore + -url: the extra URL is in its own tab and selected, the restored tab is pending", tabs.all.length === n0 + 2 && tabs.selected === tabs.all[n0 + 1] && tabs.all[n0].pending === u("m"));
+      check("restore + -url: the extra URL loaded", await wait(() => tabs.selected.url === u("extra"), 15000), tabs.selected.url);
       tabs.close(tabs.all[tabs.all.length - 1]);
       tabs.close(tabs.all[tabs.all.length - 1]);
-      check("restore(null) ve boş durum: false", S.restore(null) === false && S.restore({ selected: 0, tabs: [] }) === false);
+      check("restore(null) and an empty state: false", S.restore(null) === false && S.restore({ selected: 0, tabs: [] }) === false);
 
-      // -- Son durum: 2. aşamada (yeniden başlatma) doğrulanır. Başlıklar sunucunun döndürdüğü gerçek sayfa başlığıdır.
+      // -- Final state: verified in phase 2 (restart). The titles are the real page titles the server returns.
       for (const t of tabs.all) { if (t !== tabs.selected) { tabs.close(t); } }
       const keep = tabs.selected;
       const [a2, b2, c2] = [tabs.open(u("a"), { select: false }), tabs.open(u("b"), { select: false }), tabs.open(u("c"), { select: false })];
       await wait(() => [a2, b2, c2].every(t => !t.loading && t.browser.currentURI?.spec === t.url && t.url.startsWith("http")), 15000);
-      await wait(() => a2.title === "Sayfa A" && c2.title === "Sayfa C", 10000); // başlıklar sunucudan gerçek sayfa başlığı olarak gelir
-      tabs.close(keep); // boş/data sekmesi geri gelmesin
+      await wait(() => a2.title === "Sayfa A" && c2.title === "Sayfa C", 10000); // titles come from the server as the real page title
+      tabs.close(keep); // so the blank/data tab doesn't come back
       tabs.select(c2);
-      await S.flush();       // ara durum: seçili C
-      tabs.select(b2);       // seçili B — ARTIK yazılmayı beklemeden çıkıyoruz: kapanış engelleyicisi yazmalı
-      check("kapanış öncesi: 3 sekme, seçili B", tabs.all.length === 3 && tabs.selected === b2);
+      await S.flush();       // intermediate state: C selected
+      tabs.select(b2);       // B selected — NOW we quit without waiting for the write: the shutdown blocker must write
+      check("before shutdown: 3 tabs, B selected", tabs.all.length === 3 && tabs.selected === b2);
     }
   } catch (e) {
-    check("öz-test istisna fırlatmadı", false, String(e) + "\n" + (e.stack || ""));
+    check("self-test threw no exception", false, String(e) + "\n" + (e.stack || ""));
   }
 
   const pass = results.filter(Boolean).length;

@@ -1,4 +1,4 @@
-# Vento uygulama dizini. Firefox'un browser/ dizinine bağımlılık YOK — kural.
+# Vento application directory. NO dependency on Firefox's browser/ directory. That's a rule.
 
 with Files("**"):
     BUG_COMPONENT = ("Firefox", "General")
@@ -11,8 +11,8 @@ DIRS += [
     "locales",
 ]
 
-# Uygulama dil kaynağı (branding/brand.ftl burada). Firefox'ta browser/l10n-registry.manifest yapar;
-# yoksa toolkit sayfaları (hata sayfaları …) brand.ftl'i bulamaz ve hiçbir ileti çözülmez.
+# App locale source (branding/brand.ftl lives here). In Firefox, browser/l10n-registry.manifest does this;
+# without it toolkit pages (error pages ...) can't find brand.ftl and no message resolves.
 EXTRA_COMPONENTS += [
     "l10n-registry.manifest",
 ]
@@ -22,7 +22,7 @@ CONFIGURE_SUBST_FILES += ["installer/Makefile"]
 DIST_SUBDIR = "browser"
 export("DIST_SUBDIR")
 
-# Uygulama tercihleri: app/profile/vento.js (yönergesiz → ön işlemesiz)
+# App preferences: app/profile/vento.js (no directives, so no preprocessing)
 JS_PREFERENCE_FILES += [
     "app/profile/vento.js",
 ]

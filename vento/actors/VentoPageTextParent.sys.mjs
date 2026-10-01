@@ -1,2 +1,2 @@
-// Parent tarafı: mantık yok, yalnızca sendQuery için gerekli (bkz. VentoPageTextChild).
+// Parent side: no logic, only needed for sendQuery (see VentoPageTextChild).
 export class VentoPageTextParent extends JSWindowActorParent {}

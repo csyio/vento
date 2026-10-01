@@ -1,8 +1,8 @@
-/* Vento görünüm dili — "rüzgâr". Sıfırdan; eski Vento/Firefox/Zen stilinden türemez.
+/* Vento visual language: "wind". From scratch; not derived from the old Vento/Firefox/Zen styling.
  *
- * İlkeler: soğuk sis zemini, tek vurgu (rüzgâr turkuazı), hap biçimli öğeler, sayfa bir "kart".
- * Tüm renkler belirteç; açık/koyu tek tanımda (light-dark). Yeni yüzey eklerken belirteç kullan,
- * çıplak renk yazma. */
+ * Principles: cold mist ground, a single accent (wind turquoise), pill-shaped elements, the page is a "card".
+ * All colors are tokens; light/dark in one definition (light-dark). When adding a new surface, use a token,
+ * don't write bare colors. */
 
 :root {
   color-scheme: light dark;
@@ -26,7 +26,7 @@
   --v-font: system-ui, -apple-system, "SF Pro Text", sans-serif;
   --v-ease: cubic-bezier(0.22, 0.8, 0.3, 1);
   --v-ease-in: cubic-bezier(0.4, 0, 1, 1);
-  /* Hareket süreleri (vento-motion.js ile aynı tutulur): hızlı geri bildirim / normal / yavaş */
+  /* Motion durations (kept in sync with vento-motion.js): quick feedback / normal / slow */
   --v-dur-fast: 110ms;
   --v-dur: 180ms;
   --v-dur-slow: 260ms;
@@ -47,7 +47,7 @@ body {
   flex-direction: column;
 }
 
-/* Menü çubuğu yalnızca macOS yerel menüsünü beslemek için var; ekranda görünmez. */
+/* The menu bar exists only to feed the macOS native menu; it is not visible. */
 #vento-menus {
   position: absolute;
   width: 0;
@@ -66,7 +66,7 @@ button {
   cursor: default;
 }
 
-/* ---- Sekme şeridi ------------------------------------------------------- */
+/* ---- Tab strip --------------------------------------------------------- */
 
 #tabstrip {
   flex: none;
@@ -79,15 +79,15 @@ button {
   -moz-window-dragging: drag;
 }
 
-/* macOS trafik ışıkları: boş kutu, tema geometrisi onları buraya yerleştirir (Firefox'un
-   .titlebar-buttonbox'ı ile aynı mekanizma). Tam ekranda gizlenir. */
+/* macOS traffic lights: an empty box, the theme geometry places them here (same mechanism as Firefox's
+   .titlebar-buttonbox). Hidden in full screen. */
 .titlebar-buttonbox {
   appearance: auto;
   -moz-default-appearance: -moz-window-button-box;
   flex: none;
   align-self: center;
   position: relative;
-  top: 3px; /* sekme hapının dikey ortasıyla hizala */
+  top: 3px; /* align with the vertical center of the tab pill */
   margin-inline: 14px 10px;
   -moz-window-dragging: no-drag;
 }
@@ -106,8 +106,8 @@ button {
   display: flex;
   align-items: center;
   gap: 8px;
-  /* Genişlik açık verilir: içerik (uzun başlık) kabın doğal genişliğini şişirip "+" düğmesini
-     sağa itmesin. Yer azalınca sekmeler 40 px'e kadar daralır. */
+  /* Width is set explicitly: so content (a long title) can't inflate the container's natural width and push the "+" button
+     right. As space runs out, tabs shrink down to 40 px. */
   width: 200px;
   flex: 0 1 200px;
   min-width: 40px;
@@ -120,7 +120,7 @@ button {
   transition: background var(--v-dur-fast) var(--v-ease), color var(--v-dur-fast) var(--v-ease), box-shadow var(--v-dur) var(--v-ease);
 }
 
-/* Kapanan sekmenin hayaleti: animasyon bitene kadar yerinde durur, tıklanamaz */
+/* Ghost of a closing tab: stays in place until the animation ends, not clickable */
 .tab.closing { pointer-events: none; overflow: hidden; }
 
 .tab:hover { background: var(--v-surface-hover); }
@@ -147,7 +147,7 @@ button {
 
 .tab[selected] .tab-mark { background: var(--v-accent); }
 
-/* Sitenin kendi simgesi: yuvarlak harf işaretinin yerini alır */
+/* The site's own icon: replaces the round letter mark */
 .tab-mark.has-icon,
 .tab[selected] .tab-mark.has-icon {
   background: none;
@@ -160,7 +160,7 @@ button {
   object-fit: contain;
 }
 
-/* Yüklenirken dönen halka görünür, simge gizlenir */
+/* While loading the spinner ring is shown and the icon is hidden */
 .tab[loading] .tab-mark img { display: none; }
 
 .tab[loading] .tab-mark {
@@ -213,7 +213,7 @@ button {
 
 #newtab:hover { background: var(--v-surface-hover); color: var(--v-text); }
 
-/* ---- Araç çubuğu: gezinme + akıllı çubuk ---------------------------------- */
+/* ---- Toolbar: navigation + smart bar ----------------------------------- */
 
 #toolbar {
   flex: none;
@@ -309,7 +309,7 @@ button {
 #smartbar:focus-within #smartbar-input { text-align: left; }
 #smartbar-input::placeholder { color: var(--v-faint); }
 
-/* ---- Sahne: sayfa kartı --------------------------------------------------- */
+/* ---- Stage: page card -------------------------------------------------- */
 
 #workspace {
   position: relative;
@@ -342,7 +342,7 @@ button {
 
 .vento-page[hidden-tab] { visibility: hidden; pointer-events: none; }
 
-/* Yükleme: kartın üstünde süzülen rüzgâr çizgisi */
+/* Loading: a wind line gliding across the top of the card */
 #gust {
   position: absolute;
   z-index: 5;
@@ -370,7 +370,7 @@ button {
   to   { transform: translateX(300%); }
 }
 
-/* Boş sekme: başlangıç görünümü */
+/* Blank tab: start view */
 #start {
   position: absolute;
   inset: 0;
@@ -394,7 +394,7 @@ button {
   letter-spacing: 0.02em;
   color: var(--v-text);
 }
-/* ---- Ebabil (maskot): süzülür, kanat çırpar, kuyruk sallanır; arkasında rüzgâr çizgileri ---- */
+/* ---- Ebabil (mascot): glides, flaps its wings, wags its tail; wind lines behind it ---- */
 #ebabil {
   position: relative;
   width: min(300px, 36vh);
@@ -422,7 +422,7 @@ button {
 }
 .eb-streak.s2 { animation-delay: -1.6s; animation-duration: 5.4s; stroke-width: 1.6; }
 .eb-streak.s3 { animation-delay: -3.1s; animation-duration: 6.2s; stroke-width: 1.3; }
-/* Katmanlar önceden-çarpılmış renkte TOPLANIR: dinlenme hâli orijinalle aynı, döndüklerinde kenarlar yumuşak birleşir */
+/* Layers are ADDED in premultiplied color: the resting state matches the original, and the edges blend softly as they rotate */
 #ebabil-rig { position: absolute; inset: 0; isolation: isolate; transform-origin: 56% 55%; animation: eb-float 5.4s ease-in-out infinite; will-change: transform; }
 .eb { position: absolute; inset: 0; width: 100%; height: 100%; mix-blend-mode: plus-lighter; will-change: transform; }
 .eb-wl { transform-origin: 55.8% 51.8%; animation: eb-flap-l 2.9s ease-in-out infinite; }
@@ -440,7 +440,7 @@ button {
   100% { stroke-dashoffset: -120; opacity: 0; }
 }
 
-/* display:none → flex olunca animasyon yeniden başlar: boş sekme açılınca içerik hafifçe yükselerek belirir */
+/* display:none -> flex restarts the animation: when a blank tab opens the content rises slightly into view */
 #stage[blank] #start { animation: v-start-in 420ms var(--v-ease) both; }
 #stage[blank] #start-word { animation: v-rise 520ms var(--v-ease) 60ms both; }
 #stage[blank] #start-hint { animation: v-rise 520ms var(--v-ease) 160ms both; }
@@ -463,12 +463,12 @@ button {
 }
 
 
-/* ---- Araç çubuğu: Esin düğmesi ------------------------------------------------ */
+/* ---- Toolbar: Esin button ---------------------------------------------- */
 
 #nav-esin[active] { background: var(--v-accent-soft); color: var(--v-accent); }
 #nav-esin { margin-left: 4px; }
 
-/* ---- Akıllı çubuk: Ara / Esin'e sor önerileri --------------------------------- */
+/* ---- Smart bar: Search / Ask Esin suggestions -------------------------- */
 
 #smartbar-slot { position: relative; }
 
@@ -516,7 +516,7 @@ button {
 .suggest-label { flex: none; font-weight: 600; }
 .suggest-text { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--v-muted); }
 
-/* ---- Esin paneli ------------------------------------------------------------------ */
+/* ---- Esin panel -------------------------------------------------------- */
 
 #esin {
   flex: none;
@@ -613,7 +613,7 @@ button {
   gap: 8px;
 }
 
-/* Boş durumlar: telde tünemiş Ebabil, hafifçe sallanır */
+/* Empty states: Ebabil perched on a wire, swaying slightly */
 .empty-ebabil {
   display: block;
   width: 132px;
@@ -638,7 +638,7 @@ button {
 
 #esin-empty button:hover { background: var(--v-surface-hover); }
 
-/* Teşekkür: LLMTR'nin kendi marka belirteçleri (açık #F8FAFC / koyu #111113 zemin); logoya dokunulmaz */
+/* Credits: LLMTR's own brand tokens (light #F8FAFC / dark #111113 ground); the logo is left untouched */
 #esin-thanks { margin-top: 18px; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
 #esin-llmtr {
   display: inline-flex;
@@ -837,7 +837,7 @@ button {
 #esin-form[busy] #esin-send .ic-stop { display: block; }
 
 
-/* ---- Sayfada ara ------------------------------------------------------------------ */
+/* ---- Find in page ------------------------------------------------------ */
 
 #findbar {
   position: absolute;
@@ -891,13 +891,13 @@ button {
 .find-btn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
 
-/* ---- İndirmeler --------------------------------------------------------------------- */
+/* ---- Downloads --------------------------------------------------------- */
 
 .nav { position: relative; }
 #nav-downloads[hidden] { display: none; }
 #nav-downloads[active-panel] { background: var(--v-accent-soft); color: var(--v-accent); }
 
-/* İndirme sürerken düğmenin çevresinde ilerleme halkası */
+/* Progress ring around the button while a download runs */
 #nav-downloads[downloading]::before {
   content: "";
   position: absolute;
@@ -991,7 +991,7 @@ button {
 .dl-btn:hover { background: var(--v-surface-press); color: var(--v-text); }
 .dl-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 
-/* Duruma göre yalnızca ilgili eylemler */
+/* Only the relevant actions for the state */
 .dl-cancel, .dl-retry, .dl-reveal { display: none; }
 .dl-row[data-kind="active"] .dl-cancel,
 .dl-row[data-kind="paused"] .dl-cancel { display: grid; }
@@ -1001,7 +1001,7 @@ button {
 .dl-row[data-kind="active"] .dl-remove { display: none; }
 
 
-/* ---- Sayfa iletişim kutuları (alert / confirm / prompt / kimlik doğrulama) --------------- */
+/* ---- Page dialogs (alert / confirm / prompt / authentication) -------------- */
 
 #dialog-layer {
   position: absolute;
@@ -1066,7 +1066,7 @@ button {
 .dlg-btn[primary]:hover { filter: brightness(1.08); }
 
 
-/* ---- Site izin kartı (konum, bildirim, kamera, mikrofon) ----------------------------- */
+/* ---- Site permission card (location, notifications, camera, microphone) ---- */
 
 #perm-layer {
   position: absolute;
@@ -1109,7 +1109,7 @@ button {
 .perm-btn[primary] { background: var(--v-accent); color: var(--v-bg); box-shadow: none; }
 .perm-btn[primary]:hover { filter: brightness(1.08); }
 
-/* ---- Basma geri bildirimi: tıklanabilir araç çubuğu öğeleri hafifçe küçülür ---- */
+/* ---- Press feedback: clickable toolbar items shrink slightly ---- */
 #toolbar button:not(:disabled):active,
 .tab-close:active,
 #newtab:active {
@@ -1119,9 +1119,9 @@ button {
   transition: background var(--v-dur-fast) var(--v-ease), color var(--v-dur-fast) var(--v-ease), transform var(--v-dur-fast) var(--v-ease), opacity var(--v-dur-fast) var(--v-ease);
 }
 
-/* ---- Hareketi azalt: kayma/ölçek/dönme yok; yalnız çok kısa solma (JS tarafı vento-motion.js'te) ---- */
+/* ---- Reduce motion: no sliding/scaling/rotating; only a very short fade (JS side is in vento-motion.js) ---- */
 @media (prefers-reduced-motion: reduce) {
-  /* Ebabil durur (dinlenme hâli özgün maskotla aynı); rüzgâr çizgileri ve parıltı gizlenir */
+  /* Ebabil stops (resting state matches the original mascot); wind lines and glow are hidden */
   #ebabil-rig, .eb, #ebabil-glow { animation: none; }
   #ebabil-wind { display: none; }
   #stage[blank] #start,
@@ -1131,7 +1131,7 @@ button {
   * { transition-duration: 1ms !important; }
 }
 
-/* ---- Başlangıç ekranı: duvar kâğıdı ve "Özelleştir" ---- */
+/* ---- Start screen: wallpaper and "Customize" ---- */
 #start-wall {
   position: absolute;
   inset: 0;
@@ -1139,7 +1139,7 @@ button {
   background-position: center;
   pointer-events: none;
 }
-/* Duvar kâğıdı varken ortası sakin kalsın: yumuşak bir perde (okunurluk) */
+/* With a wallpaper, keep the middle calm: a soft veil (readability) */
 #start[data-wallpaper] #start-wall::after {
   content: "";
   position: absolute;
@@ -1147,7 +1147,7 @@ button {
   background: radial-gradient(55% 60% at 50% 52%, var(--st-scrim), transparent 78%);
 }
 #start > :not(#start-wall) { position: relative; z-index: 1; }
-/* Ton: yazı rengi duvar kâğıdına göre (sistem açık/koyu temasından bağımsız) */
+/* Tone: text color follows the wallpaper (independent of the system light/dark theme) */
 #start[data-tone="dark"] {
   --v-text: #e9eff6;
   --v-muted: #aebbcb;
@@ -1237,7 +1237,7 @@ button {
 .cp-row { display: flex; align-items: center; justify-content: space-between; font-size: 13px; padding-top: 10px; border-top: 1px solid var(--v-line); }
 .cp-row input { width: 16px; height: 16px; accent-color: var(--v-accent); }
 
-/* ---- Esin logosu: araç çubuğunda tek renk (maske), panel başlığında renkli ---- */
+/* ---- Esin logo: single color in the toolbar (mask), colored in the panel header ---- */
 .esin-glyph {
   display: block;
   width: 18px;
@@ -1247,7 +1247,7 @@ button {
 }
 .esin-logo { width: 18px; height: 18px; margin-right: 2px; vertical-align: -4px; }
 
-/* ---- İlk açılış (karşılama) ---- */
+/* ---- First launch (welcome) ---- */
 #welcome {
   position: fixed;
   inset: 0;
@@ -1322,12 +1322,12 @@ button {
 #w-next:hover { filter: brightness(1.08); }
 @media (prefers-reduced-motion: reduce) { #w-eb-img { animation: none; } }
 
-/* ---- Esin kapalıyken: düğme, öneri ve menü öğesi görünmez ---- */
+/* ---- When Esin is off: button, suggestion and menu item are hidden ---- */
 html[esin-off] #nav-esin,
 html[esin-off] .suggest-row[data-kind="esin"],
 html[esin-off] #esin { display: none !important; }
 
-/* ---- Güncelleme çubuğu ---- */
+/* ---- Update bar ---- */
 #update-bar {
   position: absolute;
   z-index: 20;
@@ -1350,12 +1350,12 @@ html[esin-off] #esin { display: none !important; }
 #ub-primary { background: var(--v-accent); color: var(--v-bg) !important; font-weight: 500; }
 #ub-primary:hover { filter: brightness(1.08); background: var(--v-accent); }
 
-/* ---- Yer imi yıldızı ---- */
+/* ---- Bookmark star ---- */
 #nav-bookmark svg { fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linejoin: round; }
 #nav-bookmark[active] { color: var(--v-accent); }
 #nav-bookmark[active] svg { fill: currentColor; }
 
-/* ---- Başlangıç ekranı: sık siteler ---- */
+/* ---- Start screen: top sites ---- */
 #start-sites { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 10px; max-width: min(640px, 86%); margin-top: 18px; }
 #start-sites[hidden] { display: none; }
 .site { position: relative; width: 88px; }
@@ -1393,7 +1393,7 @@ html[esin-off] #esin { display: none !important; }
 }
 .site:hover .site-x, .site-x:focus-visible { opacity: 1; }
 
-/* ---- Özelleştir: güncelleme satırı ---- */
+/* ---- Customize: update row ---- */
 .cp-update { gap: 10px; justify-content: flex-start; }
 #cp-update-check { padding: 5px 11px; border-radius: 10px; font-size: 12.5px; color: var(--v-text); box-shadow: inset 0 0 0 1px var(--v-line); }
 #cp-update-check:hover { background: var(--v-surface-hover); }

@@ -1,8 +1,8 @@
 "use strict";
 
-// Güvenli mini markdown çizici. Model çıktısı ASLA HTML olarak yorumlanmaz (innerHTML yok):
-// yalnızca burada listelenen düğümler DOM API'siyle kurulur, geri kalan her şey düz metindir.
-// Desteklenen: başlık, **kalın**, *italik*, `kod`, ``` kod bloğu ```, - / 1. listeler, [metin](http(s) adresi).
+// Safe mini markdown renderer. Model output is NEVER interpreted as HTML (no innerHTML):
+// only the nodes listed here are built with the DOM API, everything else is plain text.
+// Supported: headings, **bold**, *italic*, `code`, ``` code block ```, - / 1. lists, [text](http(s) URL).
 
 Vento.markdown = (() => {
   const INLINE = /(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(\*[^*\n]+\*)|(\[[^\]\n]+\]\(https?:\/\/[^)\s]+\))/g;
@@ -39,7 +39,7 @@ Vento.markdown = (() => {
     }
   }
 
-  /** Metni bir kap öğenin içine çizer (önceki içeriğin yerine). */
+  /** Renders text into a container element (replacing the previous content). */
   function render(text, container) {
     const frag = document.createDocumentFragment();
     const lines = text.replace(/\r\n/g, "\n").split("\n");
@@ -53,7 +53,7 @@ Vento.markdown = (() => {
         while (i < lines.length && !/^```/.test(lines[i])) {
           code.push(lines[i++]);
         }
-        i++; // kapanış (akış sırasında olmayabilir)
+        i++; // closing fence (may be missing while streaming)
         const pre = document.createElement("pre");
         const c = document.createElement("code");
         c.textContent = code.join("\n");
@@ -95,7 +95,7 @@ Vento.markdown = (() => {
         continue;
       }
 
-      // Paragraf: boş satıra kadar
+      // Paragraph: up to a blank line
       const para = [];
       while (i < lines.length && lines[i].trim() && !/^```/.test(lines[i]) && !/^\s*([-*•]|\d+[.)])\s+/.test(lines[i]) && !/^#{1,4}\s/.test(lines[i])) {
         para.push(lines[i++]);

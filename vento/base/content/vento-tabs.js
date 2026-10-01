@@ -1,22 +1,22 @@
 "use strict";
 
-// Vento sekme modeli ve motor arayüzü.
+// Vento tab model and engine interface.
 //
-// Kural: Firefox'un tabbrowser/gBrowser'ı KULLANILMAZ. Her sekme kendi <browser> öğesidir;
-// durumu (başlık, adres, yükleniyor, geri/ileri) burada tutarız. Arayüz yalnızca bu
-// modelin olaylarını dinler (vento-ui.js) — motora doğrudan dokunmaz.
+// Rule: Firefox's tabbrowser/gBrowser is NOT used. Each tab is its own <browser> element;
+// we keep its state (title, URL, loading, back/forward) here. The UI only listens to this
+// model's events (vento-ui.js) — it never touches the engine directly.
 
 var Vento = (window.Vento = window.Vento || {});
 
 const SYSTEM_PRINCIPAL = Services.scriptSecurityManager.getSystemPrincipal();
-// Arama motorları (Özelleştir ▸ Arama motoru; tercih: vento.search.engine). Yeni motor eklemek için yalnız buraya satır ekle.
+// Search engines (Customize > Search engine; pref: vento.search.engine). To add an engine, just add a line here.
 const SEARCH_ENGINES = {
   duckduckgo: "https://duckduckgo.com/?q=",
   google: "https://www.google.com/search?q=",
 };
 const searchBase = () => SEARCH_ENGINES[Services.prefs.getStringPref("vento.search.engine", "duckduckgo")] ?? SEARCH_ENGINES.duckduckgo;
 
-/** VENTO_TRACE=<dosya> verilirse her adımı oraya yazar (stdout'a güvenilmez). */
+/** If VENTO_TRACE=<file> is set, writes every step there (stdout is unreliable). */
 Vento.trace = (() => {
   const file = Services.env.exists("VENTO_TRACE") ? Services.env.get("VENTO_TRACE") : "";
   return msg => {
@@ -28,9 +28,9 @@ Vento.trace = (() => {
 })();
 
 /**
- * Akıllı çubuğa yazılanı bir adrese çevirir (saf fonksiyon).
- * Adres gibi görünüyorsa adres, değilse arama. Güvensiz şemalar (javascript:, chrome:, data: …)
- * asla adres olmaz — arama metni sayılır.
+ * Turns what was typed in the smart bar into a URL (pure function).
+ * A URL if it looks like one, otherwise a search. Unsafe schemes (javascript:, chrome:, data: ...)
+ * never become a URL; they count as search text.
  */
 Vento.resolveInput = function resolveInput(raw) {
   const text = (raw ?? "").trim();
@@ -49,14 +49,14 @@ Vento.resolveInput = function resolveInput(raw) {
   return searchBase() + encodeURIComponent(text);
 };
 
-/** Metni geçerli arama motorunda arayan adres (adres gibi görünse de arar). */
+/** URL that searches the text in the current search engine (searches even if it looks like a URL). */
 Vento.searchURL = text => searchBase() + encodeURIComponent(text);
 Vento.SEARCH_ENGINES = SEARCH_ENGINES;
 
-/** Girdi bir adres değil, arama/soru metni mi? (çubuktaki "Ara / Esin'e sor" önerisi için) */
+/** Is the input a search/question text rather than a URL? (for the bar's "Search / Ask Esin" suggestion) */
 Vento.isSearchText = text => Vento.resolveInput(text)?.startsWith(searchBase()) ?? false;
 
-/** Çubukta gösterilecek kısa biçim: alan adı + yol. */
+/** Short form shown in the bar: domain + path. */
 Vento.formatDisplay = function formatDisplay(url) {
   if (!url || url === "about:blank") {
     return "";
@@ -67,7 +67,7 @@ Vento.formatDisplay = function formatDisplay(url) {
       return u.host + (u.pathname === "/" ? "" : u.pathname) + u.search + u.hash;
     }
   } catch (e) {
-    // adres değil — olduğu gibi göster
+    // not a URL — show as is
   }
   return url;
 };
@@ -77,7 +77,7 @@ ChromeUtils.defineESModuleGetters(lazyPlaces, {
   PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
 });
 
-// Bellekte tutulan kapatılmış sekme sayısı (Firefox'ta da 25'e yakın)
+// Number of closed tabs kept in memory (close to Firefox's 25 as well)
 const CLOSED_LIMIT = 25;
 
 let nextTabId = 1;
@@ -91,9 +91,9 @@ class VentoTab {
     this.loading = false;
     this.canGoBack = false;
     this.canGoForward = false;
-    // Oturumdan geri yüklenen ama henüz yüklenmemiş sekme: seçilince bu adres yüklenir.
+    // A tab restored from the session but not loaded yet: this URL loads when it is selected.
     this.pending = null;
-    // Sekme simgesi (favicon): data:/http adresi ya da "" (yok → harf işareti)
+    // Tab icon (favicon): a data:/http URL or "" (none -> letter mark)
     this.icon = "";
   }
 
@@ -124,7 +124,7 @@ function contentTitle(browser) {
 
 Vento.tabs = new (class TabManager extends EventTarget {
   #tabs = [];
-  #closed = []; // kapatılan sekmeler, en yeni SONDA: {url, title, index}
+  #closed = []; // closed tabs, newest LAST: {url, title, index}
   #selected = null;
   #container = null;
 
@@ -140,7 +140,7 @@ Vento.tabs = new (class TabManager extends EventTarget {
     return this.#selected;
   }
 
-  /** Yeniden açılabilecek kapatılmış sekmeler (en yeni başta). */
+  /** Closed tabs that can be reopened (newest first). */
   get closed() {
     return [...this.#closed].reverse();
   }
@@ -163,7 +163,7 @@ Vento.tabs = new (class TabManager extends EventTarget {
     try {
       tab.browser.docShellIsActive = active;
     } catch (e) {
-      Vento.trace(`docShellIsActive ayarlanamadı: ${e}`);
+      Vento.trace(`could not set docShellIsActive: ${e}`);
     }
   }
 
@@ -206,7 +206,7 @@ Vento.tabs = new (class TabManager extends EventTarget {
         return true;
       },
     };
-    // İlerleme bildirimleri süzgeçten geçer; süzgeç ve dinleyici zayıf bağlanır → sekmede tutulmalı.
+    // Progress notifications go through a filter; the filter and listener are weakly bound -> must be held on the tab.
     const filter = Cc["@mozilla.org/appshell/component/browser-status-filter;1"].createInstance(
       Ci.nsIWebProgress
     );
@@ -221,13 +221,13 @@ Vento.tabs = new (class TabManager extends EventTarget {
   }
 
   /**
-   * Yeni sekme açar.
-   * @param url          açılacak adres (çözümlenmiş); "about:blank" = boş sekme
-   * @param select       true → sekmeyi seç
-   * @param openWindowInfo  window.open() ile gelen bilgi (varsa sayfa yüklenmez, içerik kendi yükler)
-   * @param afterCurrent true → seçili sekmenin hemen sağına
-   * @param lazy         {url, title} → sayfa şimdi yüklenmez (oturum geri yükleme); sekme seçilince yüklenir
-   * @param at           sekmenin konacağı sıra (verilmezse sona / afterCurrent'e göre)
+   * Opens a new tab.
+   * @param url          URL to open (resolved); "about:blank" = blank tab
+   * @param select       true -> select the tab
+   * @param openWindowInfo  info from window.open() (if present the page isn't loaded, the content loads itself)
+   * @param afterCurrent true -> right next to the selected tab
+   * @param lazy         {url, title} -> the page isn't loaded now (session restore); it loads when the tab is selected
+   * @param at           index for the tab (if omitted, end / per afterCurrent)
    */
   open(url = "about:blank", { select = true, openWindowInfo = null, afterCurrent = false, lazy = null, at = null } = {}) {
     const browser = document.createXULElement("browser");
@@ -244,7 +244,7 @@ Vento.tabs = new (class TabManager extends EventTarget {
     }
     const loadNow = !!url && url !== "about:blank" && !openWindowInfo && !lazy;
     if (loadNow || openWindowInfo || lazy) {
-      // Gereksiz ilk about:blank yüklemesini engelle (tabbrowser ile aynı).
+      // Prevent the needless initial about:blank load (same as tabbrowser).
       browser.setAttribute("nodefaultsrc", "true");
     }
     if (openWindowInfo) {
@@ -273,8 +273,8 @@ Vento.tabs = new (class TabManager extends EventTarget {
     if (loadNow) {
       browser.fixupAndLoadURIString(url, { triggeringPrincipal: SYSTEM_PRINCIPAL });
     }
-    // Hiç seçili sekme yokken ilk sekme seçilir; ama tembel (geri yüklenen) sekme kendiliğinden seçilmez —
-    // yoksa oturumdaki İLK sekme gereksiz yüklenir. Seçileni çağıran belirler (select: true).
+    // With no selected tab the first tab is selected; but a lazy (restored) tab isn't selected on its own —
+    // otherwise the FIRST tab in the session would be loaded needlessly. The caller decides what's selected (select: true).
     if (select || (!this.#selected && !lazy)) {
       this.select(tab);
     }
@@ -293,7 +293,7 @@ Vento.tabs = new (class TabManager extends EventTarget {
     this.#loadPending(tab);
   }
 
-  /** İçerik süreci bir sekmenin simgesini bulunca (VentoLinkParent) çağrılır. */
+  /** Called when the content process finds a tab's icon (VentoLinkParent). */
   setIcon(browser, iconURL) {
     const tab = this.#tabs.find(t => t.browser === browser);
     if (!tab || tab.icon === iconURL) {
@@ -303,7 +303,7 @@ Vento.tabs = new (class TabManager extends EventTarget {
     this.#emit("tabchange", tab);
   }
 
-  /** Yüklenmemiş (oturumdan gelen) sekmeler için Places'in önbellekli simgesi; yoksa harf işareti kalır. */
+  /** Places' cached icon for unloaded (from session) tabs; if none, the letter mark stays. */
   async #iconFromCache(tab) {
     try {
       const fav = await lazyPlaces.PlacesUtils.favicons.getFaviconForPage(Services.io.newURI(tab.url));
@@ -312,7 +312,7 @@ Vento.tabs = new (class TabManager extends EventTarget {
         this.#emit("tabchange", tab);
       }
     } catch (e) {
-      // önbellekte simge yok
+      // no icon in the cache
     }
   }
 
@@ -339,7 +339,7 @@ Vento.tabs = new (class TabManager extends EventTarget {
       return;
     }
     const wasSelected = tab === this.#selected;
-    // Son sekme kapanınca pencere (uygulama) de kapanır; o durum oturum geri yüklemenin işi, burada kaydedilmez.
+    // When the last tab closes the window (app) closes too; that is session restore's job, not saved here.
     if (this.#tabs.length > 1 && /^(https?|file):/i.test(tab.url || "")) {
       this.#closed.push({ url: tab.url, title: tab.title, index: i });
       if (this.#closed.length > CLOSED_LIMIT) {
@@ -360,13 +360,13 @@ Vento.tabs = new (class TabManager extends EventTarget {
     }
   }
 
-  /** Kapatılmış sekme yığınını unutur (geçmişi temizle / gizlilik). */
+  /** Forgets the closed-tab stack (clear history / privacy). */
   forgetClosed() {
     this.#closed.length = 0;
     this.dispatchEvent(new CustomEvent("closedchange"));
   }
 
-  /** En son kapatılan sekmeyi eski yerine açar ve seçer. Kapatılmış sekme yoksa null. */
+  /** Reopens the most recently closed tab at its old position and selects it. null if there is no closed tab. */
   reopenClosed() {
     const entry = this.#closed.pop();
     if (!entry) {

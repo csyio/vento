@@ -1,12 +1,12 @@
-// Kamera/mikrofon isteği — içerik tarafı. Cihaz listesini toplar, ana sürece sorar, cevabı MediaManager'a iletir.
-// Yalnızca kamera ve mikrofon: ekran/ses yakalama henüz desteklenmiyor (isteği açıkça reddederiz, askıda bırakmayız).
+// Camera/microphone request, content side. Collects the device list, asks the parent process, passes the answer to MediaManager.
+// Camera and microphone only: screen/audio capture isn't supported yet (we reject the request explicitly instead of leaving it hanging).
 
 const respond = (topic, subject, callID) => Services.obs.notifyObservers(subject, topic, callID);
 
 export class VentoMediaChild extends JSWindowActorChild {
   #pending = new Map(); // callID → nsIMediaDevice[]
 
-  /** Süreç aktöründen çağrılır. */
+  /** Called from the process actor. */
   gum(subject) {
     const { callID } = subject;
     const constraints = subject.getConstraints();
@@ -15,7 +15,7 @@ export class VentoMediaChild extends JSWindowActorChild {
     const sharingScreen = video && typeof video != "boolean" && video.mediaSource != "camera";
     const sharingAudio = audio && typeof audio != "boolean" && audio.mediaSource != "microphone";
     if (sharingScreen || sharingAudio) {
-      respond("getUserMedia:response:deny", null, callID); // ekran paylaşımı henüz yok
+      respond("getUserMedia:response:deny", null, callID); // no screen sharing yet
       return;
     }
 
@@ -66,7 +66,7 @@ export class VentoMediaChild extends JSWindowActorChild {
   }
 
   didDestroy() {
-    // Sayfa gezindi/kapandı: cevap bekleyen istekleri reddet ki MediaManager takılı kalmasın
+    // Page navigated/closed: reject pending requests so MediaManager doesn't hang
     for (const callID of this.#pending.keys()) {
       respond("getUserMedia:response:deny", null, callID);
     }

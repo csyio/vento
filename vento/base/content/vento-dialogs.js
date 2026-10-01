@@ -1,15 +1,15 @@
 "use strict";
 
-// Sayfa iletişim kutuları: alert / confirm / prompt / kimlik doğrulama (confirmEx, promptUserAndPass, …).
+// Page dialogs: alert / confirm / prompt / authentication (confirmEx, promptUserAndPass, ...).
 //
-// Toolkit'in Prompter'ı istemi "Prompt" aktörüne yollar (VentoPromptParent → buraya). Diyalog SEKMEYE bağlıdır:
-// arka plandaki sekmenin diyaloğu o sekme seçilene kadar görünmez; sekme kapanır/gezinirse iptal edilir.
-// Cevap sözleşmesi (CommonDialog ile aynı): args.ok, args.buttonNumClicked, args.checked, args.value | user | pass.
+// Toolkit's Prompter sends the prompt to the "Prompt" actor (VentoPromptParent -> here). The dialog is bound to the TAB:
+// a background tab's dialog stays hidden until that tab is selected; it is cancelled if the tab closes or navigates.
+// Answer contract (same as CommonDialog): args.ok, args.buttonNumClicked, args.checked, args.value | user | pass.
 
 Vento.dialogs = (() => {
   const $ = id => document.getElementById(id);
   const els = {};
-  /** browser → { current: entry|null, queue: entry[] } */
+  /** browser -> { current: entry|null, queue: entry[] } */
   const perBrowser = new Map();
   const state = { shown: null };
 
@@ -25,12 +25,12 @@ Vento.dialogs = (() => {
         return p.URI.host;
       }
     } catch (e) {
-      // başlık yalnızca bilgi
+      // the title is informational only
     }
     return "";
   }
 
-  /** [{index, label}] — index, cevaptaki buttonNumClicked'dir. */
+  /** [{index, label}] — index is the buttonNumClicked in the answer. */
   function buttonsFor(args) {
     const t = args.promptType;
     const label = (i, fallback) => args[`button${i}Label`] || fallback;
@@ -129,7 +129,7 @@ Vento.dialogs = (() => {
         answer(entry, defaultIndex);
       } else if (e.key === "Escape") {
         e.preventDefault();
-        // İptal düğmesi varsa o; yoksa (alert) tek düğme
+        // The cancel button if there is one; otherwise (alert) the only button
         answer(entry, buttons.some(b => b.index === 1) ? 1 : buttons[0]?.index ?? 0);
       }
     });
@@ -138,12 +138,12 @@ Vento.dialogs = (() => {
     return card;
   }
 
-  // ---- Akış -------------------------------------------------------------------------------------
+  // ---- Flow -------------------------------------------------------------------------------------
 
-  /** Actor'dan çağrılır. Kullanıcı cevap verince (ya da iptal edilince) args ile çözülen Promise döner. */
+  /** Called from the actor. Returns a Promise that resolves with args once the user answers (or it is cancelled). */
   function open(browser, args, actor = null) {
     if (args.promptType === "select") {
-      return Promise.resolve({ promptAborted: true }); // seçim istemleri henüz desteklenmiyor
+      return Promise.resolve({ promptAborted: true }); // select prompts are not supported yet
     }
     return new Promise(resolve => {
       const entry = { browser, args, actor, resolve, ui: null };
@@ -203,7 +203,7 @@ Vento.dialogs = (() => {
     if (slot && !slot.current && !slot.queue.length) {
       perBrowser.delete(entry.browser);
     }
-    // Görünen kartı sync() kaldırır (karartma solarken yerinde kalsın); görünmeyen (sırada bekleyen) kart hemen gider.
+    // sync() removes the visible card (so it stays in place while the dim fades); a hidden (queued) card goes immediately.
     if (entry !== state.shown) {
       entry.ui?.card.remove();
     }
@@ -221,7 +221,7 @@ Vento.dialogs = (() => {
     }
   }
 
-  /** Seçili sekmenin geçerli diyaloğunu göster; yoksa katmanı gizle. */
+  /** Shows the selected tab's current dialog; hides the layer if there is none. */
   function sync() {
     const browser = Vento.tabs.selected?.browser;
     const entry = perBrowser.get(browser)?.current ?? null;
@@ -232,7 +232,7 @@ Vento.dialogs = (() => {
     const old = state.shown?.ui?.card;
     state.shown = entry;
     if (!entry) {
-      // Çıkış: kart, karartma solarken yerinde kalır; bitince kaldırılır (bu arada yeni diyalog geldiyse dokunulmaz)
+      // Exit: the card stays in place while the dim fades; removed when it finishes (untouched if a new dialog arrived meanwhile)
       state.leaving = old ?? null;
       Vento.motion.hide(els.layer, "fade").then(() => {
         if (!state.shown && state.leaving === old) {
@@ -247,13 +247,13 @@ Vento.dialogs = (() => {
     old?.remove();
     {
       if (!entry.ui) {
-        build(entry); // entry.ui = { card, inputs, checkbox } kurar
+        build(entry); // sets up entry.ui = { card, inputs, checkbox }
       }
       const wasShown = Vento.motion.isShown(els.layer);
       els.layer.append(entry.ui.card);
       Vento.motion.show(els.layer, "fade");
       if (!wasShown) {
-        Vento.motion.enter(entry.ui.card, "pop"); // kart da kendi girişini yapar (karartma yalnız solar)
+        Vento.motion.enter(entry.ui.card, "pop"); // the card enters on its own (the dim only fades)
       }
       const first = entry.ui.card.querySelector("input:not([type=checkbox])") ?? entry.ui.card.querySelector("button[primary]");
       first?.focus();

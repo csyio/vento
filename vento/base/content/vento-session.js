@@ -1,9 +1,9 @@
 "use strict";
 
-// Oturum geri yükleme (pencere tarafı): sekmelerden durumu çıkarır, açılışta geri getirir.
-// Diske yazma ve kapanış kaydı pencereden bağımsız `VentoSessionStore` modülündedir.
-// Yalnız seçili sekme hemen yüklenir; diğerleri sekme şeridinde başlığıyla durur, seçilince yüklenir
-// (VentoTab.pending). Geri/ileri geçmişi ve kaydırma konumu saklanmaz.
+// Session restore (window side): extracts state from the tabs, brings it back on startup.
+// Writing to disk and the on-quit save live in the window-independent `VentoSessionStore` module.
+// Only the selected tab loads right away; the others sit in the tab strip with their title and load when selected
+// (VentoTab.pending). Back/forward history and scroll position are not saved.
 
 const { VentoSessionStore } = ChromeUtils.importESModule("resource:///modules/VentoSessionStore.sys.mjs");
 
@@ -22,7 +22,7 @@ Vento.session = new (class Session {
     return VentoSessionStore.flush();
   }
 
-  /** Şimdiki sekmelerden saklanacak durumu üretir. */
+  /** Builds the state to save from the current tabs. */
   capture() {
     const saved = [];
     let selected = 0;
@@ -39,8 +39,8 @@ Vento.session = new (class Session {
   }
 
   /**
-   * Okunan durumu sekmelere döker. `extra` (komut satırı adresi ya da adres dizisi) verilirse hepsi ayrı sekmede açılır,
-   * sonuncusu seçilir. Hiç sekme geri getirilemezse false döner.
+   * Restores the loaded state into tabs. If `extra` (a command-line URL or array of URLs) is given, each opens in its own tab,
+   * the last one selected. Returns false if no tab could be restored.
    */
   restore(state, extra = []) {
     if (!state?.tabs?.length) {
@@ -55,7 +55,7 @@ Vento.session = new (class Session {
     return true;
   }
 
-  /** Değişiklikleri dinlemeye başlar; ilk sekmeler kurulduktan SONRA çağrılır. */
+  /** Starts listening for changes; call AFTER the first tabs are set up. */
   start() {
     if (this.#started) {
       return;
@@ -68,8 +68,8 @@ Vento.session = new (class Session {
   }
 
   #update() {
-    // Sekme kalmadıysa (son sekme kapandı = pencere/uygulama kapanıyor) önceki durum korunur;
-    // sonraki açılışta o sekme geri gelir (Firefox'un "önceki oturumu aç" davranışı).
+    // If no tabs are left (last tab closed = window/app is quitting) the previous state is kept;
+    // the next launch brings that tab back (Firefox's "restore previous session" behavior).
     if (Vento.tabs.all.length) {
       VentoSessionStore.set(this.capture());
     }

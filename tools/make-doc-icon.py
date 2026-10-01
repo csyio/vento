@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Vento belge simgesi (document.icns) ve disk simgesi (disk.icns) üretir.
+"""Generates the Vento document icon (document.icns) and disk icon (disk.icns).
 
-Belge: koyu "mürekkep" kâğıt, sağ üstte kıvrık köşe, ortada Vento'nun V rüzgâr işareti (uygulama simgesinden çıkarılır).
-Gereksinim: Pillow + numpy (venv), macOS `iconutil`. Kullanım: python3 tools/make-doc-icon.py
+Document: dark "ink" paper, folded top-right corner, Vento's V wind mark in the middle (extracted from the app icon).
+Requires Pillow + numpy (venv) and macOS `iconutil`. Usage: python3 tools/make-doc-icon.py
 """
 import os, subprocess, tempfile, shutil
 import numpy as np
@@ -10,9 +10,9 @@ from PIL import Image, ImageDraw, ImageFilter
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BRAND = os.path.join(ROOT, "vento/branding/default")
-S = 2048  # süper-örnekleme alanı (1024'e indirilir)
+S = 2048  # supersampling canvas (downscaled to 1024)
 
-# V işareti: uygulama simgesinden (koyu zemin üzerinde degrade çizgiler) → zemin rengine uzaklıktan alfa
+# V mark: taken from the app icon (gradient strokes on a dark background); alpha comes from the distance to the background color
 src_icon = Image.open(os.path.join(ROOT, "assets/logo-vento-1024.png")).convert("RGB").resize((1024, 1024), Image.LANCZOS)
 rgb = np.asarray(src_icon, dtype=np.float32)
 bg = np.array([18, 18, 22], dtype=np.float32)
@@ -25,13 +25,13 @@ mark_img = Image.fromarray(mark).crop((xs.min(), ys.min(), xs.max(), ys.max()))
 def sheet(size=S):
     W = H = size
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    # kâğıt: 62% genişlik, 80% yükseklik, ortalanmış; sağ üst köşe kıvrık
+    # paper: 62% width, 80% height, centered; top-right corner folded
     pw, ph = int(W * 0.64), int(H * 0.80)
     x0, y0 = (W - pw) // 2, int(H * 0.10)
     x1, y1 = x0 + pw, y0 + ph
     r = int(W * 0.05)
     fold = int(W * 0.17)
-    # gövde maskesi (kıvrık köşe kesilmiş); gölge de AYNI şekilden üretilir
+    # body mask (folded corner cut off); the shadow is built from the SAME shape
     body = Image.new("L", (W, H), 0)
     d = ImageDraw.Draw(body)
     d.rounded_rectangle((x0, y0, x1, y1), r, fill=255)
@@ -48,12 +48,12 @@ def sheet(size=S):
     grad[..., 3] = 255
     paper = Image.fromarray(grad.astype(np.uint8))
     paper.putalpha(body)
-    # ince kenar çizgisi
+    # thin edge line
     edge = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     ImageDraw.Draw(edge).rounded_rectangle((x0, y0, x1, y1), r, outline=(90, 130, 190, 90), width=max(2, W // 512))
     edge.putalpha(Image.fromarray((np.asarray(edge)[..., 3].astype(np.float32) * (np.asarray(body) > 0)).astype(np.uint8)))
     img.alpha_composite(paper); img.alpha_composite(edge)
-    # kıvrık köşe: üçgen, açık mavi-turkuaz degrade
+    # folded corner: triangle with a light blue-to-turquoise gradient
     fd = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     ImageDraw.Draw(fd).polygon([(x1 - fold, y0), (x1 - fold, y0 + fold), (x1, y0 + fold)], fill=(64, 160, 240, 255))
     fg = np.asarray(fd).copy()
@@ -62,7 +62,7 @@ def sheet(size=S):
     fg[..., 1] = np.where(fg[..., 3] > 0, 160 + (224 - 160) * gx, 0)
     fg[..., 2] = np.where(fg[..., 3] > 0, 240 + (208 - 240) * gx, 0)
     img.alpha_composite(Image.fromarray(fg.astype(np.uint8)))
-    # V işareti
+    # V mark
     mw = int(pw * 0.62)
     m = mark_img.resize((mw, int(mw * mark_img.height / mark_img.width)), Image.LANCZOS)
     img.alpha_composite(m, (x0 + (pw - m.width) // 2, y0 + int(ph * 0.55) - m.height // 2))
@@ -81,4 +81,4 @@ doc.save(os.path.join(ROOT, "tools/doc-icon-preview.png"))
 make_icns(doc, os.path.join(BRAND, "document.icns"))
 print("document.icns:", os.path.getsize(os.path.join(BRAND, "document.icns")) // 1024, "KB")
 shutil.copyfile(os.path.join(BRAND, "firefox.icns"), os.path.join(BRAND, "disk.icns"))
-print("disk.icns = uygulama simgesi")
+print("disk.icns = app icon")

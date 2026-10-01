@@ -1,4 +1,4 @@
-/* Vento sitesi. Yazı tipleri kendi sunucudan (OFL): Inter Tight, Fraunces. */
+/* Vento site. Fonts are self-hosted (OFL): Inter Tight, Fraunces. */
 
 @font-face { font-family: "Inter Tight"; font-weight: 400; font-display: swap; src: url(/assets/fonts/inter-tight-latin-ext-400.woff2) format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
 @font-face { font-family: "Inter Tight"; font-weight: 400; font-display: swap; src: url(/assets/fonts/inter-tight-latin-400.woff2) format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
@@ -56,7 +56,7 @@ body {
   overflow-x: hidden;
   position: relative;
 }
-/* Hafif kâğıt dokusu: sayfanın arkasında sabit, içeriği etkilemez */
+/* Light paper texture: fixed behind the page, doesn't affect content */
 body::before {
   content: "";
   position: fixed;
@@ -75,7 +75,7 @@ a:hover { text-decoration-thickness: 2px; }
 .skip:focus { left: 8px; }
 .wrap { width: min(100% - 2 * var(--gutter), var(--max)); margin-inline: auto; }
 
-/* ---------- Üst bilgi ---------- */
+/* ---------- Header ---------- */
 .top { padding-block: 22px 8px; }
 .top .wrap { display: flex; align-items: center; gap: 28px; flex-wrap: wrap; }
 .wm { display: inline-flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; font: 600 1.5rem/1 var(--sans); letter-spacing: -0.025em; }
@@ -85,7 +85,7 @@ a:hover { text-decoration-thickness: 2px; }
 .top nav a:hover, .top nav a[aria-current] { background-size: 100% 1px; }
 .top nav .lang { color: var(--ink-soft); font-size: 0.85rem; border: 1px solid var(--line); border-radius: 99px; padding: 2px 10px; background: none; }
 
-/* ---------- Tipografi ---------- */
+/* ---------- Typography ---------- */
 h1, h2, h3 { font-family: var(--serif); font-weight: 480; letter-spacing: -0.02em; line-height: 1.08; margin: 0; font-variation-settings: "opsz" 96; text-wrap: balance; }
 h1 { font-size: clamp(2.6rem, 6.4vw, 5.2rem); }
 h2 { font-size: clamp(1.9rem, 3.8vw, 3rem); }
@@ -98,7 +98,7 @@ p { margin: 0 0 1em; text-wrap: pretty; }
 kbd { font: 500 0.82em var(--mono); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 0 0.4em; background: var(--paper-2); }
 code { font: 0.88em var(--mono); background: var(--paper-2); padding: 0.1em 0.35em; border-radius: 4px; overflow-wrap: anywhere; }
 
-/* el çizimi dalgalı alt çizgi */
+/* hand-drawn wavy underline */
 .wave {
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='10' viewBox='0 0 40 10'%3E%3Cpath d='M0 6 C 5 1, 10 1, 15 5 S 25 9.5, 30 4.5 S 37 2, 40 5' fill='none' stroke='%231fae9f' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E") repeat-x 0 100% / 40px 10px;
   padding-bottom: 0.14em;
@@ -109,7 +109,7 @@ code { font: 0.88em var(--mono); background: var(--paper-2); padding: 0.1em 0.35
   .wave { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='10' viewBox='0 0 40 10'%3E%3Cpath d='M0 6 C 5 1, 10 1, 15 5 S 25 9.5, 30 4.5 S 37 2, 40 5' fill='none' stroke='%233ed6c6' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E"); }
 }
 
-/* ---------- Giriş ---------- */
+/* ---------- Hero ---------- */
 .hero { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: clamp(24px, 4vw, 64px); align-items: center; padding-block: clamp(36px, 7vw, 88px) clamp(40px, 6vw, 80px); }
 .hero h1 { margin-bottom: 0.45em; }
 .hero-copy { position: relative; z-index: 2; }
@@ -157,7 +157,7 @@ code { font: 0.88em var(--mono); background: var(--paper-2); padding: 0.1em 0.35
 @keyframes draw { to { stroke-dashoffset: 0; } }
 @media (prefers-reduced-motion: reduce) { .wind { display: none; } }
 
-/* ---------- Bölümler ---------- */
+/* ---------- Sections ---------- */
 .sec { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 8fr); gap: clamp(20px, 4vw, 64px); padding-block: clamp(40px, 6vw, 84px); border-top: 1px solid var(--line); }
 .sec > .tag { font: 500 0.8rem/1.4 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); padding-top: 0.6em; }
 .sec > .tag b { display: block; font: 400 3rem/1 var(--serif); letter-spacing: -0.02em; color: var(--ink); margin-bottom: 6px; text-transform: none; }
@@ -180,7 +180,7 @@ code { font: 0.88em var(--mono); background: var(--paper-2); padding: 0.1em 0.35
 .ledger .lack li::before { content: ""; position: absolute; left: 1px; top: 0.78em; width: 15px; height: 2px; background: var(--ink-soft); border-radius: 2px; transform: rotate(-3deg); opacity: 0.6; }
 .ledger .lack .why { color: var(--ink-soft); font-size: 0.92rem; }
 
-/* Esin bandı */
+/* Esin band */
 .band { position: relative; color: #e7e7ea; background: #121216 url(/assets/wall/dusk.webp) center / cover; margin-block: 0; }
 .band::before { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, rgba(18, 18, 22, 0.92) 25%, rgba(18, 18, 22, 0.35)); }
 .band .wrap { position: relative; padding-block: clamp(56px, 9vw, 120px); display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 4fr); gap: 40px; align-items: end; }
@@ -189,7 +189,7 @@ code { font: 0.88em var(--mono); background: var(--paper-2); padding: 0.1em 0.35
 .band .kicker { color: #b0b0ba; }
 .band .note { font: italic 400 1.05rem/1.4 var(--serif); border-left: 2px solid #3ed6c6; padding-left: 16px; color: #d4d4da; }
 
-/* ---------- İç sayfalar ---------- */
+/* ---------- Inner pages ---------- */
 .page-head { padding-block: clamp(36px, 6vw, 80px) clamp(20px, 3vw, 40px); }
 .page-head h1 { font-size: clamp(2.4rem, 5.4vw, 4.4rem); max-width: 14em; }
 .page-head .lede { margin-top: 1em; }
@@ -215,11 +215,11 @@ th { font-weight: 600; }
 .callout { border: 1.5px solid var(--ink); border-radius: 4px 16px 4px 16px; padding: 18px 22px; margin: 1.6em 0; background: var(--paper-2); }
 .callout p:last-child { margin-bottom: 0; }
 
-/* LLMTR: markanın kendi token'ları (design.md): açık #F8FAFC / koyu #111113 zemin, logo çevresinde ≥ %50 yükseklik boşluk */
+/* LLMTR: the brand's own tokens (design.md): light #F8FAFC / dark #111113 background, clear space around the logo of at least 50% of its height */
 .llmtr { display: inline-flex; background: var(--llmtr-card); padding: 20px 26px; border-radius: 10px; border: 1px solid var(--line); margin: 6px 0 14px; }
 .llmtr img { display: block; width: 141px; height: 36px; }
 
-/* Akış şeması */
+/* Flow diagram */
 .flow { display: flex; flex-wrap: wrap; align-items: stretch; gap: 0; margin: 1.4em 0 2em; padding: 0; list-style: none; }
 .flow li { flex: 1 1 100px; position: relative; padding: 14px 16px; margin: 0; border: 1px solid var(--line); background: var(--paper-2); font-size: 0.92rem; line-height: 1.35; }
 .flow li:nth-child(odd) { transform: translateY(2px) rotate(-0.4deg); }
@@ -240,7 +240,7 @@ th { font-weight: 600; }
 .err img { width: 100%; max-width: 380px; height: auto; transform: rotate(-3deg); justify-self: center; }
 .err .big { font: italic 300 clamp(5rem, 16vw, 11rem)/0.8 var(--serif); color: var(--scribble); display: block; margin-bottom: 0.15em; }
 
-/* ---------- Alt bilgi ---------- */
+/* ---------- Footer ---------- */
 .foot { border-top: 1px solid var(--line); margin-top: 40px; padding-block: 34px 50px; font-size: 0.92rem; color: var(--ink-soft); }
 .foot .wrap { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 8fr); gap: clamp(20px, 4vw, 64px); }
 .foot p { margin: 0 0 0.6em; max-width: 40em; }

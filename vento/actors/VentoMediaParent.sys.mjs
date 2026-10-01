@@ -1,4 +1,4 @@
-// Kamera/mikrofon isteği — ana süreç tarafı. İzin kartını Vento.permissions çizer.
+// Camera/microphone request, parent side. Vento.permissions draws the permission card.
 
 export class VentoMediaParent extends JSWindowActorParent {
   #vento() {

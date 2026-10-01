@@ -1,5 +1,5 @@
-// Vento başlangıç bileşeni: komut satırı işleyicisi. Ana pencereyi DefaultCLH değil biz açarız.
-// VENTO_TRACE=<dosya> ortam değişkeni verilirse her adımı oraya yazar (stdout'a güvenilmez).
+// Vento startup component: command line handler. We open the main window, not DefaultCLH.
+// If the VENTO_TRACE=<file> environment variable is set, every step is written there (stdout can't be trusted).
 
 const TRACE = Services.env.exists("VENTO_TRACE") ? Services.env.get("VENTO_TRACE") : "";
 function trace(msg) {
@@ -19,16 +19,16 @@ VentoStartup.prototype = {
   QueryInterface: ChromeUtils.generateQI(["nsICommandLineHandler"]),
 
   handle(cmdLine) {
-    trace("startup: komut satırı işleyicisi çağrıldı");
+    trace("startup: command line handler called");
     if (cmdLine.preventDefault) {
-      trace("startup: preventDefault zaten set, çıkılıyor");
+      trace("startup: preventDefault already set, exiting");
       return;
     }
-    // Toolkit'in pencere/süreç aktörlerini (PageExtractor, Select, Find, Pdfjs …) kaydeder. Firefox'ta bunu
-    // browser/'ın DesktopActorRegistry'si yapar; bizde kimse yapmadığı için burada yüklenir.
+    // Registers the toolkit's window/process actors (PageExtractor, Select, Find, Pdfjs ...). In Firefox,
+    // browser/'s DesktopActorRegistry does this; nobody does here, so it's loaded here.
     try {
       ChromeUtils.importESModule("resource://gre/modules/ActorManagerParent.sys.mjs");
-      trace("startup: toolkit aktörleri kaydedildi");
+      trace("startup: toolkit actors registered");
       ChromeUtils.registerWindowActor("VentoPageText", {
         parent: { esModuleURI: "resource:///actors/VentoPageTextParent.sys.mjs" },
         child: { esModuleURI: "resource:///actors/VentoPageTextChild.sys.mjs" },
@@ -36,7 +36,7 @@ VentoStartup.prototype = {
         matches: ["http://*/*", "https://*/*"],
         messageManagerGroups: ["browsers"],
       });
-      trace("startup: VentoPageText aktörü kaydedildi");
+      trace("startup: VentoPageText actor registered");
       ChromeUtils.registerWindowActor("VentoContextMenu", {
         parent: { esModuleURI: "resource:///actors/VentoContextMenuParent.sys.mjs" },
         child: {
@@ -46,8 +46,8 @@ VentoStartup.prototype = {
         allFrames: true,
         messageManagerGroups: ["browsers"],
       });
-      trace("startup: VentoContextMenu aktörü kaydedildi");
-      // Hata sayfasına Ebabil (yalnız bağlantı hatalarında; sertifika uyarısında yok)
+      trace("startup: VentoContextMenu actor registered");
+      // Ebabil on the error page (connection errors only; not on certificate warnings)
       ChromeUtils.registerWindowActor("VentoErrorPage", {
         child: {
           esModuleURI: "resource:///actors/VentoErrorPageChild.sys.mjs",
@@ -56,8 +56,8 @@ VentoStartup.prototype = {
         matches: ["about:neterror?*"],
         messageManagerGroups: ["browsers"],
       });
-      trace("startup: VentoErrorPage aktörü kaydedildi");
-      // Sekme simgeleri (favicon): <link rel=icon> + /favicon.ico; Firefox'un FaviconLoader'ı içerik sürecinde çalışır
+      trace("startup: VentoErrorPage actor registered");
+      // Tab icons (favicon): <link rel=icon> + /favicon.ico; Firefox's FaviconLoader runs in the content process
       ChromeUtils.registerWindowActor("VentoLink", {
         parent: { esModuleURI: "resource:///actors/VentoLinkParent.sys.mjs" },
         child: {
@@ -67,21 +67,21 @@ VentoStartup.prototype = {
             DOMLinkAdded: {},
             DOMLinkChanged: {},
             pageshow: {},
-            // pagehide yalnız var olan aktörün durumunu temizler
+            // pagehide only clears the state of an existing actor
             pagehide: { createActor: false },
           },
         },
         messageManagerGroups: ["browsers"],
       });
-      trace("startup: VentoLink aktörü kaydedildi");
-      // alert/confirm/prompt/kimlik doğrulama: toolkit'in Prompter'ı "Prompt" adlı aktörü arar
+      trace("startup: VentoLink actor registered");
+      // alert/confirm/prompt/authentication: the toolkit's Prompter looks for an actor named "Prompt"
       ChromeUtils.registerWindowActor("Prompt", {
         parent: { esModuleURI: "resource:///actors/VentoPromptParent.sys.mjs" },
         includeChrome: true,
         allFrames: true,
       });
-      trace("startup: Prompt aktörü kaydedildi");
-      // Kamera/mikrofon: süreç aktörü bildirimi dinler, pencere aktörü kartı ana sürece taşır
+      trace("startup: Prompt actor registered");
+      // Camera/microphone: the process actor listens for the notification, the window actor carries the card to the parent process
       ChromeUtils.registerProcessActor("VentoMediaProcess", {
         child: {
           esModuleURI: "resource:///actors/VentoMediaProcessChild.sys.mjs",
@@ -95,16 +95,16 @@ VentoStartup.prototype = {
         allFrames: true,
         messageManagerGroups: ["browsers"],
       });
-      trace("startup: VentoMedia aktörleri kaydedildi");
+      trace("startup: VentoMedia actors registered");
     } catch (e) {
-      trace(`startup: ActorManagerParent HATA: ${e}`);
+      trace(`startup: ActorManagerParent ERROR: ${e}`);
     }
     try {
       const win = Services.ww.openWindow(null, MAIN_WINDOW, "_blank", WINDOW_FEATURES, cmdLine);
-      trace(`startup: openWindow döndü, pencere=${!!win}`);
+      trace(`startup: openWindow returned, window=${!!win}`);
       cmdLine.preventDefault = true;
     } catch (e) {
-      trace(`startup: openWindow HATA: ${e}`);
+      trace(`startup: openWindow ERROR: ${e}`);
     }
   },
 

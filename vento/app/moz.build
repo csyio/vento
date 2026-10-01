@@ -1,4 +1,4 @@
-# Vento ana ikilisi (macOS önce). nsBrowserApp'in sadeleştirilmiş kopyası.
+# Vento main binary (macOS first). A simplified copy of nsBrowserApp.
 
 if CONFIG["MOZ_MACBUNDLE_NAME"]:
     DIRS += ["macbuild/Contents"]

@@ -1,21 +1,21 @@
 "use strict";
 
-// Hareket sistemi: Vento'da açılıp kapanan her şey buradan geçer, böylece süre/eğri/"hareketi azalt" tek yerde.
+// Motion system: everything that opens or closes in Vento goes through here, so duration, easing and "reduce motion" live in one place.
 //
-// İlkeler
-//  - Giriş yavaşça-durur (ease-out), çıkış hızlanarak-gider (ease-in) ve girişten KISA: kullanıcı beklemez.
-//  - Yalnız opacity + transform (GPU'da, sayfayı yeniden boyutlandırmaz). İstisna: sekme şeridi (30 px'lik küçük ağaç).
-//  - `prefers-reduced-motion`: konum/ölçek hareketi kalkar, yalnız çok kısa solma kalır (bilgi "belirir", sıçramaz).
-//  - `hidden` niteliği MANTIKSAL durumdur: girişte hemen kalkar, çıkışta animasyon BİTİNCE konur. Çıkış sürerken öğe
-//    `closing` niteliği taşır; "açık mı?" sorusu için isShown() kullanılır (hidden'a doğrudan bakılmaz).
-//  - Çıkış sürerken yeniden show() çağrılırsa çıkış iptal olur ve öğe takılı kalmaz (yarış güvenli).
+// Principles
+//  - Enter decelerates (ease-out), exit accelerates (ease-in) and is SHORTER than enter: the user shouldn't wait.
+//  - Only opacity + transform (GPU, no relayout). Exception: the tab strip (a small 30 px tree).
+//  - `prefers-reduced-motion`: position/scale motion is dropped, only a very short fade stays (content "appears", doesn't jump).
+//  - `hidden` is the LOGICAL state: removed immediately on enter, set only when the exit animation FINISHES. While exiting, the element
+//    carries a `closing` attribute; use isShown() to ask "is it open?" (don't read hidden directly).
+//  - If show() is called during an exit, the exit is cancelled and the element doesn't get stuck (race-safe).
 
 Vento.motion = (() => {
   const EASE_OUT = "cubic-bezier(0.22, 0.8, 0.3, 1)";
   const EASE_IN = "cubic-bezier(0.4, 0, 1, 1)";
   const REDUCED_MS = 90;
 
-  // [başlangıç durumu] → doğal durum. Çıkış bunun tersi (daha kısa süre, ease-in).
+  // [start state] -> natural state. Exit is the reverse (shorter, ease-in).
   const PRESETS = {
     pop: { from: { opacity: 0, transform: "translateY(8px) scale(0.97)" }, to: { opacity: 0, transform: "translateY(4px) scale(0.98)" }, enter: 190, exit: 130 },
     drop: { from: { opacity: 0, transform: "translateY(-6px) scale(0.98)" }, to: { opacity: 0, transform: "translateY(-4px) scale(0.99)" }, enter: 170, exit: 120 },
@@ -35,7 +35,7 @@ Vento.motion = (() => {
   };
 
   const api = {
-    /** Test düzeneği: true → "hareketi azalt" gibi davranır. */
+    /** Test hook: true -> behave as if "reduce motion" is on. */
     reducedOverride: null,
 
     get reduced() {
@@ -44,12 +44,12 @@ Vento.motion = (() => {
 
     PRESETS,
 
-    /** Öğe görünür (ve kapanmıyor) mu? `hidden`a doğrudan bakmak yerine bunu kullan. */
+    /** Is the element visible (and not closing)? Use this instead of reading `hidden` directly. */
     isShown(el) {
       return !el.hidden && !el.hasAttribute("closing");
     },
 
-    /** Kareler + süre. Hareket azaltılmışsa yalnız opacity. */
+    /** Keyframes + duration. With reduced motion, opacity only. */
     frames(preset, dir) {
       const p = PRESETS[preset] ?? PRESETS.pop;
       const edge = dir === "in" ? p.from : p.to;
@@ -60,12 +60,12 @@ Vento.motion = (() => {
       return { keyframes: [edge, { opacity: 1, transform: "none" }], duration: ms };
     },
 
-    /** Öğeyi gösterir (zaten açıksa dokunmaz). `inner` verilirse o öğe ayrıca giriş yapar (ör. katmanın içindeki kart). */
+    /** Shows the element (no-op if already open). If `inner` is given, it also animates in separately (e.g. the card inside a layer). */
     show(el, preset = "pop") {
       const s = stateOf(el);
       const wasClosing = el.hasAttribute("closing");
       const wasHidden = el.hidden;
-      s.token++; // bekleyen çıkışın sonunu geçersiz kıl
+      s.token++; // invalidate the end of any pending exit
       s.anim?.cancel();
       s.anim = null;
       s.settle?.();
@@ -78,7 +78,7 @@ Vento.motion = (() => {
       s.anim = el.animate(keyframes, { duration, easing: EASE_OUT });
     },
 
-    /** Öğeyi gizler; animasyon bitince `hidden` konur. Bitince çözülen söz döner. */
+    /** Hides the element; `hidden` is set when the animation ends. Returns a promise that resolves when done. */
     hide(el, preset = "pop") {
       const s = stateOf(el);
       if (el.hidden) {
@@ -91,7 +91,7 @@ Vento.motion = (() => {
       el.setAttribute("closing", "");
       const { keyframes, duration } = api.frames(preset, "out");
       const anim = el.animate(keyframes.toReversed(), { duration, easing: EASE_IN, fill: "forwards" });
-      // keyframes.toReversed(): [doğal, çıkış kenarı] — giriş karelerinin tersi
+      // keyframes.toReversed(): [natural, exit edge], the reverse of the enter frames
       s.anim = anim;
       s.done = new Promise(resolve => {
         let over = false;
@@ -102,7 +102,7 @@ Vento.motion = (() => {
           over = true;
           clearTimeout(timer);
           if (s.token === token) {
-            anim.cancel(); // fill:forwards kalıntısı kalmasın
+            anim.cancel(); // don't leave fill:forwards residue
             el.removeAttribute("closing");
             el.hidden = true;
             s.anim = null;
@@ -111,7 +111,7 @@ Vento.motion = (() => {
         };
         s.settle = finish;
         anim.finished.then(finish, () => {});
-        // Güvence: animasyon hiç ilerlemezse (gizli belge, arka plan) öğe yine de kapanır
+        // Safety net: if the animation never progresses (hidden document, background), the element still closes
         const timer = setTimeout(finish, duration + 150);
       });
       return s.done;
@@ -125,7 +125,7 @@ Vento.motion = (() => {
       return api.hide(el, preset);
     },
 
-    /** Yalnız giriş animasyonu (öğe zaten DOM'da, ör. kart). */
+    /** Enter animation only (element is already in the DOM, e.g. a card). */
     enter(el, preset = "pop") {
       const { keyframes, duration } = api.frames(preset, "in");
       return el.animate(keyframes, { duration, easing: EASE_OUT });

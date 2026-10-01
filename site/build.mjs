@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// Vento ürün sitesi üretici. Bağımlılık yok (Node 18+).
+// Vento product site generator. No dependencies (Node 18+).
 //
-//   node site/build.mjs              → site/dist/ + site/vento-site-<sürüm>.zip (DMG şart)
-//   node site/build.mjs --preview    → DMG olmadan; indirme düğmesi "yakında" olur
-//   node site/build.mjs --dmg <yol>  → DMG yolunu elle ver (ya da VENTO_DMG=<yol>)
-//   node site/build.mjs --no-zip     → zip üretme
+//   node site/build.mjs              -> site/dist/ + site/vento-site-<version>.zip (needs the DMG)
+//   node site/build.mjs --preview    -> no DMG needed; the download button shows "coming soon"
+//   node site/build.mjs --dmg <path> -> give the DMG path explicitly (or VENTO_DMG=<path>)
+//   node site/build.mjs --no-zip     -> skip the zip
 //
-// Yalnızca sayfalar + görseller + (varsa) DMG üretir. /updates/… dosyaları bu işin parçası DEĞİL.
+// Produces only pages, images and (if present) the DMG. The /updates/… files are NOT part of this.
 import { readFileSync, writeFileSync, mkdirSync, copyFileSync, readdirSync, statSync, existsSync, rmSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join, dirname, basename } from "node:path";
@@ -24,8 +24,8 @@ const preview = args.includes("--preview");
 const noZip = args.includes("--no-zip");
 const dmgArg = args.includes("--dmg") ? args[args.indexOf("--dmg") + 1] : process.env.VENTO_DMG;
 
-// Sürüm: kullanıcıya gösterilen sürüm (version_display.txt) varsa o; yoksa version.txt.
-// (version.txt şu an motor/uygulama sürümünü, 153.2.0, taşıyor; kullanıcıya görünen sürüm 0.1.0.)
+// Version: the user-facing version (version_display.txt) if present, otherwise version.txt.
+// (version.txt currently holds the engine/app version, 153.2.0; the user-facing version is 0.1.0.)
 function readVersion() {
   for (const f of ["version_display.txt", "version.txt"]) {
     const p = join(REPO, "vento", "config", f);
@@ -34,7 +34,7 @@ function readVersion() {
       if (v) return v;
     }
   }
-  throw new Error("vento/config/version_display.txt ya da version.txt okunamadı");
+  throw new Error("could not read vento/config/version_display.txt or version.txt");
 }
 const version = readVersion();
 const dmgName = `vento-${version}.dmg`;
@@ -45,7 +45,7 @@ function findDmg() {
 }
 const dmgPath = findDmg();
 if (!dmgPath && !preview) {
-  console.error(`HATA: DMG bulunamadı (aranan: dist/${dmgName}, site/dmg/${dmgName}). DMG olmadan önizleme için: node site/build.mjs --preview`);
+  console.error(`ERROR: DMG not found (looked for: dist/${dmgName}, site/dmg/${dmgName}). For a preview without a DMG: node site/build.mjs --preview`);
   process.exit(1);
 }
 
@@ -153,17 +153,17 @@ ${["tr", "en"].flatMap(lang => keys.map(k => `<url><loc>${ORIGIN}${routes[lang][
 </urlset>
 `);
 
-console.log(`Vento sitesi ${version} → ${OUT}${dl.has ? `  (DMG: ${dmgName}, ${dl.size}, sha256 ${dl.sha.slice(0, 12)}…)` : "  (DMG yok: önizleme)"}`);
+console.log(`Vento site ${version} → ${OUT}${dl.has ? `  (DMG: ${dmgName}, ${dl.size}, sha256 ${dl.sha.slice(0, 12)}…)` : "  (no DMG: preview)"}`);
 
 if (!noZip) {
   const zipName = `vento-site-${version}${dl.has ? "" : "-onizleme"}.zip`;
   const zipPath = join(SITE, zipName);
   if (spawnSync("zip", ["-v"], { stdio: "ignore" }).error) {
-    console.warn(`UYARI: 'zip' komutu yok; zip üretilemedi. ${OUT} klasörünün içeriğini elle sıkıştırıp Plesk'e yükle.`);
+    console.warn(`WARNING: 'zip' command not found; could not build the zip. Compress the contents of ${OUT} by hand and upload them to Plesk.`);
   } else {
     rmSync(zipPath, { force: true });
     const r = spawnSync("zip", ["-qr", zipPath, "."], { cwd: OUT, stdio: "inherit" });
     if (r.status === 0) console.log(`Zip: ${zipPath} (${(statSync(zipPath).size / 1048576).toFixed(1)} MB)`);
-    else console.warn("UYARI: zip başarısız oldu.");
+    else console.warn("WARNING: zip failed.");
   }
 }

@@ -1,6 +1,6 @@
 #!/bin/sh
-# Motorun Türkçe dil dosyalarını (Mozilla'nın firefox-l10n deposu, yalnız `tr`) pin'li sürümle indirir. Yeniden çalıştırmak güvenlidir.
-# Sürümü yükseltmek için PIN'i değiştir ve vento/docs'a nedenini yaz (dil dosyaları MPL-2.0).
+# Downloads the engine's Turkish locale files (Mozilla's firefox-l10n repo, `tr` only) at a pinned revision. Safe to re-run.
+# To bump the revision, change PIN and record the reason in vento/docs (locale files are MPL-2.0).
 set -e
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PIN="ab3eee19ba53d3e29999278548eff2052df1d8a9"

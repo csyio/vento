@@ -1,4 +1,4 @@
-// Firefox'un browser/actors/LinkHandlerChild.sys.mjs dosyasından uyarlandı (arama motoru bağlantıları çıkarıldı).
+// Adapted from Firefox's browser/actors/LinkHandlerChild.sys.mjs (search engine links removed).
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */

@@ -1,8 +1,8 @@
-// Sayfalar arasında paylaşılan küçük HTML parçaları.
+// Small HTML fragments shared across pages.
 
 export const arrowIcon = `<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v10m0 0-4-4m4 4 4-4M4 17h12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
-// Ebabil: dört katman, toplamsal karışım (plus-lighter). Hareket azaltılmışsa still.webp gösterilir (CSS).
+// Ebabil: four layers, additive blending (plus-lighter). With reduced motion, still.webp is shown instead (CSS).
 export function bird() {
   return `<div class="bird" aria-hidden="true">
   <svg class="wind" viewBox="0 0 320 240" preserveAspectRatio="none">
@@ -21,8 +21,8 @@ export function bird() {
 </div>`;
 }
 
-// LLMTR logosu: değiştirilmemiş resmi dosya, koyu/açık sürüm zemine göre; 141x36 (en az 96 px genişlik).
-// Logo çevresinde (kartın dolgusu) işaret yüksekliğinin %50'sinden fazla boşluk bırakılır.
+// LLMTR logo: the official file, unmodified; dark or light version depending on the background; 141x36 (at least 96 px wide).
+// Keep clear space around the logo (the card padding) of more than 50% of the mark's height.
 export function llmtrLockup() {
   return `<a class="llmtr" href="https://llmtr.com" rel="noopener"><picture><source media="(prefers-color-scheme: dark)" srcset="/assets/img/llmtr-on-dark.svg"><img src="/assets/img/llmtr-on-light.svg" alt="LLMTR" width="141" height="36"></picture></a>`;
 }

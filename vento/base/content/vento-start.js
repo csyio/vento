@@ -1,9 +1,9 @@
 "use strict";
 
-// Başlangıç ekranı kişiselleştirme: duvar kâğıdı + Ebabil aç/kapa. Varsayılan SADE (duvar kâğıdı yok, Ebabil açık).
-// Tercihler: vento.start.wallpaper ("" ya da bir kimlik), vento.start.ebabil (bool). Panel "Özelleştir" düğmesinden açılır.
+// Start screen personalization: wallpaper + Ebabil on/off. Default is PLAIN (no wallpaper, Ebabil on).
+// Prefs: vento.start.wallpaper ("" or an id), vento.start.ebabil (bool). The panel opens from the "Customize" button.
 //
-// Metinler Fluent'te (vento.ftl): wp-<kimlik> duvar kâğıdı adları, cp-* panel metinleri.
+// Text lives in Fluent (vento.ftl): wp-<id> wallpaper names, cp-* panel text.
 
 Vento.start = (() => {
   const WALLPAPERS = [
@@ -30,10 +30,10 @@ Vento.start = (() => {
     }
   }
 
-  /** Duvar kâğıdını tercihten uygular. Önce görsel ÇÖZÜLÜR, sonra ton değişir (okunurluk + titreme olmasın). */
+  /** Applies the wallpaper from the pref. The image is RESOLVED first, then the tone changes (readability + no flicker). */
   async function applyWallpaper() {
     const id = Services.prefs.getStringPref(PREF_WALL, "");
-    const w = WALLPAPERS.find(x => x.id === id); // bilinmeyen kimlik (elle bozulmuş tercih) = yok
+    const w = WALLPAPERS.find(x => x.id === id); // unknown id (hand-edited pref) = none
     const mine = ++token;
     if (!w) {
       els.start.removeAttribute("data-wallpaper");
@@ -47,11 +47,11 @@ Vento.start = (() => {
     try {
       await img.decode();
     } catch (e) {
-      Vento.trace(`duvar kâğıdı yüklenemedi (${w.id}): ${e}`);
+      Vento.trace(`could not load wallpaper (${w.id}): ${e}`);
       return;
     }
     if (mine !== token) {
-      return; // bu arada başka seçim yapıldı
+      return; // another choice was made in the meantime
     }
     els.wall.style.backgroundImage = `url("${full(w.id)}")`;
     els.start.dataset.wallpaper = w.id;
@@ -91,7 +91,7 @@ Vento.start = (() => {
     els.walls.replaceChildren(mk("", Vento.l10n.t("cp-none-title"), Vento.l10n.t("cp-none")), ...WALLPAPERS.map(w => mk(w.id, Vento.l10n.t(`wp-${w.id}`), Vento.l10n.t(`wp-${w.id}`))));
   }
 
-  // ---- Sık kullanılan siteler (yer imleri + en sık girilenler) ---------------------------------------
+  // ---- Top sites (bookmarks + most visited) ---------------------------------------
   const PREF_SITES = "vento.start.sites";
   let sitesToken = 0;
 
@@ -147,7 +147,7 @@ Vento.start = (() => {
     }
     const tiles = await Promise.all((await Vento.bookmarks.topSites(8)).map(makeTile));
     if (mine !== sitesToken) {
-      return; // daha yeni bir yenileme başladı
+      return; // a newer refresh has started
     }
     els.sites.replaceChildren(...tiles);
     els.sites.hidden = tiles.length === 0;
@@ -169,7 +169,7 @@ Vento.start = (() => {
     });
     buildTiles();
     Vento.l10n.addEventListener("change", () => {
-      buildTiles(); // karo adları ve ipuçları yeni dilde
+      buildTiles(); // tile names and hints in the new language
       markSelected(Services.prefs.getStringPref(PREF_WALL, ""));
     });
     applyWallpaper();
@@ -177,10 +177,10 @@ Vento.start = (() => {
     refreshSites();
     Vento.bookmarks.addEventListener("change", refreshSites);
     Vento.l10n.addEventListener("change", refreshSites);
-    // Yeni boş sekme açılınca liste güncel olsun (yeni girilen siteler)
+    // Keep the list current when a new blank tab opens (newly visited sites)
     Vento.tabs.addEventListener("tabselect", () => Vento.tabs.selected?.blank && refreshSites());
 
-    // Panel satırları: doğrudan tercihe bağlı onay kutuları (tercih dışarıdan değişirse kutu da güncellenir)
+    // Panel rows: checkboxes bound directly to the pref (the checkbox updates if the pref changes elsewhere)
     const cleanups = [];
     const bindBool = (id, pref, def) => {
       const box = $(id);
@@ -194,7 +194,7 @@ Vento.start = (() => {
     bindBool("cp-sites", PREF_SITES, true);
     Services.prefs.addObserver(PREF_SITES, { observe: () => refreshSites() });
     bindBool("cp-esin", "vento.esin.enabled", true);
-    // Arama motoru: varsayılan DuckDuckGo; Google seçilince gizlilik notu görünür
+    // Search engine: DuckDuckGo by default; picking Google shows a privacy note
     const engineSel = $("cp-search");
     const applyEngine = () => {
       const e = Services.prefs.getStringPref("vento.search.engine", "duckduckgo");
@@ -206,7 +206,7 @@ Vento.start = (() => {
     const engineObs = { observe: applyEngine };
     Services.prefs.addObserver("vento.search.engine", engineObs);
     cleanups.push(() => Services.prefs.removeObserver("vento.search.engine", engineObs));
-    // Esin modeli: varsayılan (kayıt tutulmaz) ya da Qwen; Qwen seçilince sağlayıcı günlüğü notu görünür
+    // Esin model: the default (no logging) or Qwen; picking Qwen shows a note about the provider keeping logs
     const modelSel = $("cp-model");
     const applyModel = () => {
       const m = Services.prefs.getStringPref("vento.esin.model", "");
@@ -234,7 +234,7 @@ Vento.start = (() => {
       Services.prefs.removeObserver(PREF_WALL, observer);
       Services.prefs.removeObserver(PREF_EB, observer);
     });
-    // Dışarı tıklayınca / Esc ile kapanır; başlangıç ekranı görünmüyorsa (sayfaya gidildi) panel de kapanır
+    // Closes on click outside / Esc; if the start screen is not visible (navigated to a page) the panel closes too
     document.addEventListener("mousedown", e => {
       if (isOpen() && !els.panel.contains(e.target) && !els.btn.contains(e.target)) {
         close();

@@ -1,10 +1,10 @@
 "use strict";
 
-// İlk açılış (karşılama): dil → tanışma (Ebabil) → Esin açık/kapalı → otomatik güncelleme açık/kapalı → bitti.
-// Her seçim ANINDA uygulanır (dil canlı değişir). "Atla" ve Esc akışı kapatır ve tamamlanmış sayar; hiçbir seçim geri alınmaz,
-// hepsi başlangıç ekranındaki "Özelleştir" panelinden değiştirilebilir. Yalnız bir kez gösterilir (vento.welcome.completed).
+// First launch (welcome): language -> intro (Ebabil) -> Esin on/off -> auto-update on/off -> done.
+// Every choice applies INSTANTLY (the language changes live). "Skip" and Esc close the flow and count it as completed; no choice is undone,
+// all can be changed later in the "Customize" panel on the start screen. Shown only once (vento.welcome.completed).
 //
-// Tercihler: vento.welcome.completed, vento.esin.enabled, vento.esin.consented, app.update.auto, intl.locale.requested.
+// Prefs: vento.welcome.completed, vento.esin.enabled, vento.esin.consented, app.update.auto, intl.locale.requested.
 
 Vento.welcome = (() => {
   const PREF_DONE = "vento.welcome.completed";
@@ -14,7 +14,7 @@ Vento.welcome = (() => {
   let index = 0;
   let open = false;
 
-  /** İşletim sistemi dili Türkçe ise tr, değilse en-US önerilir. */
+  /** If the OS language is Turkish, tr is suggested; otherwise en-US. */
   function systemLocale() {
     try {
       const os = Cc["@mozilla.org/intl/ospreferences;1"].getService(Ci.mozIOSPreferences).systemLocale;
@@ -33,7 +33,7 @@ Vento.welcome = (() => {
   }
 
   function setPose() {
-    // Esin kapalıyken uyuyan Ebabil, aksi hâlde uçan
+    // Ebabil sleeps while Esin is off, flies otherwise
     const sleeping = STEPS[index] === "esin" && !Services.prefs.getBoolPref("vento.esin.enabled", true);
     els.img.src = sleeping ? "chrome://vento/content/art/pose-idle.webp" : "chrome://vento/content/ebabil/still.webp";
   }
@@ -78,7 +78,7 @@ Vento.welcome = (() => {
     markChoices(section("lang"), "lang", code);
   }
 
-  /** Karşılamayı gösterir (ilk açılışta shell çağırır; testler de doğrudan çağırır). */
+  /** Shows the welcome flow (the shell calls it on first launch; tests call it directly). */
   function show() {
     if (open) {
       return;
@@ -86,7 +86,7 @@ Vento.welcome = (() => {
     open = true;
     index = 0;
     els.dots.replaceChildren(...STEPS.map(() => document.createElement("i")));
-    // Seçimlerin başlangıç durumu: dil sistemden, Esin ve güncelleme mevcut tercihten
+    // Initial state of the choices: language from the system, Esin and updates from the current prefs
     const code = Services.prefs.getStringPref("intl.locale.requested", "") === "en-US" ? "en-US" : systemLocale();
     applyLocale(code);
     markChoices(section("esin"), "esin", Services.prefs.getBoolPref("vento.esin.enabled", true) ? "on" : "off");
@@ -125,7 +125,7 @@ Vento.welcome = (() => {
       const on = b.dataset.esin === "on";
       Services.prefs.setBoolPref("vento.esin.enabled", on);
       if (on) {
-        // Bu ekranda veri akışı (LLMTR → GreenPT) açıkça anlatıldı: onay burada alınmış olur
+        // The data flow (LLMTR -> GreenPT) was explained explicitly on this screen: consent is taken here
         Services.prefs.setBoolPref("vento.esin.consented", true);
       }
       markChoices(section("esin"), "esin", on ? "on" : "off");

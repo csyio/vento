@@ -1,6 +1,6 @@
-// Sağ tık: içerik tarafı. Tıklanan yerde ne olduğunu (bağlantı, resim, seçili metin, yazı alanı…) toplar ve
-// ana sürece yollar. Menüyü ana süreç çizer (bkz. vento-menu.js). Firefox'un ContextMenuChild'ından
-// (browser/ içinde, bizde yok) çok daha küçük; yalnızca Vento'nun menüsünün ihtiyaç duyduğu veri.
+// Context menu, content side. Collects what is under the click (link, image, selected text, editable field...)
+// and sends it to the parent process. The parent process draws the menu (see vento-menu.js). Much smaller than
+// Firefox's ContextMenuChild (it lives in browser/, which we don't have); only the data Vento's menu needs.
 
 const TEXT_INPUT_TYPES = new Set(["text", "search", "url", "email", "tel", "password", "number", ""]);
 const MAX_SELECTION = 2000;
@@ -10,14 +10,14 @@ export class VentoContextMenuChild extends JSWindowActorChild {
     try {
       this.#collect(event);
     } catch (e) {
-      // İçerik sürecinde sessiz ölmesin: ana süreç iz dosyasına yazar.
+      // Don't fail silently in the content process: the parent process writes it to the trace file.
       this.sendAsyncMessage("VentoContextMenu:Error", `${e}`);
     }
   }
 
   #collect(event) {
     if (event.type !== "contextmenu" || event.defaultPrevented) {
-      return; // sayfa kendi menüsünü yapıyorsa dokunma
+      return; // the page draws its own menu, leave it alone
     }
     const win = this.contentWindow;
     const doc = this.document;
@@ -26,7 +26,7 @@ export class VentoContextMenuChild extends JSWindowActorChild {
       return;
     }
 
-    // pageUrl'yi ana süreç doldurur (seçili sekmenin adresi); içerikten top belgesine erişilmez.
+    // The parent process fills in pageUrl (the selected tab's address); the top document isn't reachable from content.
     const data = {
       frameUrl: this.browsingContext.parent ? doc.documentURI : "",
       linkUrl: "",
@@ -41,7 +41,7 @@ export class VentoContextMenuChild extends JSWindowActorChild {
       screenYDevPx: event.screenY * win.devicePixelRatio,
     };
 
-    // Bağlantı: hedeften yukarı, birleştirilmiş ağaç boyunca
+    // Link: walk up from the target through the flattened tree
     for (let n = target; n && n.nodeType === 1; n = n.flattenedTreeParentNode) {
       if ((win.HTMLAnchorElement.isInstance(n) || win.HTMLAreaElement.isInstance(n)) && n.href) {
         data.linkUrl = n.href;
@@ -63,7 +63,7 @@ export class VentoContextMenuChild extends JSWindowActorChild {
       data.password = win.HTMLInputElement.isInstance(target) && target.type === "password";
     }
 
-    // Seçili metin (şifre alanında asla gönderme)
+    // Selected text (never send it from a password field)
     if (!data.password) {
       let sel = "";
       if (data.editable && (isTextInput || win.HTMLTextAreaElement.isInstance(target))) {

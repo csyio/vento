@@ -1,4 +1,4 @@
-# Vento paketleme (mach package). Firefox'un browser/installer/Makefile.in'inden uyarlandı; yalnız macOS kullanılır.
+# Vento packaging (mach package). Adapted from Firefox's browser/installer/Makefile.in; macOS only.
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -14,9 +14,9 @@ MOZ_PKG_MANIFEST = $(srcdir)/package-manifest.in
 MOZ_PKG_DUPEFLAGS = -f $(srcdir)/allowed-dupes.mn
 
 DEFINES += -DPKG_LOCALE_MANIFEST=$(topobjdir)/vento/installer/locale-manifest.in
-# Paketli diller: tr (+ en-US yedek). Dosyalar tools/build-locale.sh ile dist'e konur.
+# Packaged locales: tr (+ en-US fallback). Files are put into dist by tools/build-locale.sh.
 MOZ_CHROME_MULTILOCALE = tr
-# tr yalnız chrome/ altında; browser/chrome/en-US (yalnız marka) package-manifest.in'de ayrıca listelenir.
+# tr lives only under chrome/; browser/chrome/en-US (branding only) is listed separately in package-manifest.in.
 MOZ_CHROME_LOCALE_ENTRIES=@RESPATH@/chrome/
 
 # Some files have been already bundled with xulrunner

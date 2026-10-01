@@ -1,11 +1,11 @@
 "use strict";
 
-// Yer imleri + sık siteler (Places üzerinde; toolkit'te). Yer imleri "Diğer yer imleri" (unfiled) klasörüne gider.
-//  - ⌘D / araç çubuğundaki yıldız: geçerli sayfayı yer imi yap / kaldır.
-//  - Yer İmleri menüsü: en yeni 25 yer imi (açılırken kurulur).
-//  - Başlangıç ekranı: yer imleri (en yeni başta) + en sık girilen siteler (frecency); "×" ile kaldırılır
-//    (yer imi → silinir; sık site → sunucu adı gizlenir, vento.start.hidden).
-// Gizlilik: hepsi yerel geçmişten; dışarıya hiçbir şey gitmez.
+// Bookmarks + top sites (on Places; in toolkit). Bookmarks go to the "Other bookmarks" (unfiled) folder.
+//  - ⌘D / toolbar star: bookmark / unbookmark the current page.
+//  - Bookmarks menu: the 25 newest bookmarks (built when it opens).
+//  - Start screen: bookmarks (newest first) + most visited sites (frecency); removed with "×"
+//    (bookmark -> deleted; top site -> hostname hidden, vento.start.hidden).
+// Privacy: everything comes from local history; nothing leaves the machine.
 
 const { PlacesUtils: Places } = ChromeUtils.importESModule("resource://gre/modules/PlacesUtils.sys.mjs");
 
@@ -33,7 +33,7 @@ Vento.bookmarks = new (class VentoBookmarks extends EventTarget {
     this.dispatchEvent(new Event("change"));
   }
 
-  /** URL'nin yer imi kaydı (yoksa null). */
+  /** The URL's bookmark entry (null if none). */
   async find(url) {
     if (!VentoBookmarks.isWeb(url)) {
       return null;
@@ -64,7 +64,7 @@ Vento.bookmarks = new (class VentoBookmarks extends EventTarget {
     return guids.length;
   }
 
-  /** Geçerli sekmeyi yer imi yapar ya da kaldırır; yeni durumu (true = yer imi) döndürür. */
+  /** Bookmarks or unbookmarks the current tab; returns the new state (true = bookmarked). */
   async toggle(tab = Vento.tabs.selected) {
     if (!tab || !VentoBookmarks.isWeb(tab.url)) {
       return false;
@@ -77,7 +77,7 @@ Vento.bookmarks = new (class VentoBookmarks extends EventTarget {
     return true;
   }
 
-  /** Yer imleri, en yeni başta. */
+  /** Bookmarks, newest first. */
   async list(limit = 50) {
     const all = [];
     await Places.bookmarks.fetch({ parentGuid: Places.bookmarks.unfiledGuid }, b => b.url && all.push(b));
@@ -88,7 +88,7 @@ Vento.bookmarks = new (class VentoBookmarks extends EventTarget {
       .map(b => ({ url: b.url.href ?? String(b.url), title: b.title || VentoBookmarks.host(b.url.href ?? b.url), guid: b.guid, lastModified: b.lastModified }));
   }
 
-  /** En sık girilen siteler (frecency), gizlenenler ve `except` adresleri hariç. */
+  /** Most visited sites (frecency), excluding hidden ones and `except` URLs. */
   async frecent(limit = 8, except = new Set()) {
     const conn = await Places.promiseDBConnection();
     const rows = await conn.executeCached(
@@ -106,7 +106,7 @@ Vento.bookmarks = new (class VentoBookmarks extends EventTarget {
       if (!host || hidden.has(host) || seen.has(host) || except.has(host)) {
         continue;
       }
-      seen.add(host); // sitenin yalnız en sık girilen sayfası (aynı sunucudan tek karo)
+      seen.add(host); // only the most visited page of a site (one tile per host)
       out.push({ url, title: r.getResultByName("title") || host });
       if (out.length >= limit) {
         break;
@@ -115,7 +115,7 @@ Vento.bookmarks = new (class VentoBookmarks extends EventTarget {
     return out;
   }
 
-  /** Başlangıç ekranı karoları: yer imleri + sık siteler. [{url, title, host, bookmark: bool}] */
+  /** Start screen tiles: bookmarks + top sites. [{url, title, host, bookmark: bool}] */
   async topSites(limit = 8) {
     const marks = (await this.list(limit)).map(b => ({ ...b, host: VentoBookmarks.host(b.url), bookmark: true }));
     const taken = new Set(marks.map(m => m.host));
@@ -123,7 +123,7 @@ Vento.bookmarks = new (class VentoBookmarks extends EventTarget {
     return [...marks, ...rest].slice(0, limit);
   }
 
-  /** Sık site karosunu gizler (sunucu adına göre). */
+  /** Hides a top site tile (by hostname). */
   hideHost(host) {
     const set = this.#hiddenHosts();
     set.add(host);
@@ -131,7 +131,7 @@ Vento.bookmarks = new (class VentoBookmarks extends EventTarget {
     this.#changed();
   }
 
-  /** Sayfanın simgesi (Places önbelleğinden) data: adresi; yoksa null. */
+  /** The page's icon from the Places cache as a data: URL; null if none. */
   async icon(url) {
     try {
       const fav = await Places.favicons.getFaviconForPage(Services.io.newURI(url));
@@ -141,7 +141,7 @@ Vento.bookmarks = new (class VentoBookmarks extends EventTarget {
     }
   }
 
-  // ---- Arayüz -------------------------------------------------------------------------------------
+  // ---- UI -----------------------------------------------------------------------------------
 
   async #syncStar() {
     const btn = document.getElementById("nav-bookmark");

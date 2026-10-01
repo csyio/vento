@@ -1,4 +1,4 @@
-# Liste alfabetik sıralı olmak zorunda (mozbuild StrictOrderingOnAppendList).
+# The list must be in alphabetical order (mozbuild StrictOrderingOnAppendList).
 FINAL_TARGET_FILES.actors += [
     "VentoContextMenuChild.sys.mjs",
     "VentoContextMenuParent.sys.mjs",

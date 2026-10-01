@@ -1,8 +1,8 @@
 "use strict";
 
-// İndirmeler: araç çubuğu düğmesi + açılır panel. Motor: toolkit'in Downloads modülü
-// (liste, ilerleme, iptal/yeniden dene, profilde kalıcı downloads.json). Arayüz bizim.
-// Dosya yardımcı-uygulama diyaloğu YOK: tercihler (vento.js) soru sormadan Downloads klasörüne kaydeder.
+// Downloads: toolbar button + dropdown panel. Engine: toolkit's Downloads module
+// (list, progress, cancel/retry, persistent downloads.json in the profile). The UI is ours.
+// No file helper-app dialog: prefs (vento.js) save to the Downloads folder without asking.
 
 Vento.downloads = (() => {
   const { Downloads } = ChromeUtils.importESModule("resource://gre/modules/Downloads.sys.mjs");
@@ -13,7 +13,7 @@ Vento.downloads = (() => {
   const els = {};
   const state = { list: null, rows: new Map(), dryRun: false };
 
-  // ---- Yardımcılar ------------------------------------------------------------------------------
+  // ---- Helpers ------------------------------------------------------------------------------
 
   const fileName = d => PathUtils.filename(d.target.path);
 
@@ -30,7 +30,7 @@ Vento.downloads = (() => {
     return `${Vento.l10n.number(n, { maximumFractionDigits: i ? 1 : 0 })} ${units[i]}`;
   }
 
-  /** Durum metni + sınıf: active | done | error | canceled | paused */
+  /** Status text + class: active | done | error | canceled | paused */
   function status(d) {
     if (d.error) {
       return { kind: "error", text: Vento.l10n.t("dl-failed") };
@@ -63,7 +63,7 @@ Vento.downloads = (() => {
     return b;
   }
 
-  // ---- Satır ------------------------------------------------------------------------------------
+  // ---- Row ------------------------------------------------------------------------------------
 
   function buildRow(d) {
     const row = document.createElement("div");
@@ -117,13 +117,13 @@ Vento.downloads = (() => {
     r.fill.toggleAttribute("indeterminate", st.kind === "active" && !d.hasProgress);
   }
 
-  // ---- Eylemler ---------------------------------------------------------------------------------
+  // ---- Actions ---------------------------------------------------------------------------------
 
   function open(d) {
     try {
       d.launch();
     } catch (e) {
-      Vento.trace(`indirme açılamadı: ${e}`);
+      Vento.trace(`could not open download: ${e}`);
     }
   }
 
@@ -131,13 +131,13 @@ Vento.downloads = (() => {
     try {
       new FileUtils.File(d.target.path).reveal();
     } catch (e) {
-      Vento.trace(`Finder'da gösterilemedi: ${e}`);
+      Vento.trace(`could not reveal in Finder: ${e}`);
     }
   }
 
   async function remove(d) {
     await state.list.remove(d);
-    await d.finalize(!d.succeeded); // biten dosyayı silme; yarımı sil
+    await d.finalize(!d.succeeded); // keep a finished file; delete a partial one
   }
 
   async function clearFinished() {
@@ -148,7 +148,7 @@ Vento.downloads = (() => {
     }
   }
 
-  /** Bir adresi Downloads klasörüne kaydeder (sağ tık "Resmi kaydet" vb.). */
+  /** Saves a URL to the Downloads folder (right-click "Save image" etc.). */
   async function saveURL(url, { referrer = "" } = {}) {
     const dir = await Downloads.getPreferredDownloadsDirectory();
     let base = "indirilen";
@@ -156,7 +156,7 @@ Vento.downloads = (() => {
       const u = new URL(url);
       base = decodeURIComponent(u.pathname.split("/").filter(Boolean).pop() || u.hostname) || base;
     } catch (e) {
-      // data: vb. — varsayılan ad
+      // data: etc. — default name
     }
     base = base.replace(/[\\/:*?"<>|\x00-\x1f]/g, "_").slice(0, 120);
     if (!/\.[a-z0-9]{1,5}$/i.test(base) && url.startsWith("data:image/")) {
@@ -177,12 +177,12 @@ Vento.downloads = (() => {
         info.init(Ci.nsIReferrerInfo.UNSET, true, Services.io.newURI(referrer));
         source.referrerInfo = info;
       } catch (e) {
-        // referrer olmadan devam
+        // continue without a referrer
       }
     }
     const d = await Downloads.createDownload({ source, target: path });
     await state.list.add(d);
-    d.start().catch(() => {}); // hata durumu satırda görünür
+    d.start().catch(() => {}); // the error state shows in the row
     return d;
   }
 
@@ -211,11 +211,11 @@ Vento.downloads = (() => {
     onDownloadAdded(d) {
       const r = buildRow(d);
       state.rows.set(d, r);
-      els.rows.prepend(r.row); // en yeni üstte
+      els.rows.prepend(r.row); // newest on top
       paintRow(d);
       refreshChrome();
       if (!state.dryRun && !d.stopped) {
-        showPanel(true); // yeni indirme başlayınca paneli göster
+        showPanel(true); // show the panel when a new download starts
       }
     },
     onDownloadChanged(d) {
@@ -239,8 +239,8 @@ Vento.downloads = (() => {
     els.button.addEventListener("click", () => showPanel(!Vento.motion.isShown(els.panel)));
     $("dl-clear").addEventListener("click", clearFinished);
 
-    // Panel dışına tıklayınca / Esc ile kapanır. Sayfa içeriğine tıklama chrome'a mousedown olarak gelmez;
-    // içeriğe odak geçişi (focusin) yakalanır.
+    // Closes on click outside the panel / Esc. Clicks in page content don't reach chrome as mousedown;
+    // focus moving to the content (focusin) is caught instead.
     document.addEventListener("mousedown", e => {
       if (Vento.motion.isShown(els.panel) && !els.panel.contains(e.target) && !els.button.contains(e.target)) {
         showPanel(false);
@@ -257,7 +257,7 @@ Vento.downloads = (() => {
       }
     });
 
-    await Downloads.getList(Downloads.PUBLIC); // kalıcı listeyi (downloads.json) yükler
+    await Downloads.getList(Downloads.PUBLIC); // loads the persistent list (downloads.json)
     state.list = await Downloads.getList(Downloads.ALL);
     await state.list.addView(view);
   }

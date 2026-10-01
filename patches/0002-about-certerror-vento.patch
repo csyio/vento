@@ -6,8 +6,8 @@ index 22bef400fd..9824bd6d06 100644
       nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
           nsIAboutModule::URI_CAN_LOAD_IN_CHILD | nsIAboutModule::ALLOW_SCRIPT |
           nsIAboutModule::HIDE_FROM_ABOUTABOUT},
-+    // Vento: Firefox bunu browser/components/about/AboutRedirector.cpp'de kaydeder; biz o dosyayı derlemiyoruz.
-+    // Yoksa sertifika hatasında docshell about:certerror'u yükleyemez ve sekme sessizce boş kalır.
++    // Vento: Firefox registers this in browser/components/about/AboutRedirector.cpp; we don't build that file.
++    // Without it, docshell can't load about:certerror on a certificate error and the tab silently stays blank.
 +    {"certerror", "chrome://global/content/aboutNetError.html",
 +     nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
 +         nsIAboutModule::URI_CAN_LOAD_IN_CHILD | nsIAboutModule::ALLOW_SCRIPT |

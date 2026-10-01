@@ -1,27 +1,27 @@
 "use strict";
 
-// Esin: sayfayı okuyup soru cevaplayan yerleşik asistan (tek sayfa + birden çok sekme).
+// Esin: the built-in assistant that reads the page and answers questions (single page + multiple tabs).
 //
-// Sağlayıcıdan bağımsız: OpenAI uyumlu /chat/completions + akış. Varsayılan uç nokta Vento vekilidir
-// (anahtar yalnızca sunucuda). Gizlilik: sayfa metni YALNIZCA kullanıcı bir soru gönderdiğinde ve o sekme
-// bağlama eklenmişse gönderilir; neyin gönderildiği mesajın altında görünür.
+// Provider-independent: OpenAI-compatible /chat/completions + streaming. The default endpoint is the Vento proxy
+// (the key lives only on the server). Privacy: page text is sent ONLY when the user submits a question and that tab
+// is attached to the context; what was sent is shown under the message.
 
 Vento.esin = (() => {
   const PREF_ENDPOINT = "vento.esin.endpoint";
   const PREF_CONSENT = "vento.esin.consented";
-  // Kullanıcının seçtiği model ("" = vekilin varsayılanı: greenpt/gpt-oss-120b-eu). Yalnız bilinen modeller gönderilir.
+  // The model the user picked ("" = the proxy's default: greenpt/gpt-oss-120b-eu). Only known models are sent.
   const PREF_MODEL = "vento.esin.model";
   const MODELS = ["greenpt/gpt-oss-120b-eu", "qwen/qwen3.6-35b-a3b", "qwen/qwen3.6-flash"];
   const chosenModel = () => {
     const m = Services.prefs.getStringPref(PREF_MODEL, "");
     return MODELS.includes(m) ? m : "";
   };
-  const PREF_ENABLED = "vento.esin.enabled"; // kapalıyken düğme/öneri/panel yok ve hiçbir şey gönderilmez
-  const PAGE_CHARS = 20000; // sayfa başına (~5k jeton)
+  const PREF_ENABLED = "vento.esin.enabled"; // when off there is no button/suggestion/panel and nothing is sent
+  const PAGE_CHARS = 20000; // per page (~5k tokens)
   const MAX_TABS = 5;
-  const KEEP_MESSAGES = 16; // geçmişte tutulan son mesaj sayısı
+  const KEEP_MESSAGES = 16; // number of latest messages kept in history
 
-  // Sistem istemi Fluent'te (esin-system): dile göre; "cevabı kullanıcının yazdığı dilde ver" kuralı ikisinde de var.
+  // The system prompt is in Fluent (esin-system): per language; the "answer in the language the user wrote in" rule is in both.
   const systemPrompt = () => Vento.l10n.t("esin-system");
 
   const $ = id => document.getElementById(id);
@@ -31,7 +31,7 @@ Vento.esin = (() => {
   class EsinError extends Error {
     constructor(message, { noRetry = false } = {}) {
       super(message);
-      this.noRetry = noRetry; // kota doluyken "tekrar dene" anlamsız
+      this.noRetry = noRetry; // "retry" is pointless when the quota is used up
     }
   }
 
@@ -39,7 +39,7 @@ Vento.esin = (() => {
   const consented = () => Services.prefs.getBoolPref(PREF_CONSENT, false);
   const enabled = () => Services.prefs.getBoolPref(PREF_ENABLED, true);
 
-  /** Esin açık/kapalı durumunu arayüze yansıtır (kök öğede `esin-off`, komut devre dışı, açıksa panel kapanır). */
+  /** Reflects Esin's on/off state in the UI (`esin-off` on the root, command disabled, panel closes if it's off). */
   function applyEnabled() {
     document.documentElement.toggleAttribute("esin-off", !enabled());
     $("cmd_toggleEsin")?.toggleAttribute("disabled", !enabled());
@@ -69,9 +69,9 @@ Vento.esin = (() => {
     }
   }
 
-  // ---- Günlük kota (vekil sunucu: X-Esin-* başlıkları ve 429 kodları) ---------------------------
+  // ---- Daily quota (proxy server: X-Esin-* headers and 429 codes) ---------------------------
 
-  /** Panelin altında "Bugün kalan: N / M"; bilinmiyorsa gizli. Az kalınca vurgulanır. */
+  /** "Left today: N / M" under the panel; hidden if unknown. Highlighted when few are left. */
   function showQuota(remaining, limit) {
     state.quota = { remaining, limit };
     const el = $("esin-quota");
@@ -88,13 +88,13 @@ Vento.esin = (() => {
     }
   }
 
-  /** 429: kota doluysa yenilenme zamanıyla söyler (kullanıcının saat dilimiyle), değilse genel yoğunluk iletisi. */
+  /** 429: if the quota is used up, says when it renews (in the user's time zone), otherwise a generic busy message. */
   async function rateLimitError(res) {
     let e = null;
     try {
       e = (await res.json())?.error;
     } catch {
-      // gövde yok/bozuk
+      // no body / malformed body
     }
     if (e?.code === "client_quota") {
       showQuota(0, e.limit ?? state.quota?.limit ?? 0);
@@ -109,7 +109,7 @@ Vento.esin = (() => {
     return new EsinError(httpMessage(429));
   }
 
-  // ---- Akış istemcisi (OpenAI uyumlu SSE) -------------------------------------------------------
+  // ---- Streaming client (OpenAI-compatible SSE) -------------------------------------------
 
   async function* streamChat(messages, signal) {
     let res;
@@ -160,14 +160,14 @@ Vento.esin = (() => {
               yield delta;
             }
           } catch {
-            // yarım/bozuk olay: atla
+            // partial/malformed event: skip
           }
         }
       }
     }
   }
 
-  // ---- Sayfa metni --------------------------------------------------------------------------------
+  // ---- Page text --------------------------------------------------------------------------------
 
   async function extract(tab) {
     if (!eligible(tab)) {
@@ -175,18 +175,18 @@ Vento.esin = (() => {
     }
     try {
       const wg = tab.browser.browsingContext?.currentWindowGlobal;
-      // Kendi aktörümüz: arka plan sekmelerinde de anında (bkz. VentoPageTextChild). Yoksa Firefox'unkine düş.
+      // Our own actor: instant for background tabs too (see VentoPageTextChild). If missing, fall back to Firefox's.
       let r;
       try {
         r = await wg.getActor("VentoPageText").sendQuery("VentoPageText:Get", { sufficientLength: PAGE_CHARS });
       } catch (e) {
-        Vento.trace(`esin: VentoPageText yok/başarısız (${e}), PageExtractor'a düşülüyor`);
+        Vento.trace(`esin: VentoPageText missing/failed (${e}), falling back to PageExtractor`);
         r = await wg.getActor("PageExtractor").getText({ removeBoilerplate: true, sufficientLength: PAGE_CHARS });
       }
       const text = (r?.text ?? "").slice(0, PAGE_CHARS);
       return text ? { title: tab.label, url: tab.url, text } : null;
     } catch (e) {
-      Vento.trace(`esin: sayfa metni alınamadı (${tab.url}): ${e}`);
+      Vento.trace(`esin: could not get page text (${tab.url}): ${e}`);
       return null;
     }
   }
@@ -194,7 +194,7 @@ Vento.esin = (() => {
   const attr = s => String(s).replace(/["<>]/g, "'");
 
   function pageBlock(p) {
-    // İçerik etiketi kapatıp kaçamasın
+    // Content must not be able to break out of the tag
     const safe = p.text.replaceAll("</sayfa", "</ sayfa");
     return `<sayfa başlık="${attr(p.title)}" adres="${attr(p.url)}">\n${safe}\n</sayfa>`;
   }
@@ -210,7 +210,7 @@ Vento.esin = (() => {
     ];
   }
 
-  // ---- Arayüz ------------------------------------------------------------------------------------
+  // ---- UI ------------------------------------------------------------------------------------
 
   function letter(tab) {
     const m = /[\p{L}\p{N}]/u.exec(tab.host || tab.title || "");
@@ -355,8 +355,8 @@ Vento.esin = (() => {
     const t0 = Date.now();
     try {
       const pages = (await Promise.all(attached.map(extract))).filter(Boolean);
-      Vento.trace(`esin: ${pages.length}/${attached.length} sayfa okundu, ${Date.now() - t0} ms`);
-      // Kullanıcı neyin gönderildiğini görsün.
+      Vento.trace(`esin: ${pages.length}/${attached.length} pages read, ${Date.now() - t0} ms`);
+      // Let the user see what was sent.
       ctxRow.textContent = pages.length
         ? pages.map(p => Vento.l10n.t("esin-chars", { host: new URL(p.url).host.replace(/^www\./, ""), count: Vento.l10n.number(p.text.length) })).join("   ")
         : attached.length
@@ -377,7 +377,7 @@ Vento.esin = (() => {
       for await (const delta of streamChat(buildMessages(question, pages), ac.signal)) {
         if (first) {
           first = false;
-          Vento.trace(`esin: ilk parça ${Date.now() - t0} ms`);
+          Vento.trace(`esin: first chunk ${Date.now() - t0} ms`);
         }
         answer += delta;
         bot.el.classList.remove("typing");
@@ -413,7 +413,7 @@ Vento.esin = (() => {
       } else {
         bot.el.classList.add("msg-error");
         bot.body.textContent = e instanceof EsinError ? e.message : Vento.l10n.t("esin-unexpected");
-        Vento.trace(`esin: hata: ${e}`);
+        Vento.trace(`esin: error: ${e}`);
         if (!(e instanceof EsinError && e.noRetry)) {
           const retry = document.createElement("button");
           retry.className = "msg-retry";
@@ -448,7 +448,7 @@ Vento.esin = (() => {
     $("nav-esin").toggleAttribute("active", true);
     syncFollow();
     if (!consented() && state.pending === null && !state.history.length) {
-      // Onay kartı ilk kullanımda sohbetin en üstünde görünür
+      // The consent card shows at the top of the chat on first use
       showConsent();
     }
   }
@@ -472,10 +472,10 @@ Vento.esin = (() => {
     }
   }
 
-  /** Akıllı çubuktan: soruyu Esin'e sorar. Açık sayfa (varsa) bağlam olur. */
+  /** From the smart bar: asks Esin the question. The open page (if any) becomes context. */
   function ask(question) {
     if (!enabled()) {
-      return Promise.resolve(); // kapalıyken sormak sayfa içeriği göndermez
+      return Promise.resolve(); // asking while off doesn't send page content
     }
     open();
     state.follow = true;
@@ -508,8 +508,8 @@ Vento.esin = (() => {
     const prefObserver = { observe: () => applyEnabled() };
     Services.prefs.addObserver(PREF_ENABLED, prefObserver);
     window.addEventListener("unload", () => Services.prefs.removeObserver(PREF_ENABLED, prefObserver), { once: true });
-    setBusy(false); // gönder düğmesinin ipucunu ilk kez yazar
-    renderChips();  // girdi yer tutucusu
+    setBusy(false); // writes the send button's hint for the first time
+    renderChips();  // input placeholder
     Vento.l10n.addEventListener("change", () => {
       setBusy(state.busy);
       renderChips();
@@ -520,8 +520,8 @@ Vento.esin = (() => {
     $("esin-consent-ok").addEventListener("click", grantConsent);
     els.add.addEventListener("click", () => (!Vento.motion.isShown(els.menu) ? showMenu() : Vento.motion.hide(els.menu, "drop")));
 
-    // Enter (form gönderimi) yalnızca yeni soru gönderir; yanıt akarken hiçbir şey yapmaz.
-    // Durdurmak için yalnızca durdur düğmesi (aynı yerdeki gönder düğmesi) kullanılır.
+    // Enter (form submit) only sends a new question; does nothing while a reply is streaming.
+    // Only the stop button (the send button in the same place) is used to stop.
     els.form.addEventListener("submit", e => {
       e.preventDefault();
       if (!state.busy) {
@@ -543,7 +543,7 @@ Vento.esin = (() => {
         close();
       }
     });
-    // Hazır sorular: metin Fluent kimliğinden (data-q-id) TIKLANDIĞI ANDA çözülür → her zaman güncel dilde
+    // Quick questions: text is resolved from the Fluent id (data-q-id) AT CLICK TIME -> always in the current language
     const llmtr = $("esin-llmtr");
     const openLlmtr = () => Vento.tabs.open("https://llmtr.com", { select: true, afterCurrent: true });
     llmtr.addEventListener("click", openLlmtr);

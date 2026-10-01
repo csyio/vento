@@ -1,10 +1,10 @@
-// Hata sayfasına Ebabil ekler (about:neterror). İçerik sürecinde, sayfa yüklenince çalışır; toolkit'in sayfasına dokunmaz
-// (motor yaması gerekmez): yalnız bir stil dosyası ve bir <img> ekler.
+// Adds Ebabil to the error page (about:neterror). Runs in the content process when the page loads; doesn't touch
+// the toolkit page (no engine patch needed): it only adds a stylesheet and an <img>.
 //
-// Yalnız bağlantı/ağ hatalarında görünür. Sertifika uyarısında (about:certerror) ve güvenlik engellerinde GÖRÜNMEZ:
-// ciddi bir risk uyarısının sevimli bir kuşla yumuşatılması yanlış olur.
+// Only shown for connection/network errors. NOT shown on certificate warnings (about:certerror) or security blocks:
+// softening a serious risk warning with a cute bird would be wrong.
 //
-// NOT: sınıf adı aktör adına göre olmak ZORUNDA (VentoErrorPage → VentoErrorPageChild).
+// NOTE: the class name MUST follow the actor name (VentoErrorPage → VentoErrorPageChild).
 
 const POSES = {
   dnsNotFound: "error",
@@ -17,7 +17,7 @@ const POSES = {
   redirectLoop: "error",
   fileNotFound: "error",
   malformedURI: "error",
-  netOffline: "idle", // çevrimdışı: uyuyan Ebabil
+  netOffline: "idle", // offline: sleeping Ebabil
 };
 
 export class VentoErrorPageChild extends JSWindowActorChild {

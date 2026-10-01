@@ -1,10 +1,10 @@
 #!/bin/sh
-# İmzalı Vento.app'ten dağıtım DMG'si: uygulama + /Applications kısayolu (sürükle-bırak kurulum).
-# Kullanım: tools/make-dmg.sh /yol/Vento.app /yol/vento-0.1.0.dmg ["Hacim adı"]
-# Not: Firefox'un arka planlı/simgeli DMG düzeni (mach package çıktısı) yerine yalın düzen; imzayı bozmadan kopyalar.
+# Builds the distribution DMG from a signed Vento.app: the app plus an /Applications shortcut (drag-and-drop install).
+# Usage: tools/make-dmg.sh /path/Vento.app /path/vento-0.1.0.dmg ["Volume name"]
+# Note: plain layout instead of Firefox's DMG with background and icon layout (mach package output); copies without breaking the signature.
 set -e
 APP="$1"; OUT="$2"; VOL="${3:-Vento}"
-[ -d "$APP" ] && [ -n "$OUT" ] || { echo "kullanım: $0 Vento.app çıktı.dmg [hacim adı]" >&2; exit 2; }
+[ -d "$APP" ] && [ -n "$OUT" ] || { echo "usage: $0 Vento.app out.dmg [volume name]" >&2; exit 2; }
 STAGE="$(mktemp -d)"; trap 'rm -rf "$STAGE"' EXIT
 ditto "$APP" "$STAGE/Vento.app"
 ln -s /Applications "$STAGE/Applications"

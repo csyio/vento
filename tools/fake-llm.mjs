@@ -1,5 +1,5 @@
-// Sahte OpenAI uyumlu LLM: Esin öz-testi için. Neyin gönderildiğini kaydeder, /stats ile verir.
-// Kullanım: node tools/fake-llm.mjs <port-dosyası>
+// Fake OpenAI-compatible LLM for the Esin self-test. Records what was sent and serves it at /stats.
+// Usage: node tools/fake-llm.mjs <port-file>
 import http from "node:http";
 import https from "node:https";
 import fs from "node:fs";
@@ -11,7 +11,7 @@ const srv = http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "application/json" });
     return res.end(JSON.stringify(stats));
   }
-  // İndirme testi: ek olarak sunulan bir dosya (Content-Disposition: attachment)
+  // Download test: a file served as an attachment (Content-Disposition: attachment)
   if (req.method === "GET" && req.url.startsWith("/dosya.bin")) {
     const body = Buffer.alloc(200 * 1024, 65);
     res.writeHead(200, {
@@ -21,11 +21,11 @@ const srv = http.createServer((req, res) => {
     });
     return res.end(body);
   }
-  // İzin testi: güvenli bağlam (127.0.0.1) gerektiren API'ler için sayfa; davranış #hash ile seçilir
+  // Permission test: a page for APIs that need a secure context (127.0.0.1); the behavior is chosen via the query string
   if (req.method === "GET" && req.url.startsWith("/izin.html")) {
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
     return res.end(`<!doctype html><meta charset="utf-8"><title>hazır</title><script>
-      const mode = location.search.slice(1); // ?notif — hash değişimi sayfayı yeniden yüklemez
+      const mode = location.search.slice(1); // ?notif (query string: a hash change would not reload the page)
       const set = t => (document.title = t);
       if (mode === "notif") Notification.requestPermission().then(r => set("n:" + r));
       if (mode === "geo") navigator.geolocation.getCurrentPosition(() => set("geo:ok"), e => set("geo:" + e.code));
@@ -33,7 +33,7 @@ const srv = http.createServer((req, res) => {
       if (mode === "cam") navigator.mediaDevices.getUserMedia({ video: true }).then(st => set("cam:ok:" + st.getTracks().length), e => set("cam:" + e.name));
     </script>`);
   }
-  // Simge testi: /simge/link.html (<link rel=icon> → kırmızı), /simge/kok.html (bağlantısız → /favicon.ico mavi)
+  // Icon test: /simge/link.html (<link rel=icon> -> red), /simge/kok.html (no link -> /favicon.ico, blue)
   if (req.method === "GET" && req.url === "/simge/link.html") {
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
     return res.end('<!doctype html><meta charset="utf-8"><title>Bağlantılı</title><link rel="icon" type="image/png" href="/simge/kirmizi.png"><p>x</p>');
@@ -47,7 +47,7 @@ const srv = http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": red ? "image/png" : "image/x-icon", "Cache-Control": "no-store" });
     return res.end(Buffer.from(red ? "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFklEQVR4nGO4IydHEmIY1TCqYfhqAACaMxgQdGu1YAAAAABJRU5ErkJggg==" : "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFklEQVR4nGOQs7lDEmIY1TCqYfhqAAAQ1jYQxYTP1AAAAABJRU5ErkJggg==", "base64"));
   }
-  // Kimlik doğrulama testi: /kimlik/* → Basic (kullanıcı can, parola gizli). Doğru: 200 "Giris yapildi"; yanlış/yok: 401 "Yetkisiz"
+  // Authentication test: /kimlik/* uses Basic auth (user can, password gizli). Correct: 200 "Giris yapildi"; wrong or missing: 401 "Yetkisiz"
   if (req.method === "GET" && req.url.startsWith("/kimlik/")) {
     stats.authAttempts = stats.authAttempts ?? [];
     const h = req.headers.authorization ?? "";
@@ -60,7 +60,7 @@ const srv = http.createServer((req, res) => {
     res.writeHead(401, { "Content-Type": "text/html; charset=utf-8", "WWW-Authenticate": 'Basic realm="Test Alani"' });
     return res.end('<!doctype html><meta charset="utf-8"><title>Yetkisiz</title><p>giris gerekli</p>');
   }
-  // Dosya seçici testi: tek / çoklu / accept'li / klasör girdileri; seçilen dosyaların adı+içeriği başlığa yazılır
+  // File picker test: single / multiple / accept-filtered / directory inputs; the names and contents of the chosen files are written to the title
   if (req.method === "GET" && req.url.startsWith("/dosya.html")) {
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
     return res.end(`<!doctype html><meta charset="utf-8"><title>hazir</title>
@@ -72,7 +72,7 @@ const srv = http.createServer((req, res) => {
         document.getElementById("dir").addEventListener("change", e => { document.title = "dosya:dir:" + e.target.files.length; });
       </script>`);
   }
-  // Oturum/kapalı sekme testleri: /oturum/<ad> ve /kapali/<ad> → başlığı "Sayfa <AD>" olan gerçek bir sayfa
+  // Session / closed-tab tests: /oturum/<name> and /kapali/<name> serve a real page titled "Sayfa <NAME>"
   {
     const m = req.method === "GET" && /^\/(oturum|kapali)\/([^/?#]+)/.exec(req.url);
     if (m) {
@@ -80,7 +80,7 @@ const srv = http.createServer((req, res) => {
       return res.end(`<!doctype html><meta charset="utf-8"><title>Sayfa ${decodeURIComponent(m[2]).toUpperCase()}</title><p>${m[2]}</p>`);
     }
   }
-  // Yazdırma testi: ?pencere → sayfa kendi window.print()'ini çağırır
+  // Print test: with ?pencere the page calls its own window.print()
   if (req.method === "GET" && req.url.startsWith("/yazdir.html")) {
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
     return res.end(`<!doctype html><meta charset="utf-8"><title>Yazdirma sayfasi</title>
@@ -88,7 +88,7 @@ const srv = http.createServer((req, res) => {
       <script>if (location.search === "?pencere") setTimeout(() => window.print(), 300);</script>`);
   }
   if (req.method === "GET" && req.url.startsWith("/yavas.bin")) {
-    // İptal testi: 5 MB'ı ağır ağır yollar (bitmesi ~30 sn sürer)
+    // Abort test: trickles out 5 MB slowly (takes ~30 s to finish)
     res.writeHead(200, { "Content-Type": "application/octet-stream", "Content-Length": 5 * 1024 * 1024 });
     const iv = setInterval(() => res.write(Buffer.alloc(8192, 66)), 50);
     res.on("close", () => clearInterval(iv));
@@ -116,7 +116,7 @@ const srv = http.createServer((req, res) => {
       hasAuth: !!req.headers.authorization,
     });
 
-    // Kota (vekilin davranışı): KOTA-DOLU → 429 client_quota, GLOBAL-DOLU → 429 global_quota; diğerlerinde kalan hak başlığı
+    // Quota (mimics the proxy): KOTA-DOLU -> 429 client_quota, GLOBAL-DOLU -> 429 global_quota; otherwise sends the remaining-quota header
     if (question.includes("KOTA-DOLU") || question.includes("GLOBAL-DOLU")) {
       res.writeHead(429, { "Content-Type": "application/json" });
       const client = question.includes("KOTA-DOLU");
@@ -127,7 +127,7 @@ const srv = http.createServer((req, res) => {
     const send = t => res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: t } }] })}\n\n`);
 
     if (question.includes("YAVAS")) {
-      // bitmez: istemci kopunca "close" gelir
+      // never finishes: "close" fires when the client disconnects
       send("Başlıyorum");
       const iv = setInterval(() => send(" ve"), 100);
       res.on("close", () => {
@@ -160,7 +160,7 @@ srv.listen(0, "127.0.0.1", () => {
   fs.writeFileSync(process.argv[2], String(srv.address().port));
 });
 
-// HTTPS ucu (sertifika hatası testi): kendinden imzalı sertifika. Kullanım: node fake-llm.mjs <port> <tls-port> <key.pem> <cert.pem>
+// HTTPS endpoint (certificate error test): self-signed certificate. Usage: node fake-llm.mjs <port> <tls-port> <key.pem> <cert.pem>
 if (process.argv[3] && process.argv[4] && process.argv[5]) {
   const tls = https.createServer({ key: fs.readFileSync(process.argv[4]), cert: fs.readFileSync(process.argv[5]) }, (req, res) => {
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });

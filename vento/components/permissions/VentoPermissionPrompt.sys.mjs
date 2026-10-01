@@ -1,6 +1,6 @@
-// nsIContentPermissionPrompt: konum, bildirim, kalıcı depolama vb. izin istemleri. Firefox'ta bunu browser/'ın
-// ContentPermissionPrompt'u yapar; bizde sahibi yoktu → sayfalar cevap alamıyordu.
-// Kartı ana pencerenin Vento.permissions modülü çizer.
+// nsIContentPermissionPrompt: permission prompts for location, notifications, persistent storage, etc. In Firefox,
+// browser/'s ContentPermissionPrompt does this; here nothing owned it, so pages never got an answer.
+// The main window's Vento.permissions module draws the card.
 
 export class VentoPermissionPrompt {
   QueryInterface = ChromeUtils.generateQI(["nsIContentPermissionPrompt"]);
@@ -8,7 +8,7 @@ export class VentoPermissionPrompt {
   prompt(request) {
     const permissions = request.element?.ownerDocument?.defaultView?.Vento?.permissions;
     if (!permissions) {
-      request.cancel(); // gösterecek arayüz yok: açıkça reddet, askıda bırakma
+      request.cancel(); // no UI to show: reject explicitly, don't leave it hanging
       return;
     }
     permissions.request(request);

@@ -1,12 +1,12 @@
 "use strict";
 
-// Vento pencere kabuğu: komutlar/kısayollar, window.open yolu, başlangıç, (isteğe bağlı) öz-test.
+// Vento window shell: commands/shortcuts, the window.open path, startup, (optional) self-test.
 
 (() => {
   const BDW = Ci.nsIBrowserDOMWindow;
   const $ = id => document.getElementById(id);
 
-  // ---- Komutlar (kısayollar ve yerel menü aynı komutlara bağlanır) -----------------------
+  // ---- Commands (shortcuts and the native menu bind to the same commands) -----------------------
 
   function bindCommands() {
     const on = (id, fn) => $(id).addEventListener("command", fn);
@@ -16,7 +16,7 @@
     on("cmd_closeTab", () => t.close(t.selected));
     on("cmd_print", () => Vento.print());
     on("cmd_reopenTab", () => t.reopenClosed());
-    // Komut, yeniden açılacak sekme yokken devre dışı (menü soluk görünür, ⌘⇧T boşa basmaz)
+    // The command is disabled when there is no tab to reopen (the menu is dimmed, ⌘⇧T does nothing)
     const syncReopen = () => $("cmd_reopenTab").toggleAttribute("disabled", !t.closed.length);
     t.addEventListener("tabclose", syncReopen);
     t.addEventListener("tabopen", syncReopen);
@@ -34,7 +34,7 @@
     on("cmd_toggleEsin", () => Vento.esin.toggle());
     on("cmd_quit", () => Services.startup.quit(Ci.nsIAppStartup.eAttemptQuit));
 
-    // Düzen komutları odaktaki öğeye (sayfa ya da akıllı çubuk) gider.
+    // Edit commands go to the focused element (the page or the smart bar).
     for (const c of ["cmd_undo", "cmd_redo", "cmd_cut", "cmd_copy", "cmd_paste", "cmd_selectAll"]) {
       on(c, () => goDoCommand(c));
     }
@@ -43,8 +43,8 @@
   // ---- window.open / target=_blank -----------------------------------------------------
 
   /**
-   * Firefox'un yazdırma katmanı (toolkit/components/printing): ilk kullanımda yüklenir. Betik, browser.xhtml'in sağladığı
-   * `XPCOMUtils` genel değişkenini varsayar; bizde yok → önce tanımlanır.
+   * Firefox's printing layer (toolkit/components/printing): loaded on first use. The script assumes the `XPCOMUtils` global that
+   * browser.xhtml provides; we don't have it, so it is defined first.
    */
   function loadPrintUtils() {
     if (!window.PrintUtils) {
@@ -55,17 +55,17 @@
   }
   Vento.loadPrintUtils = loadPrintUtils;
 
-  /** window.print(): içerik süreci belgenin statik kopyası için bir tarayıcı ister (yazdırma katmanı kurar). */
+  /** window.print(): the content process asks for a browser to hold the document's static clone (sets up the printing layer). */
   function printBrowser(openWindowInfo) {
     try {
       return loadPrintUtils().handleStaticCloneCreatedForPrint(openWindowInfo);
     } catch (e) {
-      Vento.trace(`yazdırma tarayıcısı kurulamadı: ${e}`);
+      Vento.trace(`could not set up print browser: ${e}`);
       return null;
     }
   }
 
-  /** Seçili sekmeyi yazdırır (yerel macOS paneli). Boş/yazdırılamaz sekmede hiçbir şey yapmaz. */
+  /** Prints the selected tab (native macOS panel). Does nothing on an empty/unprintable tab. */
   Vento.print = (tab = Vento.tabs.selected) => {
     if (!tab || tab.blank || tab.pending) {
       return false;
@@ -74,12 +74,12 @@
       loadPrintUtils().startPrintWindow(tab.browser.browsingContext);
       return true;
     } catch (e) {
-      Vento.trace(`yazdırma başlatılamadı: ${e}`);
+      Vento.trace(`could not start printing: ${e}`);
       return false;
     }
   };
 
-  /** nsIBrowserDOMWindow: içerik yeni pencere/sekme isterse buraya gelir. */
+  /** nsIBrowserDOMWindow: arrives here when content asks for a new window/tab. */
   function makeBrowserAccess() {
     const openTab = (where, openWindowInfo) => {
       if (where === BDW.OPEN_CURRENTWINDOW && !openWindowInfo && Vento.tabs.selected) {
@@ -118,8 +118,8 @@
         return tab.browser.browsingContext;
       },
 
-      // Yazdırma statik kopyası (window.print / sessiz yazdırma) buradan ister ve tarayıcı ÖĞESİNİ bekler.
-      // Başka her şey (sekme içi sekme) desteklenmez.
+      // The print static clone (window.print / silent print) asks from here and waits for the browser ELEMENT.
+      // Everything else (a tab inside a tab) is not supported.
       createContentWindowInFrame(uri, params, where) {
         if (where === BDW.OPEN_PRINT_BROWSER) {
           return printBrowser(params.openWindowInfo);
@@ -144,7 +144,7 @@
     };
   }
 
-  // ---- Başlangıç -----------------------------------------------------------------------
+  // ---- Startup -----------------------------------------------------------------------
 
   window.addEventListener("load", async () => {
     Vento.tabs.init($("browsers"));
@@ -157,11 +157,11 @@
     Vento.welcome.init();
     Vento.dialogs.init();
     Vento.permissions.init();
-    Vento.downloads.init().catch(e => Vento.trace(`indirmeler başlatılamadı: ${e}`));
+    Vento.downloads.init().catch(e => Vento.trace(`could not start downloads: ${e}`));
     bindCommands();
     window.browserDOMWindow = makeBrowserAccess();
 
-    // Komut satırı: -url <adres> (birden fazla verilebilir; her biri ayrı sekme, sonuncusu seçili)
+    // Command line: -url <address> (can be given more than once; each in its own tab, the last one selected)
     const startUrls = [];
     try {
       const cmdLine = window.arguments?.[0];
@@ -175,15 +175,15 @@
         }
       }
     } catch (e) {
-      Vento.trace(`komut satırı okunamadı: ${e}`);
+      Vento.trace(`could not read command line: ${e}`);
     }
-    // Önceki oturumu geri getir (açık sekmeler); -url verildiyse o adresler ayrı sekmelerde açılır.
+    // Restore the previous session (open tabs); if -url was given, those URLs open in separate tabs.
     let restored = false;
     if (Services.prefs.getBoolPref("vento.session.restore", true)) {
       try {
         restored = Vento.session.restore(await Vento.session.read(), startUrls);
       } catch (e) {
-        Vento.trace(`oturum geri yüklenemedi: ${e}`);
+        Vento.trace(`could not restore session: ${e}`);
       }
     }
     if (!restored) {
@@ -194,13 +194,13 @@
     }
     Vento.session.start();
     if (!Services.env.exists("VENTO_SELFTEST")) {
-      // Güncelleme sonrası ilk açılış → sitedeki sürüm notları açılır; ilk kurulumda karşılama akışı gösterilir
+      // First launch after an update -> release notes on the site open; on first install the welcome flow is shown
       Vento.update.afterUpdate();
       if (!Vento.welcome.completed) {
         Vento.welcome.show();
       }
     }
-    Vento.trace(`kabuk hazır (oturum geri yüklendi=${restored})`);
+    Vento.trace(`shell ready (session restored=${restored})`);
 
     if (Services.env.exists("VENTO_SELFTEST")) {
       Services.scriptloader.loadSubScript("chrome://vento/content/vento-selftest.js", window);

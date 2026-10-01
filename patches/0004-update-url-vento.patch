@@ -7,6 +7,6 @@ index 6df13230a4..7d16736d20 100644
  #if MOZ_UPDATER
  [AppUpdate]
 -URL=https://@MOZ_APPUPDATE_HOST@/update/6/%PRODUCT%/%VERSION%/%BUILD_ID%/%BUILD_TARGET%/%LOCALE%/%CHANNEL%/%OS_VERSION%/%SYSTEM_CAPABILITIES%/%DISTRIBUTION%/%DISTRIBUTION_VERSION%/update.xml
-+# Vento: statik dosya sunucusu (Plesk); her kanal/hedef için tek update.xml (bkz. docs/YAYIN.md)
++# Vento: static file server (Plesk); one update.xml per channel/target (see docs/YAYIN.md)
 +URL=https://vento.cansoykanyilmaz.com/updates/browser/%BUILD_TARGET%/%CHANNEL%/update.xml
  #endif

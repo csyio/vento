@@ -1,8 +1,8 @@
-# Vento derleme yapılandırması. Kullanım: export MOZCONFIG=$PWD/mozconfig; cd engine; ./mach build
+# Vento build configuration. Usage: export MOZCONFIG=$PWD/mozconfig; cd engine; ./mach build
 ac_add_options --enable-project=vento
 ac_add_options --with-app-name=vento
 ac_add_options --with-app-basename=Vento
-# Paket kimliği: com.cansoykanyilmaz.vento (yardımcı uygulamalar: com.cansoykanyilmaz.vento-gpu-helper vb.)
+# Bundle ID: com.cansoykanyilmaz.vento (helper apps: com.cansoykanyilmaz.vento-gpu-helper etc.)
 ac_add_options --with-distribution-id=com.cansoykanyilmaz
 mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-vento
 
@@ -11,6 +11,6 @@ ac_add_options --disable-debug
 ac_add_options --enable-optimize
 ac_add_options --disable-tests
 ac_add_options --disable-crashreporter
-# Güncelleyici AÇIK: kanal 'vento' → yalnız bizim MAR imzamızı kabul eder (patches/0003; docs/YAYIN.md)
+# Updater ON: channel 'vento' only accepts our own MAR signature (patches/0003; docs/YAYIN.md)
 ac_add_options --enable-updater
 ac_add_options --enable-update-channel=vento

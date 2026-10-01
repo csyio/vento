@@ -1,20 +1,23 @@
-# Dil (yerelleştirme)
+# Language (localization)
 
-**Durum (2026-09-30):** arayüz Türkçe (`intl.locale.requested = tr`), eksik dize İngilizceye düşer (`en-US` yedek).
+**Status (2026-09-30):** the UI is Turkish (`intl.locale.requested = tr`). Missing strings fall back to English (`en-US`).
 
-## İki katman
-1. **Vento'nun kendi metinleri** (`vento/base/content/*`): kodda doğrudan Türkçe ("sen" dili: "girdiğin bilgiler"). Fluent/properties kullanılmaz.
-2. **Motorun metinleri** (hata sayfaları, kimlik/yazdırma/dosya seçici istemleri, PDF görüntüleyici, `about:` sayfaları): Mozilla'nın Türkçe çevirisi ("siz" dili: "giriş yapmanızı"). Kaynak: `mozilla-l10n/firefox-l10n`, yalnız `tr`.
+## Two layers
 
-## Nasıl çalışır
-- `tools/fetch-l10n.sh` → `l10n-base/firefox-l10n` (git'te YOK, `.gitignore`), **pin'li commit** (`PIN=` betiğin içinde). Sürüm yükseltmek için PIN'i değiştir.
-- `tools/build-locale.sh` → Firefox'un kendi adımları: `merge-tr` (eksik dizeleri en-US'ten tamamlar) + `chrome-tr` (toolkit, dom, netwerk, security, devtools, **marka**) → `Vento.app/Contents/Resources/{localization,chrome}/tr`, `res/multilocale.txt` = `tr,en-US`.
-  Kuralları `vento/locales/Makefile.in` (Firefox'un `browser/locales/Makefile.in`'inin browser'a bağlı kısımları çıkarılmış hâli).
-- `tools/selftest.sh`, `mach build faster`'tan sonra `build-locale.sh`'ı çalıştırır. **`faster` Vento.app'i yeniden kurar; Türkçeyi silebilir → her zaman `build-locale.sh` çalıştırın.**
-- **Sürüm derlemesinde (paketleme/imza adımı yazıldığında) de `tools/build-locale.sh` çalışmalı**; yoksa paket İngilizce çıkar. (Henüz bir release betiği yok.)
+1. **Vento's own strings** (`vento/base/content/*`). Turkish, written directly in the code, in the informal "sen" register ("girdiğin bilgiler"). No Fluent or .properties files.
+2. **The engine's strings** (error pages, login/print/file-picker prompts, the PDF viewer, `about:` pages). These use Mozilla's Turkish translation, in the formal "siz" register ("giriş yapmanızı"). Source: `mozilla-l10n/firefox-l10n`, `tr` only.
 
-## Tuzaklar
-- Marka (`branding/brand.ftl`) ayrıca `make -C <marka dizini>/locales chrome AB_CD=tr` ile eklenmeli. **Bir Fluent kümesinde tek dosya eksikse TÜM küme İngilizceye düşer** (hata sayfaları sessizce İngilizce kalır).
-- Alt make'lere `IS_LANGUAGE_REPACK=1` komut satırından verilmeli, hedef-özel değişken geçmez.
-- `.properties` dizelerinde `&` erişim tuşudur ("&Evet").
-- macOS uygulama menüsü (Vento ▸ Hakkında/Gizle/Çık) sistem nib'inden gelir, sistem diliyle seçilir; Türkçeleştirilmedi (bkz. Obsidian Log).
+## How it works
+
+- `tools/fetch-l10n.sh` fetches into `l10n-base/firefox-l10n` (not in git, listed in `.gitignore`) at a **pinned commit** (`PIN=` inside the script). To move to a new version, change the PIN.
+- `tools/build-locale.sh` runs Firefox's own steps: `merge-tr` (fills missing strings from en-US) and `chrome-tr` (toolkit, dom, netwerk, security, devtools, **branding**). The output goes to `Vento.app/Contents/Resources/{localization,chrome}/tr`, and `res/multilocale.txt` becomes `tr,en-US`.
+  The rules are in `vento/locales/Makefile.in`. It is Firefox's `browser/locales/Makefile.in` with the browser-specific parts removed.
+- `tools/selftest.sh` runs `build-locale.sh` after `mach build faster`. **`faster` reinstalls Vento.app and can wipe the Turkish locale, so always run `build-locale.sh` afterwards.**
+- **A release build (once the packaging/signing step exists) must run `tools/build-locale.sh` too.** Otherwise the package ships in English. There is no release script yet.
+
+## Pitfalls
+
+- Branding (`branding/brand.ftl`) has to be added separately with `make -C <branding dir>/locales chrome AB_CD=tr`. **If one file in a Fluent bundle is missing, the whole bundle falls back to English.** Error pages then stay English with no warning.
+- Pass `IS_LANGUAGE_REPACK=1` on the command line of sub-makes. A target-specific variable does not get through.
+- In `.properties` strings, `&` marks the access key ("&Evet").
+- The macOS application menu (Vento > About/Hide/Quit) comes from the system nib and follows the system language. We did not translate it.

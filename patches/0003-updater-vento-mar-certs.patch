@@ -7,7 +7,7 @@ index 7e362df573..8a105f7122 100644
      primary_cert.inputs += ["nightly_aurora_level3_primary.der"]
      secondary_cert.inputs += ["nightly_aurora_level3_secondary.der"]
 +elif CONFIG["MOZ_UPDATE_CHANNEL"] == "vento":
-+    # Vento: kendi MAR imza sertifikalarımız (anahtarlar ~/.vento-mar-keys, imzalama tools/sign-mar.sh; docs/YAYIN.md)
++    # Vento: our own MAR signing certificates (keys in ~/.vento-mar-keys, signing via tools/sign-mar.sh; docs/YAYIN.md)
 +    primary_cert.inputs += ["vento1.der"]
 +    secondary_cert.inputs += ["vento2.der"]
  else:

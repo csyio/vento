@@ -1,7 +1,7 @@
 "use strict";
 
-// Sayfada ara (⌘F). Motor: toolkit'in Finder'ı (browser.finder → RemoteFinder); arayüz bizim.
-// Arama seçili sekmeye bağlıdır: sekme değişince çubuk kapanır.
+// Find in page (⌘F). Engine: toolkit's Finder (browser.finder -> RemoteFinder); the UI is ours.
+// Find is bound to the selected tab: the bar closes when the tab changes.
 
 Vento.find = (() => {
   const $ = id => document.getElementById(id);
@@ -32,7 +32,7 @@ Vento.find = (() => {
       },
       onHighlightFinished() {},
       onCurrentSelection(selection, isInitial) {
-        // Sayfada seçili metin varsa arama kutusunu onunla doldur (yalnızca kullanıcı henüz yazmadıysa)
+        // If text is selected on the page, fill the find box with it (only if the user hasn't typed yet)
         if (isInitial && selection && !els.input.value) {
           els.input.value = selection;
           els.input.select();
@@ -50,7 +50,7 @@ Vento.find = (() => {
     }
   }
 
-  /** Yazdıkça: ilk eşleşmeye git, hepsini vurgula, sayıyı iste. */
+  /** As you type: jump to the first match, highlight all, request the count. */
   function search() {
     const finder = state.browser?.finder;
     if (!finder) {
@@ -80,7 +80,7 @@ Vento.find = (() => {
   function open() {
     const tab = Vento.tabs.selected;
     if (!tab || tab.blank) {
-      return; // boş sekmede aranacak bir şey yok
+      return; // nothing to search in a blank tab
     }
     if (state.open && state.browser !== tab.browser) {
       close(false);
@@ -140,7 +140,7 @@ Vento.find = (() => {
     $("find-prev").addEventListener("click", () => step(true));
     $("find-next").addEventListener("click", () => step(false));
     $("find-close").addEventListener("click", () => close(true));
-    // Sekme değişince çubuk kapanır (arama sekmeye bağlı)
+    // The bar closes when the tab changes (find is bound to the tab)
     Vento.tabs.addEventListener("tabselect", () => close(false));
     Vento.tabs.addEventListener("tabclose", e => {
       if (state.browser === e.detail.tab.browser) {

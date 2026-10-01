@@ -1,6 +1,6 @@
-// Sekme simgeleri (favicon): ana süreç tarafı. İçerik sürecindeki VentoLinkChild simgeyi bulup yükler
-// (FaviconLoader, Firefox'unkiyle aynı) ve buraya gönderir; biz sekmeye yazarız.
-// Firefox'un browser/actors/LinkHandlerParent.sys.mjs dosyasından uyarlandı: gBrowser yerine Vento.tabs.
+// Tab icons (favicons), parent side. VentoLinkChild in the content process finds and loads the icon
+// (FaviconLoader, same as Firefox's) and sends it here; we set it on the tab.
+// Adapted from Firefox's browser/actors/LinkHandlerParent.sys.mjs: Vento.tabs instead of gBrowser.
 
 import {
   TYPE_ICO,
@@ -75,19 +75,19 @@ function createICO(images) {
 export class VentoLinkParent extends JSWindowActorParent {
   receiveMessage(msg) {
     const browser = this.browsingContext.top.embedderElement;
-    // NOT: browser.ownerGlobal.Vento ÇALIŞMAZ (undefined döner); ownerDocument.defaultView çalışır.
+    // NOTE: browser.ownerGlobal.Vento does NOT work (returns undefined); ownerDocument.defaultView does.
     const vento = browser?.ownerDocument?.defaultView?.Vento;
     if (!vento) {
       return;
     }
-    // "Link:LoadingIcon" (yükleniyor) ve "Link:SetFailedIcon" (yüklenemedi): sekme zaten harf işaretini gösterir.
+    // "Link:LoadingIcon" (loading) and "Link:SetFailedIcon" (failed): the tab already shows its letter placeholder.
     if (msg.name === "Link:SetIcon") {
       this.#setIcon(vento, browser, msg.data).catch(e => console.error("Vento simge:", e));
     }
   }
 
   async #setIcon(vento, browser, { pageURL, originalURL, expiration, iconURL, images, canStoreIcon, isRichIcon }) {
-    // Zengin simgeler (apple-touch vb.) sekmede gösterilmez; yalnız Places'e saklanabilir.
+    // Rich icons (apple-touch etc.) aren't shown on the tab; they can only be stored in Places.
     if (images) {
       const canvas = browser.ownerDocument.createElement("canvas");
       if (images.length > 1) {
@@ -112,10 +112,10 @@ export class VentoLinkParent extends JSWindowActorParent {
       return;
     }
 
-    // İçerik süreci, güvenilir şemalar ve SVG dışındaki her şey için ÇÖZÜLMÜŞ görüntü göndermeli;
-    // aksi hâlde (ele geçirilmiş bir içerik sürecinden gelen ham adres) reddedilir.
+    // The content process must send a DECODED image for everything except trusted schemes and SVG;
+    // otherwise (a raw address from a compromised content process) it is rejected.
     if (!images && !TRUSTED_FAVICON_SCHEMES.includes(iconURI.scheme) && !iconURL.startsWith(SVG_DATA_URI_PREFIX)) {
-      console.error(`Bu şemayla simge ayarlanamaz: "${iconURL}"`);
+      console.error(`Can't set an icon with this scheme: "${iconURL}"`);
       return;
     }
     if (!iconURI.schemeIs("data")) {

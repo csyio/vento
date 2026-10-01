@@ -1,10 +1,10 @@
-// "Prompt" aktörü (Firefox'ta browser/actors/PromptParent). İçerik sayfasındaki alert/confirm/prompt ve
-// kimlik doğrulama istemleri toolkit'in Prompter'ı tarafından buraya gelir ("Prompt:Open"). Bu aktör
-// olmadığında Prompter sessizce "iptal" döndürür (confirm → false). Diyaloğu ana pencerenin
-// Vento.dialogs modülü çizer.
+// "Prompt" actor (browser/actors/PromptParent in Firefox). alert/confirm/prompt and authentication
+// prompts from content pages reach it through the toolkit's Prompter ("Prompt:Open"). Without this actor
+// the Prompter silently returns "cancel" (confirm → false). The main window's Vento.dialogs module
+// draws the dialog.
 //
-// NOT: dışa aktarılan sınıf adı aktör adına göre olmak ZORUNDA (Prompt → PromptParent), dosya adına göre değil.
-// Çocuk (child) tarafı yok: Prompter doğrudan sendQuery ile yollar.
+// NOTE: the exported class name MUST follow the actor name (Prompt → PromptParent), not the file name.
+// There is no child side: the Prompter sends directly with sendQuery.
 
 export class PromptParent extends JSWindowActorParent {
   #vento() {
@@ -12,7 +12,7 @@ export class PromptParent extends JSWindowActorParent {
   }
 
   didDestroy() {
-    // Sayfa gezindi / sekme çöktü: açık istemleri iptal et
+    // Page navigated / tab crashed: cancel open prompts
     this.#vento()?.dialogs?.abortActor(this);
   }
 
